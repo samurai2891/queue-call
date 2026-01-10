@@ -1,17 +1,10 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
  */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -25,4 +18,269 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+/**
+ * Store - 店舗情報
+ */
+export const stores = mysqlTable("stores", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 64 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  ownerId: int("ownerId").notNull(),
+  
+  // PIN認証
+  staffPinHash: varchar("staffPinHash", { length: 255 }),
+  managerPinHash: varchar("managerPinHash", { length: 255 }),
+  
+  // 受付状態
+  intakeStatus: mysqlEnum("intakeStatus", ["open", "paused"]).default("open").notNull(),
+  
+  // 言語設定
+  defaultLocale: varchar("defaultLocale", { length: 10 }).default("ja").notNull(),
+  supportedLocales: json("supportedLocales").$type<string[]>(),
+  
+  // 日次リセット時刻 (HH:mm形式)
+  resetTime: varchar("resetTime", { length: 5 }).default("04:00").notNull(),
+  
+  // 現在の番号カウンター
+  currentNumber: int("currentNumber").default(0).notNull(),
+  dayKey: varchar("dayKey", { length: 10 }), // YYYY-MM-DD形式
+  
+  // キオスク・ボード用キー
+  kioskKey: varchar("kioskKey", { length: 64 }),
+  boardKey: varchar("boardKey", { length: 64 }),
+  
+  // 設定JSON
+  settings: json("settings").$type<StoreSettings>(),
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Store = typeof stores.$inferSelect;
+export type InsertStore = typeof stores.$inferInsert;
+
+export interface StoreSettings {
+  queue?: {
+    checkinGraceMinutes?: number;
+    autoSkip?: boolean;
+    enableReorder?: boolean;
+    reorderMaxMove?: number;
+    reorderReasonRequired?: boolean;
+    auditLog?: boolean;
+  };
+  notifications?: {
+    pushEnabled?: boolean;
+    smsEnabled?: boolean;
+    recallLimitSeconds?: number;
+    recallMaxCount?: number;
+    smsTemplateCalled?: string;
+    smsTemplateRecall?: string;
+  };
+  menu?: {
+    switchStyle?: "icons" | "tabs";
+    defaultView?: "feed" | "list";
+    photoDefaultSize?: "large" | "small";
+    allowCustomerPhotoSizeToggle?: boolean;
+  };
+  kiosk?: {
+    autoResetSeconds?: number;
+    maxPartySize?: number;
+  };
+  board?: {
+    nextCount?: number;
+  };
+}
+
+/**
+ * Ticket - 順番待ちチケット
+ */
+export const tickets = mysqlTable("tickets", {
+  id: int("id").autoincrement().primaryKey(),
+  storeId: int("storeId").notNull(),
+  ticketToken: varchar("ticketToken", { length: 64 }).notNull().unique(),
+  
+  dayKey: varchar("dayKey", { length: 10 }).notNull(), // YYYY-MM-DD
+  number: int("number").notNull(),
+  
+  partySize: int("partySize").notNull(),
+  note: text("note"),
+  locale: varchar("locale", { length: 10 }).default("ja"),
+  source: mysqlEnum("source", ["web", "qr", "kiosk"]).default("web").notNull(),
+  
+  status: mysqlEnum("status", ["WAITING", "CALLED", "ARRIVED", "SKIPPED", "DONE", "CANCELED", "EXPIRED"]).default("WAITING").notNull(),
+  
+  // 順番調整用ランク (lexorank形式)
+  queueRank: varchar("queueRank", { length: 64 }),
+  
+  calledAt: timestamp("calledAt"),
+  arrivedAt: timestamp("arrivedAt"),
+  doneAt: timestamp("doneAt"),
+  canceledAt: timestamp("canceledAt"),
+  checkinDeadlineAt: timestamp("checkinDeadlineAt"),
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Ticket = typeof tickets.$inferSelect;
+export type InsertTicket = typeof tickets.$inferInsert;
+
+/**
+ * PushSubscription - Web Push購読
+ */
+export const pushSubscriptions = mysqlTable("push_subscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  ticketId: int("ticketId").notNull(),
+  endpoint: text("endpoint").notNull(),
+  p256dh: varchar("p256dh", { length: 255 }).notNull(),
+  auth: varchar("auth", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
+
+/**
+ * SmsSubscription - SMS通知購読 (Twilio)
+ */
+export const smsSubscriptions = mysqlTable("sms_subscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  ticketId: int("ticketId").notNull(),
+  phoneE164: varchar("phoneE164", { length: 20 }).notNull(),
+  verifiedAt: timestamp("verifiedAt"),
+  optedOutAt: timestamp("optedOutAt"),
+  lastSentAt: timestamp("lastSentAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SmsSubscription = typeof smsSubscriptions.$inferSelect;
+export type InsertSmsSubscription = typeof smsSubscriptions.$inferInsert;
+
+/**
+ * MenuCategory - メニューカテゴリ
+ */
+export const menuCategories = mysqlTable("menu_categories", {
+  id: int("id").autoincrement().primaryKey(),
+  storeId: int("storeId").notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  
+  // 多言語名称
+  nameJa: varchar("nameJa", { length: 255 }).notNull(),
+  nameEn: varchar("nameEn", { length: 255 }),
+  nameKo: varchar("nameKo", { length: 255 }),
+  nameZhHans: varchar("nameZhHans", { length: 255 }),
+  nameZhHant: varchar("nameZhHant", { length: 255 }),
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type MenuCategory = typeof menuCategories.$inferSelect;
+export type InsertMenuCategory = typeof menuCategories.$inferInsert;
+
+/**
+ * MenuItem - メニュー商品
+ */
+export const menuItems = mysqlTable("menu_items", {
+  id: int("id").autoincrement().primaryKey(),
+  storeId: int("storeId").notNull(),
+  categoryId: int("categoryId"),
+  price: int("price").default(0).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  
+  // 多言語名称・説明
+  nameJa: varchar("nameJa", { length: 255 }).notNull(),
+  nameEn: varchar("nameEn", { length: 255 }),
+  nameKo: varchar("nameKo", { length: 255 }),
+  nameZhHans: varchar("nameZhHans", { length: 255 }),
+  nameZhHant: varchar("nameZhHant", { length: 255 }),
+  
+  descJa: text("descJa"),
+  descEn: text("descEn"),
+  descKo: text("descKo"),
+  descZhHans: text("descZhHans"),
+  descZhHant: text("descZhHant"),
+  
+  // 画像URL (大小バリアント)
+  photoLargeUrl: text("photoLargeUrl"),
+  photoSmallUrl: text("photoSmallUrl"),
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type MenuItem = typeof menuItems.$inferSelect;
+export type InsertMenuItem = typeof menuItems.$inferInsert;
+
+/**
+ * FeedPost - フィード投稿
+ */
+export const feedPosts = mysqlTable("feed_posts", {
+  id: int("id").autoincrement().primaryKey(),
+  storeId: int("storeId").notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  
+  // 画像URL (大小バリアント)
+  photoLargeUrl: text("photoLargeUrl").notNull(),
+  photoSmallUrl: text("photoSmallUrl"),
+  
+  // 多言語タイトル・キャプション
+  titleJa: varchar("titleJa", { length: 255 }),
+  titleEn: varchar("titleEn", { length: 255 }),
+  titleKo: varchar("titleKo", { length: 255 }),
+  titleZhHans: varchar("titleZhHans", { length: 255 }),
+  titleZhHant: varchar("titleZhHant", { length: 255 }),
+  
+  captionJa: text("captionJa"),
+  captionEn: text("captionEn"),
+  captionKo: text("captionKo"),
+  captionZhHans: text("captionZhHans"),
+  captionZhHant: text("captionZhHant"),
+  
+  // 価格表示（任意）
+  price: int("price"),
+  
+  // 商品へのリンク（任意）
+  linkedMenuItemId: int("linkedMenuItemId"),
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FeedPost = typeof feedPosts.$inferSelect;
+export type InsertFeedPost = typeof feedPosts.$inferInsert;
+
+/**
+ * QueueAuditLog - 順番調整ログ
+ */
+export const queueAuditLogs = mysqlTable("queue_audit_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  storeId: int("storeId").notNull(),
+  ticketId: int("ticketId").notNull(),
+  action: mysqlEnum("action", ["MOVE_UP", "MOVE_DOWN", "CALL_SPECIFIC", "SKIP", "RECALL"]).notNull(),
+  reason: text("reason"),
+  performedBy: varchar("performedBy", { length: 64 }), // staff/manager
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type QueueAuditLog = typeof queueAuditLogs.$inferSelect;
+export type InsertQueueAuditLog = typeof queueAuditLogs.$inferInsert;
+
+/**
+ * StaffSession - スタッフセッション
+ */
+export const staffSessions = mysqlTable("staff_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  storeId: int("storeId").notNull(),
+  sessionToken: varchar("sessionToken", { length: 64 }).notNull().unique(),
+  role: mysqlEnum("role", ["staff", "manager"]).notNull(),
+  reorderModeEnabled: boolean("reorderModeEnabled").default(false).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type StaffSession = typeof staffSessions.$inferSelect;
+export type InsertStaffSession = typeof staffSessions.$inferInsert;
