@@ -400,8 +400,11 @@ export default function Settings() {
                       type="number"
                       min={1}
                       max={30}
-                      value={formData.checkinGraceMinutes}
-                      onChange={(e) => updateField('checkinGraceMinutes', parseInt(e.target.value))}
+                      value={Number.isNaN(formData.checkinGraceMinutes) ? '' : formData.checkinGraceMinutes}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        updateField('checkinGraceMinutes', Number.isNaN(val) ? 5 : val);
+                      }}
                     />
                   </div>
                 </div>
@@ -427,8 +430,11 @@ export default function Settings() {
                         type="number"
                         min={1}
                         max={60}
-                        value={formData.autoSkipMinutes}
-                        onChange={(e) => updateField('autoSkipMinutes', parseInt(e.target.value))}
+                        value={Number.isNaN(formData.autoSkipMinutes) ? '' : formData.autoSkipMinutes}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          updateField('autoSkipMinutes', Number.isNaN(val) ? 5 : val);
+                        }}
                         className="w-32"
                       />
                       <p className="text-xs text-muted-foreground">呼び出し後、この時間内に到着しない場合は自動的にスキップされます</p>
@@ -458,8 +464,11 @@ export default function Settings() {
                           type="number"
                           min={1}
                           max={10}
-                          value={formData.reorderMaxMove}
-                          onChange={(e) => updateField('reorderMaxMove', parseInt(e.target.value))}
+                          value={Number.isNaN(formData.reorderMaxMove) ? '' : formData.reorderMaxMove}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            updateField('reorderMaxMove', Number.isNaN(val) ? 3 : val);
+                          }}
                         />
                       </div>
                       <div className="flex items-center gap-2">
@@ -543,8 +552,11 @@ export default function Settings() {
                       type="number"
                       min={30}
                       max={300}
-                      value={formData.recallLimitSeconds}
-                      onChange={(e) => updateField('recallLimitSeconds', parseInt(e.target.value))}
+                      value={Number.isNaN(formData.recallLimitSeconds) ? '' : formData.recallLimitSeconds}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        updateField('recallLimitSeconds', Number.isNaN(val) ? 60 : val);
+                      }}
                     />
                   </div>
                   <div className="space-y-2">
@@ -554,8 +566,11 @@ export default function Settings() {
                       type="number"
                       min={1}
                       max={10}
-                      value={formData.recallMaxCount}
-                      onChange={(e) => updateField('recallMaxCount', parseInt(e.target.value))}
+                      value={Number.isNaN(formData.recallMaxCount) ? '' : formData.recallMaxCount}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        updateField('recallMaxCount', Number.isNaN(val) ? 3 : val);
+                      }}
                     />
                   </div>
                 </div>
@@ -651,8 +666,11 @@ export default function Settings() {
                       type="number"
                       min={5}
                       max={60}
-                      value={formData.kioskAutoResetSeconds}
-                      onChange={(e) => updateField('kioskAutoResetSeconds', parseInt(e.target.value))}
+                      value={Number.isNaN(formData.kioskAutoResetSeconds) ? '' : formData.kioskAutoResetSeconds}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        updateField('kioskAutoResetSeconds', Number.isNaN(val) ? 15 : val);
+                      }}
                     />
                     <p className="text-xs text-muted-foreground">発券後、次の顧客用に画面をリセットするまでの時間</p>
                   </div>
@@ -663,8 +681,11 @@ export default function Settings() {
                       type="number"
                       min={1}
                       max={50}
-                      value={formData.kioskMaxPartySize}
-                      onChange={(e) => updateField('kioskMaxPartySize', parseInt(e.target.value))}
+                      value={Number.isNaN(formData.kioskMaxPartySize) ? '' : formData.kioskMaxPartySize}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        updateField('kioskMaxPartySize', Number.isNaN(val) ? 10 : val);
+                      }}
                     />
                     <p className="text-xs text-muted-foreground">キオスクで選択可能な最大人数</p>
                   </div>
@@ -688,8 +709,11 @@ export default function Settings() {
                     type="number"
                     min={1}
                     max={10}
-                    value={formData.boardNextCount}
-                    onChange={(e) => updateField('boardNextCount', parseInt(e.target.value))}
+                    value={Number.isNaN(formData.boardNextCount) ? '' : formData.boardNextCount}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      updateField('boardNextCount', Number.isNaN(val) ? 3 : val);
+                    }}
                     className="w-32"
                   />
                   <p className="text-xs text-muted-foreground">現在の番号の後に表示する次の番号の件数</p>
