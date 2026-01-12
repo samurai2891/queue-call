@@ -290,3 +290,23 @@
 - [x] 設定ページ `/admin/settings`
 - [x] 言語切替機能
 - [x] 主要機能のVitestテスト（16件パス）
+
+
+---
+
+## 新規追加タスク: T1-2 自動スキップ機能
+
+### 実装内容
+- [x] バックグラウンドジョブの作成（server/jobs/autoSkip.ts）
+- [x] CALLED状態のチケットで猶予時間（checkinGraceMinutes）を超過したものを自動SKIPPED化
+- [x] setIntervalで定期実行（60秒ごと）
+- [x] server/_core/index.tsでジョブを起動
+- [x] 監査ログへの記録（reason: "auto_skipped_no_checkin"）
+- [x] SSEで状態変更を通知
+
+### テスト
+- [x] autoSkip.test.tsでユニットテスト作成
+- [x] CALLED状態のチケットが猶予時間経過後にSKIPPEDになることを確認
+- [x] autoSkipEnabled=falseの場合はスキップされないことを確認
+
+**確認ポイント:** 呼び出し後5分経過したチケットが自動的にSKIPPEDになり、次の顧客が呼ばれる
