@@ -104,8 +104,8 @@ export default function Settings() {
         
         dailyResetTime: (settings.queue as any)?.dailyResetTime || '04:00',
         checkinGraceMinutes: settings.queue?.checkinGraceMinutes || 5,
-        autoSkipEnabled: settings.queue?.autoSkip || false,
-        autoSkipMinutes: (settings.queue as any)?.autoSkipMinutes || 10,
+        autoSkipEnabled: settings.queue?.autoSkip ?? true,
+        autoSkipMinutes: settings.queue?.checkinGraceMinutes || 5,
         enableReorder: settings.queue?.enableReorder || false,
         reorderMaxMove: settings.queue?.reorderMaxMove || 3,
         reorderReasonRequired: settings.queue?.reorderReasonRequired || true,
@@ -158,14 +158,21 @@ export default function Settings() {
   });
 
   const handleSave = () => {
+    // バリデーション
+    if (formData.autoSkipEnabled) {
+      if (formData.autoSkipMinutes < 1 || formData.autoSkipMinutes > 60) {
+        toast.error('猶予時間は1～60分の範囲で設定してください');
+        return;
+      }
+    }
+    
     setIsSaving(true);
     
     const settings = {
       queue: {
         dailyResetTime: formData.dailyResetTime,
-        checkinGraceMinutes: formData.checkinGraceMinutes,
-        autoSkipEnabled: formData.autoSkipEnabled,
-        autoSkipMinutes: formData.autoSkipMinutes,
+        checkinGraceMinutes: formData.autoSkipMinutes, // 猶予時間を保存
+        autoSkip: formData.autoSkipEnabled,
         enableReorder: formData.enableReorder,
         reorderMaxMove: formData.reorderMaxMove,
         reorderReasonRequired: formData.reorderReasonRequired,
@@ -405,7 +412,7 @@ export default function Settings() {
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>自動スキップ</Label>
-                      <p className="text-sm text-muted-foreground">呼び出し後、一定時間応答がない場合に自動でスキップ</p>
+                      <p className="text-sm text-muted-foreground">呼び出し後、猶予時間内に到着しない場合に自動でスキップ</p>
                     </div>
                     <Switch
                       checked={formData.autoSkipEnabled}
@@ -414,7 +421,7 @@ export default function Settings() {
                   </div>
                   {formData.autoSkipEnabled && (
                     <div className="space-y-2 ml-4">
-                      <Label htmlFor="autoSkipMinutes">自動スキップまでの時間（分）</Label>
+                      <Label htmlFor="autoSkipMinutes">猶予時間（分）</Label>
                       <Input
                         id="autoSkipMinutes"
                         type="number"
@@ -424,6 +431,7 @@ export default function Settings() {
                         onChange={(e) => updateField('autoSkipMinutes', parseInt(e.target.value))}
                         className="w-32"
                       />
+                      <p className="text-xs text-muted-foreground">呼び出し後、この時間内に到着しない場合は自動的にスキップされます</p>
                     </div>
                   )}
                 </div>
