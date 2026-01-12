@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "agentsDir": "opencode/agents",
+  "skillsDir": "opencode/skills",
+  "routing": [
+    {
+      "agent": "frontend",
+      "include": ["client/**", "shared/i18n/**", "components.json"],
+      "notes": "UI, routing, and localized copy."
+    },
+    {
+      "agent": "backend",
+      "include": ["server/**", "drizzle/**", "storage/**"],
+      "notes": "API, SSE, notifications, and data access."
+    },
+    {
+      "agent": "platform",
+      "include": ["scripts/**", "vite.config.ts", "drizzle.config.ts", "tsconfig.json"],
+      "notes": "Build, tooling, and operational workflows."
+    }
+  ]
+}
