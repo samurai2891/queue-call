@@ -10,17 +10,17 @@
 ## M0: ローカル実行と環境変数の固定（最優先）
 
 ### T0-1. .env.example と起動手順の整備
-- [ ] server用の必須envを列挙（DB、VAPID、Twilio、Storage、BaseURL等）
-- [ ] client用の必須envを列挙（API Base、Public VAPID Key等）
-- [ ] README.md に起動手順を記載
-- [ ] 「どのenvが無いと何が壊れるか」を明記
+- [x] server用の必須envを列挙（DB、VAPID、Twilio、Storage、BaseURL等）
+- [x] client用の必須envを列挙（API Base、Public VAPID Key等）
+- [x] README.md に起動手順を記載
+- [x] 「どのenvが無いと何が壊れるか」を明記
 
 **確認ポイント:** 新しいPCで .env を埋めて起動できる
 
 ### T0-2. DBマイグレーション/シード
 - [x] drizzle の migration 実行手順を固定
-- [ ] seed スクリプトを用意（storeSlug=demo、staffPIN、kioskKey、boardKey）
-- [ ] 開発時に http://localhost:3000/s/demo がすぐ触れる状態
+- [x] seed スクリプトを用意（storeSlug=demo、staffPIN、kioskKey、boardKey）
+- [x] 開発時に http://localhost:3000/s/demo がすぐ触れる状態
 
 **確認ポイント:** pnpm db:push / pnpm db:seed が動き、seed店舗で受付→呼び出しが一通りできる
 
