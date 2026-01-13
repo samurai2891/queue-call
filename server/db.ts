@@ -304,7 +304,7 @@ export async function getWaitingTickets(storeId: number): Promise<Ticket[]> {
     .where(and(
       eq(tickets.storeId, storeId),
       eq(tickets.dayKey, dayKey),
-      inArray(tickets.status, ['WAITING', 'CALLED'])
+      inArray(tickets.status, ['WAITING', 'CALLED', 'ARRIVED'])
     ))
     .orderBy(asc(tickets.queueRank));
 }

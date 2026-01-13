@@ -77,9 +77,11 @@ function TicketContent() {
       if (data.groupsAhead !== undefined) {
         setGroupsAhead(data.groupsAhead);
       }
+      refetch();
     },
     onCalled: () => {
       setStatus('CALLED');
+      refetch();
       // Play notification sound if available
       if ('vibrate' in navigator) {
         navigator.vibrate([200, 100, 200, 100, 200]);

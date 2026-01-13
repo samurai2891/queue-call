@@ -26,6 +26,8 @@ describe("autoSkip job", () => {
 
     // Mock getDb to return our mock database
     vi.mocked(db.getDb).mockResolvedValue(mockDb as any);
+    vi.mocked(db.getWaitingCount).mockResolvedValue(0);
+    vi.mocked(db.getCalledTicket).mockResolvedValue(null);
 
     // Mock store data
     const mockStore = {
@@ -93,16 +95,18 @@ describe("autoSkip job", () => {
     );
 
     // Verify SSE broadcast
-    expect(vi.mocked(sse.broadcastToStore)).toHaveBeenCalledWith(
+    expect(vi.mocked(sse.broadcastTicketUpdate)).toHaveBeenCalledWith(
       1,
-      "staff",
-      "ticket-update",
+      "test-token",
       expect.objectContaining({
-        ticketToken: "test-token",
         status: "SKIPPED",
         number: 42,
       })
     );
+    expect(vi.mocked(sse.broadcastQueueUpdate)).toHaveBeenCalledWith(1, {
+      currentNumber: 0,
+      waitingCount: 0,
+    });
   });
 
   it("should not skip tickets when autoSkip is disabled", async () => {

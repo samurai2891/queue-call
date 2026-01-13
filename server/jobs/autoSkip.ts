@@ -1,7 +1,7 @@
-import { eq, and, lt } from "drizzle-orm";
-import { getDb } from "../db";
+import { eq, and, lt, or, isNull } from "drizzle-orm";
+import { getDb, getCalledTicket, getWaitingCount } from "../db";
 import { stores, tickets, queueAuditLogs } from "../../drizzle/schema";
-import { broadcastToStore } from "../sse";
+import { broadcastQueueUpdate, broadcastTicketUpdate } from "../sse";
 
 /**
  * 自動スキップジョブ
@@ -31,10 +31,11 @@ export async function runAutoSkipJob() {
         continue; // この店舗は自動スキップ無効
       }
 
+      const now = new Date();
       // 猶予時間を計算（現在時刻 - 猶予時間）
-      const graceDeadline = new Date(Date.now() - checkinGraceMinutes * 60 * 1000);
+      const graceDeadline = new Date(now.getTime() - checkinGraceMinutes * 60 * 1000);
 
-      // CALLED状態で猶予時間を超過したチケットを取得
+      // CALLED状態で期限超過したチケットを取得
       const expiredTickets = await db
         .select()
         .from(tickets)
@@ -42,7 +43,10 @@ export async function runAutoSkipJob() {
           and(
             eq(tickets.storeId, store.id),
             eq(tickets.status, "CALLED"),
-            lt(tickets.calledAt, graceDeadline)
+            or(
+              lt(tickets.checkinDeadlineAt, now),
+              and(isNull(tickets.checkinDeadlineAt), lt(tickets.calledAt, graceDeadline))
+            )
           )
         );
 
@@ -81,16 +85,19 @@ export async function runAutoSkipJob() {
         );
 
         // SSEで通知
-        broadcastToStore(store.id, "staff", "ticket-update", {
-          ticketToken: ticket.ticketToken,
+        broadcastTicketUpdate(store.id, ticket.ticketToken, {
           status: "SKIPPED",
           number: ticket.number,
         });
-        broadcastToStore(store.id, "board", "queue-update", {
-          currentNumber: store.currentNumber,
-          waitingCount: 0, // Will be recalculated by the client
-        });
       }
+
+      const waitingCount = await getWaitingCount(store.id);
+      const calledTicket = await getCalledTicket(store.id);
+
+      broadcastQueueUpdate(store.id, {
+        currentNumber: calledTicket?.number || 0,
+        waitingCount,
+      });
     }
   } catch (error) {
     console.error("[AutoSkip] Job failed:", error);

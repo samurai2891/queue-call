@@ -8,6 +8,27 @@ import * as db from "./db";
 import { broadcastQueueUpdate, broadcastTicketUpdate, broadcastIntakeStatus } from "./sse";
 import * as bcrypt from "bcryptjs";
 
+type TicketStatus = 'WAITING' | 'CALLED' | 'ARRIVED' | 'SKIPPED' | 'DONE' | 'CANCELED' | 'EXPIRED';
+
+const ticketStatusTransitions: Record<TicketStatus, TicketStatus[]> = {
+  WAITING: ['CALLED', 'CANCELED', 'EXPIRED'],
+  CALLED: ['ARRIVED', 'SKIPPED', 'CANCELED', 'CALLED'],
+  ARRIVED: ['DONE'],
+  SKIPPED: [],
+  DONE: [],
+  CANCELED: [],
+  EXPIRED: [],
+};
+
+function assertTicketTransition(currentStatus: TicketStatus, nextStatus: TicketStatus) {
+  if (!ticketStatusTransitions[currentStatus]?.includes(nextStatus)) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: `Cannot change ticket status from ${currentStatus} to ${nextStatus}`,
+    });
+  }
+}
+
 // ==================== Store Router ====================
 const storeRouter = router({
   // Get store by slug (public)
@@ -434,6 +455,8 @@ const staffRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
       }
 
+      assertTicketTransition(ticket.status as TicketStatus, 'CALLED');
+
       const store = await db.getStoreById(session.storeId);
       const graceMinutes = store?.settings?.queue?.checkinGraceMinutes || 5;
       const checkinDeadlineAt = new Date(Date.now() + graceMinutes * 60 * 1000);
@@ -459,6 +482,11 @@ const staffRouter = router({
         calledTicket: { number: ticket.number, ticketToken: ticket.ticketToken },
       });
 
+      broadcastTicketUpdate(session.storeId, ticket.ticketToken, {
+        status: 'CALLED',
+        number: ticket.number,
+      });
+
       return ticket;
     }),
 
@@ -480,6 +508,8 @@ const staffRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
       }
 
+      assertTicketTransition(ticket.status as TicketStatus, 'SKIPPED');
+
       await db.updateTicketStatus(ticket.id, 'SKIPPED');
 
       // Log
@@ -497,6 +527,12 @@ const staffRouter = router({
       // Broadcast
       const waitingCount = await db.getWaitingCount(session.storeId);
       const calledTicket = await db.getCalledTicket(session.storeId);
+
+      broadcastTicketUpdate(session.storeId, ticket.ticketToken, {
+        status: 'SKIPPED',
+        number: ticket.number,
+      });
+
       broadcastQueueUpdate(session.storeId, {
         currentNumber: calledTicket?.number || 0,
         waitingCount,
@@ -522,11 +558,19 @@ const staffRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
       }
 
+      assertTicketTransition(ticket.status as TicketStatus, 'DONE');
+
       await db.updateTicketStatus(ticket.id, 'DONE');
 
       // Broadcast
       const waitingCount = await db.getWaitingCount(session.storeId);
       const calledTicket = await db.getCalledTicket(session.storeId);
+
+      broadcastTicketUpdate(session.storeId, ticket.ticketToken, {
+        status: 'DONE',
+        number: ticket.number,
+      });
+
       broadcastQueueUpdate(session.storeId, {
         currentNumber: calledTicket?.number || 0,
         waitingCount,

@@ -31,14 +31,14 @@
 ### T1-1. チケット状態の確定と統一
 - [x] サーバ側：Ticket.status の enum（WAITING/CALLED/ARRIVED/SKIPPED/DONE/CANCELED/EXPIRED）
 - [x] 状態遷移ガード（不正遷移を弾く）
-- [~] クライアント側：表示文言・UI分岐を状態で統一
+- [x] クライアント側：表示文言・UI分岐を状態で統一
 
 **確認ポイント:** どの画面・APIでも同じ状態名、DONEのチケットをCALLできない（409）
 
 ### T1-2. 呼び出し猶予→自動SKIPPED（ノーショー対策）
-- [~] Store設定：checkinDeadlineMinutes（例：5）
-- [ ] CALL時に checkinDeadlineAt を保存
-- [ ] バックグラウンド処理で期限切れを SKIPPED へ（Cron/interval/起動時タイマー）
+- [x] Store設定：checkinGraceMinutes（例：5）
+- [x] CALL時に checkinDeadlineAt を保存
+- [x] バックグラウンド処理で期限切れを SKIPPED へ（Cron/interval/起動時タイマー）
 
 **確認ポイント:** CALLEDから一定時間で自動SKIPPEDになり、SSE/画面更新/スタッフ画面が即反映
 

@@ -440,21 +440,13 @@ function StaffContent() {
                       </div>
                       <div className="flex gap-2">
                         {ticket.status === 'CALLED' && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleSkip(ticket.id)}
-                            >
-                              <SkipForward className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleDone(ticket.id)}
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                          </>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSkip(ticket.id)}
+                          >
+                            <SkipForward className="h-4 w-4" />
+                          </Button>
                         )}
                         {ticket.status === 'ARRIVED' && (
                           <Button
@@ -463,15 +455,6 @@ function StaffContent() {
                           >
                             <CheckCircle className="mr-1 h-4 w-4" />
                             {t('staff.done')}
-                          </Button>
-                        )}
-                        {ticket.status === 'WAITING' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSkip(ticket.id)}
-                          >
-                            <SkipForward className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
