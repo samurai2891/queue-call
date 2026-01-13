@@ -14,11 +14,16 @@ vi.mock('./db', () => ({
   getTicketByToken: vi.fn(),
   getTicketsByStore: vi.fn(),
   updateTicketStatus: vi.fn(),
+  updateTicketQueueRank: vi.fn(),
   getCalledTicket: vi.fn(),
   getWaitingCount: vi.fn(),
   getNextNumber: vi.fn(),
   regenerateStoreKey: vi.fn(),
   getGroupsAhead: vi.fn(),
+  getStaffSession: vi.fn(),
+  getWaitingTickets: vi.fn(),
+  getTicketById: vi.fn(),
+  createAuditLog: vi.fn(),
 }));
 
 // Mock SSE functions
@@ -360,5 +365,95 @@ describe("Auth Router", () => {
 
     expect(result.success).toBe(true);
     expect(ctx.res.clearCookie).toHaveBeenCalled();
+  });
+});
+
+describe("Staff Router", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("moves a waiting ticket and logs audit", async () => {
+    const {
+      getStaffSession,
+      getStoreById,
+      getTicketById,
+      getWaitingTickets,
+      updateTicketQueueRank,
+      getWaitingCount,
+      getCalledTicket,
+      createAuditLog,
+    } = await import('./db');
+    const { broadcastQueueUpdate } = await import('./sse');
+
+    (getStaffSession as any).mockResolvedValue({ id: 99, storeId: 1, role: 'staff' });
+    (getStoreById as any).mockResolvedValue({
+      id: 1,
+      settings: {
+        queue: {
+          enableReorder: true,
+          reorderMaxMove: 2,
+          reorderReasonRequired: false,
+          auditLog: true,
+        },
+      },
+    });
+    (getTicketById as any).mockResolvedValue({ id: 10, storeId: 1, status: 'WAITING' });
+    (getWaitingTickets as any).mockResolvedValue([
+      { id: 10, storeId: 1, status: 'WAITING', queueRank: '000001' },
+      { id: 11, storeId: 1, status: 'WAITING', queueRank: '000002' },
+    ]);
+    (updateTicketQueueRank as any).mockResolvedValue(undefined);
+    (getWaitingCount as any).mockResolvedValue(2);
+    (getCalledTicket as any).mockResolvedValue(null);
+    (createAuditLog as any).mockResolvedValue(undefined);
+
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.staff.moveTicket({
+      sessionToken: 'session-token',
+      ticketId: 10,
+      delta: 1,
+    });
+
+    expect(result.success).toBe(true);
+    expect(updateTicketQueueRank).toHaveBeenCalledWith(10, '000002');
+    expect(updateTicketQueueRank).toHaveBeenCalledWith(11, '000001');
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storeId: 1,
+        ticketId: 10,
+        staffSessionId: 99,
+        fromPos: 1,
+        toPos: 2,
+        action: 'MOVE_DOWN',
+      })
+    );
+    expect(broadcastQueueUpdate).toHaveBeenCalledWith(1, {
+      currentNumber: 0,
+      waitingCount: 2,
+    });
+  });
+
+  it("rejects move when reorder is disabled", async () => {
+    const { getStaffSession, getStoreById } = await import('./db');
+
+    (getStaffSession as any).mockResolvedValue({ id: 99, storeId: 1, role: 'staff' });
+    (getStoreById as any).mockResolvedValue({
+      id: 1,
+      settings: {
+        queue: {
+          enableReorder: false,
+        },
+      },
+    });
+
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.staff.moveTicket({ sessionToken: 'session-token', ticketId: 10, delta: 1 })
+    ).rejects.toThrow('Reorder is disabled');
   });
 });

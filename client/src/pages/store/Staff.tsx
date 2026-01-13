@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +35,9 @@ import {
   Play,
   Loader2,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSSE } from '@/hooks/useSSE';
@@ -73,11 +77,19 @@ function StaffContent() {
   const [skipDialogOpen, setSkipDialogOpen] = useState(false);
   const [skipReason, setSkipReason] = useState('');
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+  const [reorderModeEnabled, setReorderModeEnabled] = useState(false);
+  const [reorderDialogOpen, setReorderDialogOpen] = useState(false);
+  const [reorderReason, setReorderReason] = useState('');
+  const [reorderTarget, setReorderTarget] = useState<{ ticketId: number; delta: number } | null>(null);
 
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
     { slug: params.storeSlug || '' },
     { enabled: !!params.storeSlug }
   );
+
+  const reorderEnabled = store?.settings?.queue?.enableReorder ?? false;
+  const reorderMaxMove = store?.settings?.queue?.reorderMaxMove ?? 3;
+  const reorderReasonRequired = store?.settings?.queue?.reorderReasonRequired ?? false;
 
   // Verify session
   const { data: session, isLoading: sessionLoading } = trpc.staff.getSession.useQuery(
@@ -102,6 +114,12 @@ function StaffContent() {
       setIntakeStatus(store.intakeStatus as 'open' | 'paused');
     }
   }, [store]);
+
+  useEffect(() => {
+    if (!reorderEnabled) {
+      setReorderModeEnabled(false);
+    }
+  }, [reorderEnabled]);
 
   // SSE for real-time updates
   useSSE({
@@ -160,7 +178,7 @@ function StaffContent() {
   });
 
   const skipMutation = trpc.staff.skip.useMutation({
-
+ 
     onSuccess: () => {
       toast.success(t('staff.skip'));
       refetchWaitingList();
@@ -173,6 +191,19 @@ function StaffContent() {
     },
   });
 
+  const moveTicketMutation = trpc.staff.moveTicket.useMutation({
+    onSuccess: () => {
+      toast.success(t('staff.reorderSuccess'));
+      refetchWaitingList();
+      setReorderDialogOpen(false);
+      setReorderReason('');
+      setReorderTarget(null);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+ 
   const doneMutation = trpc.staff.done.useMutation({
     onSuccess: () => {
       toast.success(t('staff.done'));
@@ -228,6 +259,34 @@ function StaffContent() {
     skipMutation.mutate({ sessionToken, ticketId: selectedTicketId, reason: skipReason || undefined });
   };
 
+  const handleMoveTicket = (ticketId: number, delta: number) => {
+    if (!sessionToken) return;
+    if (reorderReasonRequired) {
+      setReorderTarget({ ticketId, delta });
+      setReorderDialogOpen(true);
+      return;
+    }
+    moveTicketMutation.mutate({ sessionToken, ticketId, delta });
+  };
+
+  const confirmReorder = () => {
+    if (!sessionToken || !reorderTarget) return;
+    moveTicketMutation.mutate({
+      sessionToken,
+      ticketId: reorderTarget.ticketId,
+      delta: reorderTarget.delta,
+      reason: reorderReason.trim() || undefined,
+    });
+  };
+
+  const handleReorderDialogChange = (open: boolean) => {
+    setReorderDialogOpen(open);
+    if (!open) {
+      setReorderReason('');
+      setReorderTarget(null);
+    }
+  };
+ 
   const handleDone = (ticketId: number) => {
     if (!sessionToken) return;
     doneMutation.mutate({ sessionToken, ticketId });
@@ -326,6 +385,9 @@ function StaffContent() {
   const waitingTickets = tickets.filter(t => t.status === 'WAITING');
   const calledTickets = tickets.filter(t => t.status === 'CALLED');
   const arrivedTickets = tickets.filter(t => t.status === 'ARRIVED');
+  const waitingIndexMap = new Map(waitingTickets.map((ticket, index) => [ticket.id, index]));
+  const lastWaitingIndex = waitingTickets.length - 1;
+  const canReorder = reorderEnabled && reorderModeEnabled && reorderMaxMove > 0;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -376,6 +438,29 @@ function StaffContent() {
             )}
           </Button>
         </div>
+
+        {reorderEnabled && (
+          <div className="flex items-center justify-between p-4 bg-card rounded-lg border">
+            <div className="space-y-1">
+              <span className="text-sm font-medium">{t('staff.reorderMode')}</span>
+              <p className="text-xs text-muted-foreground">
+                {reorderModeEnabled ? t('staff.reorderModeOn') : t('staff.reorderModeOff')}
+              </p>
+            </div>
+            <Switch
+              checked={reorderModeEnabled}
+              onCheckedChange={(checked) => setReorderModeEnabled(checked)}
+            />
+          </div>
+        )}
+
+        {reorderEnabled && reorderModeEnabled && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>{t('staff.reorderMode')}</AlertTitle>
+            <AlertDescription>{t('staff.reorderWarning')}</AlertDescription>
+          </Alert>
+        )}
 
         {/* Call Next Button */}
         <Button
@@ -432,49 +517,76 @@ function StaffContent() {
             </div>
           ) : (
             <div className="space-y-3">
-              {tickets.map((ticket) => (
-                <Card key={ticket.id} className={ticket.status === 'CALLED' ? 'ring-2 ring-primary' : ''}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="text-3xl font-bold tabular-nums">#{ticket.number}</div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            {getStatusBadge(ticket.status)}
-                            <span className="text-sm text-muted-foreground flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {ticket.partySize}
-                            </span>
+              {tickets.map((ticket) => {
+                const waitingIndex = waitingIndexMap.get(ticket.id);
+                const canMoveUp = canReorder && ticket.status === 'WAITING' && waitingIndex !== undefined && waitingIndex > 0;
+                const canMoveDown = canReorder && ticket.status === 'WAITING' && waitingIndex !== undefined && waitingIndex < lastWaitingIndex;
+
+                return (
+                  <Card key={ticket.id} className={ticket.status === 'CALLED' ? 'ring-2 ring-primary' : ''}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="text-3xl font-bold tabular-nums">#{ticket.number}</div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              {getStatusBadge(ticket.status)}
+                              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {ticket.partySize}
+                              </span>
+                            </div>
+                            {ticket.note && (
+                              <p className="text-sm text-muted-foreground mt-1 italic">"{ticket.note}"</p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(ticket.createdAt).toLocaleTimeString()}
+                            </p>
                           </div>
-                          {ticket.note && (
-                            <p className="text-sm text-muted-foreground mt-1 italic">"{ticket.note}"</p>
-                          )}
-                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {new Date(ticket.createdAt).toLocaleTimeString()}
-                          </p>
                         </div>
-                      </div>
-                      <div className="flex gap-2">
-                        {ticket.status === 'CALLED' && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleRecall(ticket.id)}
-                              disabled={recallMutation.isPending}
-                            >
-                              <RefreshCw className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleSkip(ticket.id)}
-                            >
-                              <SkipForward className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
+                        <div className="flex gap-2">
+                          {ticket.status === 'WAITING' && canReorder && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                aria-label={t('staff.moveUp')}
+                                onClick={() => handleMoveTicket(ticket.id, -1)}
+                                disabled={!canMoveUp || moveTicketMutation.isPending}
+                              >
+                                <ChevronUp className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                aria-label={t('staff.moveDown')}
+                                onClick={() => handleMoveTicket(ticket.id, 1)}
+                                disabled={!canMoveDown || moveTicketMutation.isPending}
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          {ticket.status === 'CALLED' && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleRecall(ticket.id)}
+                                disabled={recallMutation.isPending}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSkip(ticket.id)}
+                              >
+                                <SkipForward className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         {ticket.status === 'ARRIVED' && (
                           <Button
                             size="sm"
@@ -488,7 +600,8 @@ function StaffContent() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              );
+            })}
             </div>
           )}
         </ScrollArea>
@@ -514,6 +627,35 @@ function StaffContent() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmSkip}>
+              {t('common.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reorder Dialog */}
+      <AlertDialog open={reorderDialogOpen} onOpenChange={handleReorderDialogChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('staff.reorderConfirm')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="space-y-3 mt-2">
+                <Label htmlFor="reorderReason">{t('staff.reorderReason')}</Label>
+                <Input
+                  id="reorderReason"
+                  placeholder={t('staff.reorderReasonPlaceholder')}
+                  value={reorderReason}
+                  onChange={(e) => setReorderReason(e.target.value)}
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmReorder}
+              disabled={moveTicketMutation.isPending || (reorderReasonRequired && !reorderReason.trim())}
+            >
               {t('common.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>

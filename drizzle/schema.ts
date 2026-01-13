@@ -266,6 +266,9 @@ export const queueAuditLogs = mysqlTable("queue_audit_logs", {
   id: int("id").autoincrement().primaryKey(),
   storeId: int("storeId").notNull(),
   ticketId: int("ticketId").notNull(),
+  staffSessionId: int("staffSessionId"),
+  fromPos: int("fromPos"),
+  toPos: int("toPos"),
   action: mysqlEnum("action", ["MOVE_UP", "MOVE_DOWN", "CALL_SPECIFIC", "SKIP", "RECALL"]).notNull(),
   reason: text("reason"),
   performedBy: varchar("performedBy", { length: 64 }), // staff/manager

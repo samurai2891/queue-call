@@ -164,22 +164,22 @@
 ## M5: スタッフの順番調整（オプション）
 
 ### T5-1. reorderEnabled を設定でON/OFFできるようにする
-- [~] 設定項目の追加
-- [ ] OFF時は順番変更UIが完全に出ない
-- [ ] ON時は警告（「原則は番号順。例外運用になる」）を表示
+- [x] 設定項目の追加
+- [x] OFF時は順番変更UIが完全に出ない
+- [x] ON時は警告（「原則は番号順。例外運用になる」）を表示
 
 **確認ポイント:** OFF時はUIもAPIも拒否
 
 ### T5-2. 順番調整のUI（最小）
-- [ ] 各チケット行に ↑ ↓（1つ前後に移動）ボタン
-- [ ] reorderMaxMove を超えた移動はできない
+- [x] 各チケット行に ↑ ↓（1つ前後に移動）ボタン
+- [x] reorderMaxMove を超えた移動はできない
 
 **確認ポイント:** ONの時だけ動く
 
 ### T5-3. 順番調整API＋監査ログ
-- [ ] POST /api/staff/tickets/:id/move（+delta など）
+- [x] POST /api/staff/tickets/:id/move（+delta など）
 - [x] queueAuditLogs テーブル（ticketId, fromPos, toPos, staffSessionId, reason?, createdAt）
-- [ ] 移動のたびにログが残る
+- [x] 移動のたびにログが残る
 
 **確認ポイント:** SSEでboard/staff/ticketが更新される
 

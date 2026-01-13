@@ -160,6 +160,8 @@ export const translations = {
     'staff.reorderReason': '調整理由',
     'staff.reorderReasonPlaceholder': '理由を入力',
     'staff.reorderConfirm': '順番を調整しますか？',
+    'staff.reorderWarning': '原則は番号順です。例外運用として順番を調整します。',
+    'staff.reorderSuccess': '順番を調整しました',
     
     // Settings
     'settings.title': '店舗設定',
@@ -369,6 +371,8 @@ export const translations = {
     'staff.reorderReason': 'Reason',
     'staff.reorderReasonPlaceholder': 'Enter reason',
     'staff.reorderConfirm': 'Reorder queue?',
+    'staff.reorderWarning': 'Default is ticket order. Use reordering only as an exception.',
+    'staff.reorderSuccess': 'Queue order updated',
     
     // Settings
     'settings.title': 'Store Settings',
@@ -577,6 +581,8 @@ export const translations = {
     'staff.reorderReason': '조정 사유',
     'staff.reorderReasonPlaceholder': '사유 입력',
     'staff.reorderConfirm': '순서를 조정하시겠습니까?',
+    'staff.reorderWarning': '기본은 번호 순서입니다. 예외적으로 순서를 조정합니다.',
+    'staff.reorderSuccess': '순서를 조정했습니다',
     
     // Settings
     'settings.title': '매장 설정',
@@ -785,6 +791,8 @@ export const translations = {
     'staff.reorderReason': '调整原因',
     'staff.reorderReasonPlaceholder': '输入原因',
     'staff.reorderConfirm': '确定调整顺序吗？',
+    'staff.reorderWarning': '原则上按号码顺序，仅在例外时调整顺序。',
+    'staff.reorderSuccess': '已调整顺序',
     
     // Settings
     'settings.title': '店铺设置',
@@ -993,6 +1001,8 @@ export const translations = {
     'staff.reorderReason': '調整原因',
     'staff.reorderReasonPlaceholder': '輸入原因',
     'staff.reorderConfirm': '確定調整順序嗎？',
+    'staff.reorderWarning': '原則上按號碼順序，僅在例外時調整順序。',
+    'staff.reorderSuccess': '已調整順序',
     
     // Settings
     'settings.title': '店鋪設定',

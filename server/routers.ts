@@ -398,6 +398,112 @@ const staffRouter = router({
       return await db.getWaitingTickets(input.storeId);
     }),
 
+  // Move ticket in queue
+  moveTicket: publicProcedure
+    .input(z.object({
+      sessionToken: z.string(),
+      ticketId: z.number(),
+      delta: z.number().int().refine(value => value !== 0, { message: 'Delta must be non-zero' }),
+      reason: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const session = await db.getStaffSession(input.sessionToken);
+      if (!session) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
+      }
+
+      const store = await db.getStoreById(session.storeId);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      const queueSettings = store.settings?.queue;
+      if (!queueSettings?.enableReorder) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Reorder is disabled' });
+      }
+
+      const delta = Math.trunc(input.delta);
+      const maxMove = queueSettings?.reorderMaxMove ?? 3;
+      if (maxMove <= 0 || Math.abs(delta) > maxMove) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Move exceeds maximum allowed distance' });
+      }
+
+      const reason = input.reason?.trim();
+      if (queueSettings?.reorderReasonRequired && !reason) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Reason is required' });
+      }
+
+      const ticket = await db.getTicketById(input.ticketId);
+      if (!ticket || ticket.storeId !== session.storeId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
+      }
+
+      if (ticket.status !== 'WAITING') {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Only waiting tickets can be moved' });
+      }
+
+      const waitingTickets = (await db.getWaitingTickets(session.storeId))
+        .filter(t => t.status === 'WAITING');
+      const currentIndex = waitingTickets.findIndex(t => t.id === ticket.id);
+      if (currentIndex < 0) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found in waiting list' });
+      }
+
+      const targetIndex = currentIndex + delta;
+      if (targetIndex < 0 || targetIndex >= waitingTickets.length) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Cannot move outside queue' });
+      }
+
+      const direction = delta > 0 ? 1 : -1;
+      const steps = Math.abs(delta);
+      const workingTickets = [...waitingTickets];
+      let index = currentIndex;
+
+      for (let step = 0; step < steps; step++) {
+        const swapIndex = index + direction;
+        const currentTicket = workingTickets[index];
+        const swapTicket = workingTickets[swapIndex];
+        if (!currentTicket || !swapTicket) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Cannot move ticket' });
+        }
+
+        const currentRank = currentTicket.queueRank;
+        const swapRank = swapTicket.queueRank;
+        if (!currentRank || !swapRank) {
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Queue rank missing' });
+        }
+
+        await db.updateTicketQueueRank(currentTicket.id, swapRank);
+        await db.updateTicketQueueRank(swapTicket.id, currentRank);
+        workingTickets[index] = swapTicket;
+        workingTickets[swapIndex] = currentTicket;
+        index = swapIndex;
+      }
+
+      if (queueSettings?.auditLog) {
+        await db.createAuditLog({
+          storeId: session.storeId,
+          ticketId: ticket.id,
+          staffSessionId: session.id,
+          fromPos: currentIndex + 1,
+          toPos: targetIndex + 1,
+          action: delta < 0 ? 'MOVE_UP' : 'MOVE_DOWN',
+          reason: reason || undefined,
+          performedBy: session.role,
+        });
+      }
+
+      const waitingCount = await db.getWaitingCount(session.storeId);
+      const calledTicket = await db.getCalledTicket(session.storeId);
+
+      broadcastQueueUpdate(session.storeId, {
+        currentNumber: calledTicket?.number || 0,
+        waitingCount,
+      });
+
+      return { success: true };
+    }),
+
   // Call next
   callNext: publicProcedure
     .input(z.object({ 
@@ -478,6 +584,7 @@ const staffRouter = router({
         await db.createAuditLog({
           storeId: session.storeId,
           ticketId: ticket.id,
+          staffSessionId: session.id,
           action: 'CALL_SPECIFIC',
           reason: input.reason,
           performedBy: session.role,
@@ -531,6 +638,7 @@ const staffRouter = router({
         await db.createAuditLog({
           storeId: session.storeId,
           ticketId: ticket.id,
+          staffSessionId: session.id,
           action: 'RECALL',
           performedBy: session.role,
         });
@@ -581,6 +689,7 @@ const staffRouter = router({
         await db.createAuditLog({
           storeId: session.storeId,
           ticketId: ticket.id,
+          staffSessionId: session.id,
           action: 'SKIP',
           reason: input.reason,
           performedBy: session.role,

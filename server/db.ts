@@ -358,6 +358,13 @@ export async function updateTicketStatus(
   await db.update(tickets).set(updateData).where(eq(tickets.id, id));
 }
 
+export async function updateTicketQueueRank(id: number, queueRank: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(tickets).set({ queueRank }).where(eq(tickets.id, id));
+}
+
 export async function getGroupsAhead(ticket: Ticket): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
