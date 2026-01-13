@@ -82,6 +82,18 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
     },
   });
   
+  const balance = balanceData?.balance ?? 0;
+  const messagesRemaining = Math.floor(balance / SMS_COST_PER_MESSAGE);
+  const isLowBalance = balance < lowBalanceThreshold;
+  const isCriticalBalance = balance < 500;
+  
+  // 残高が少ない場合に自動でチャージ促進モーダルを表示
+  useEffect(() => {
+    if (isCriticalBalance && !showChargePrompt) {
+      setShowChargePrompt(true);
+    }
+  }, [isCriticalBalance, showChargePrompt]);
+  
   const handleCharge = async (amount: number) => {
     if (!storeId) return;
     setIsCharging(true);
@@ -102,18 +114,6 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
       </div>
     );
   }
-  
-  const balance = balanceData?.balance ?? 0;
-  const messagesRemaining = Math.floor(balance / SMS_COST_PER_MESSAGE);
-  const isLowBalance = balance < lowBalanceThreshold;
-  const isCriticalBalance = balance < 500;
-  
-  // 残高が少ない場合に自動でチャージ促進モーダルを表示
-  useEffect(() => {
-    if (isCriticalBalance && !showChargePrompt) {
-      setShowChargePrompt(true);
-    }
-  }, [isCriticalBalance]);
   
   return (
     <div className="rounded-lg border bg-card">
