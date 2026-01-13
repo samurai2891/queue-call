@@ -51,6 +51,7 @@ const storeRouter = router({
         defaultLocale: store.defaultLocale,
         supportedLocales: store.supportedLocales,
         settings: {
+          queue: store.settings?.queue,
           menu: store.settings?.menu,
           kiosk: store.settings?.kiosk,
           board: store.settings?.board,
