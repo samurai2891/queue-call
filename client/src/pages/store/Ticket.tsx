@@ -17,9 +17,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Bell, BellOff, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { ArrowLeft, Bell, BellOff, AlertCircle, CheckCircle, XCircle, Clock, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSSE } from '@/hooks/useSSE';
+import { SmsRegistration } from '@/components/SmsRegistration';
 import type { Locale } from '@/contexts/LocaleContext';
 
 type TicketStatus = 'WAITING' | 'CALLED' | 'ARRIVED' | 'SKIPPED' | 'DONE' | 'CANCELED' | 'EXPIRED';
@@ -257,6 +258,13 @@ function TicketContent() {
             )}
           </CardContent>
         </Card>
+
+        {/* SMS Registration */}
+        {isActive && ticket && (
+          <div className="w-full max-w-md mt-4">
+            <SmsRegistration ticketId={ticket.id} />
+          </div>
+        )}
 
         {/* Notification Settings Link */}
         {isActive && (

@@ -784,18 +784,80 @@ const notificationRouter = router({
       return { success: true };
     }),
 
+  // Get SMS subscription status
+  getSmsStatus: publicProcedure
+    .input(z.object({ ticketId: z.number() }))
+    .query(async ({ input }) => {
+      const subscription = await db.getSmsSubscriptionByTicket(input.ticketId);
+      if (!subscription) {
+        return { registered: false, verified: false, phoneE164: null };
+      }
+      return {
+        registered: true,
+        verified: !!subscription.verifiedAt,
+        phoneE164: subscription.phoneE164,
+        optedOut: !!subscription.optedOutAt,
+      };
+    }),
+
   // Register SMS (start verification)
   registerSms: publicProcedure
     .input(z.object({
       ticketId: z.number(),
-      phoneE164: z.string(),
+      phoneE164: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Invalid phone number format'),
     }))
     .mutation(async ({ input }) => {
-      // TODO: Implement Twilio verification
-      await db.createSmsSubscription({
-        ticketId: input.ticketId,
-        phoneE164: input.phoneE164,
-      });
+      // Get ticket to find store
+      const ticket = await db.getTicketById(input.ticketId);
+      if (!ticket) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
+      }
+
+      // Get store to check if SMS is enabled
+      const store = await db.getStoreById(ticket.storeId);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      // Check if SMS notifications are enabled
+      if (!store.settings?.notifications?.smsEnabled) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'SMS notifications are not enabled for this store' });
+      }
+
+      // Check Twilio configuration
+      const twilioConfig = {
+        accountSid: process.env.TWILIO_ACCOUNT_SID || '',
+        authToken: process.env.TWILIO_AUTH_TOKEN || '',
+        verifyServiceSid: process.env.TWILIO_VERIFY_SERVICE_SID || '',
+      };
+
+      if (!twilioConfig.accountSid || !twilioConfig.authToken || !twilioConfig.verifyServiceSid) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'SMS service is not configured' });
+      }
+
+      // Check if already registered
+      const existing = await db.getSmsSubscriptionByTicket(input.ticketId);
+      if (existing && existing.verifiedAt) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'Phone number already verified' });
+      }
+
+      // Send OTP via Twilio Verify
+      const { sendOtp } = await import('./notifications');
+      const sent = await sendOtp(input.phoneE164, twilioConfig);
+      if (!sent) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to send verification code' });
+      }
+
+      // Create or update subscription
+      if (existing) {
+        await db.updateSmsSubscription(existing.id, { phoneE164: input.phoneE164 });
+      } else {
+        await db.createSmsSubscription({
+          ticketId: input.ticketId,
+          phoneE164: input.phoneE164,
+        });
+      }
+
       return { success: true, message: 'Verification code sent' };
     }),
 
@@ -803,16 +865,50 @@ const notificationRouter = router({
   verifySms: publicProcedure
     .input(z.object({
       ticketId: z.number(),
-      code: z.string(),
+      code: z.string().length(6, 'Verification code must be 6 digits'),
     }))
     .mutation(async ({ input }) => {
-      // TODO: Implement Twilio verification
       const subscription = await db.getSmsSubscriptionByTicket(input.ticketId);
       if (!subscription) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Subscription not found' });
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'No pending verification found' });
+      }
+
+      if (subscription.verifiedAt) {
+        return { success: true, message: 'Already verified' };
+      }
+
+      // Check Twilio configuration
+      const twilioConfig = {
+        accountSid: process.env.TWILIO_ACCOUNT_SID || '',
+        authToken: process.env.TWILIO_AUTH_TOKEN || '',
+        verifyServiceSid: process.env.TWILIO_VERIFY_SERVICE_SID || '',
+      };
+
+      if (!twilioConfig.accountSid || !twilioConfig.authToken || !twilioConfig.verifyServiceSid) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'SMS service is not configured' });
+      }
+
+      // Verify OTP via Twilio
+      const { verifyOtp } = await import('./notifications');
+      const verified = await verifyOtp(subscription.phoneE164, input.code, twilioConfig);
+      if (!verified) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid verification code' });
       }
 
       await db.updateSmsSubscription(subscription.id, { verifiedAt: new Date() });
+      return { success: true, message: 'Phone number verified' };
+    }),
+
+  // Unsubscribe SMS
+  unsubscribeSms: publicProcedure
+    .input(z.object({ ticketId: z.number() }))
+    .mutation(async ({ input }) => {
+      const subscription = await db.getSmsSubscriptionByTicket(input.ticketId);
+      if (!subscription) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'No subscription found' });
+      }
+
+      await db.updateSmsSubscription(subscription.id, { optedOutAt: new Date() });
       return { success: true };
     }),
 });
@@ -890,6 +986,56 @@ const stripeRouter = router({
     }),
 });
 
+// ==================== SMS Logs Router ====================
+const smsLogsRouter = router({
+  // Get SMS logs with pagination (protected)
+  getLogs: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      limit: z.number().min(1).max(100).optional().default(20),
+      offset: z.number().min(0).optional().default(0),
+      status: z.enum(['pending', 'sent', 'delivered', 'failed']).optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      const options: Parameters<typeof db.getSmsLogs>[1] = {
+        limit: input.limit,
+        offset: input.offset,
+        status: input.status,
+      };
+
+      if (input.startDate) {
+        options.startDate = new Date(input.startDate);
+      }
+      if (input.endDate) {
+        options.endDate = new Date(input.endDate);
+      }
+
+      return await db.getSmsLogs(input.storeId, options);
+    }),
+
+  // Get SMS stats (protected)
+  getStats: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      days: z.number().min(1).max(365).optional().default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      return await db.getSmsLogStats(input.storeId, input.days);
+    }),
+});
+
 // ==================== Main Router ====================
 export const appRouter = router({
   system: systemRouter,
@@ -907,6 +1053,7 @@ export const appRouter = router({
   menu: menuRouter,
   notification: notificationRouter,
   stripe: stripeRouter,
+  smsLogs: smsLogsRouter,
 });
 
 export type AppRouter = typeof appRouter;

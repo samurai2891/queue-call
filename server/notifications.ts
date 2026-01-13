@@ -1,5 +1,5 @@
-import { getDb } from './db';
-import { pushSubscriptions, smsSubscriptions, tickets } from '../drizzle/schema';
+import { getDb, createSmsLog, updateSmsLog } from './db';
+import { pushSubscriptions, smsSubscriptions, tickets, smsLogs } from '../drizzle/schema';
 import { eq, and, isNull, isNotNull } from 'drizzle-orm';
 import { consumeSmsBalance } from './stripe';
 
@@ -108,6 +108,17 @@ export async function sendSmsNotification(
 
     const subscription = subscriptions[0];
 
+    // Create SMS log entry first
+    const smsLogId = await createSmsLog({
+      storeId,
+      ticketId,
+      phoneE164: subscription.phoneE164,
+      messageContent: message,
+      status: 'pending',
+      creditConsumed: 20,
+      messageType: 'call',
+    });
+
     // Check and consume SMS balance BEFORE sending
     const balanceResult = await consumeSmsBalance({
       storeId,
@@ -116,6 +127,7 @@ export async function sendSmsNotification(
 
     if (!balanceResult.success) {
       console.log(`[SMS] Insufficient balance for store ${storeId}: ${balanceResult.reason}`);
+      await updateSmsLog(smsLogId, { status: 'failed', errorMessage: balanceResult.reason });
       return { success: false, reason: balanceResult.reason };
     }
 
@@ -139,11 +151,19 @@ export async function sendSmsNotification(
     if (!response.ok) {
       const error = await response.text();
       console.error('[SMS] Twilio error:', error);
+      await updateSmsLog(smsLogId, { status: 'failed', errorMessage: error });
       // Note: Balance was already consumed. In production, consider refund logic here.
       return { success: false, reason: 'Twilio API error' };
     }
 
     const result = await response.json();
+
+    // Update SMS log with success
+    await updateSmsLog(smsLogId, {
+      status: 'sent',
+      twilioMessageSid: result.sid,
+      sentAt: new Date(),
+    });
 
     // Update last sent time
     await db

@@ -26,7 +26,9 @@ import {
   ArrowLeft,
   CreditCard,
   MessageSquare,
-  Wallet
+  Wallet,
+  History,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getLoginUrl } from '@/const';
@@ -53,6 +55,8 @@ const SMS_COST_PER_MESSAGE = 20; // 1通あたり20円
 function SmsBalanceCard({ storeId }: { storeId?: number }) {
   const [isCharging, setIsCharging] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
+  const [showChargePrompt, setShowChargePrompt] = useState(false);
+  const [lowBalanceThreshold, setLowBalanceThreshold] = useState(1000);
   
   // SMS残高取得
   const { data: balanceData, isLoading: balanceLoading, refetch: refetchBalance } = trpc.stripe.getSmsBalance.useQuery(
@@ -101,7 +105,15 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
   
   const balance = balanceData?.balance ?? 0;
   const messagesRemaining = Math.floor(balance / SMS_COST_PER_MESSAGE);
-  const isLowBalance = balance < 1000;
+  const isLowBalance = balance < lowBalanceThreshold;
+  const isCriticalBalance = balance < 500;
+  
+  // 残高が少ない場合に自動でチャージ促進モーダルを表示
+  useEffect(() => {
+    if (isCriticalBalance && !showChargePrompt) {
+      setShowChargePrompt(true);
+    }
+  }, [isCriticalBalance]);
   
   return (
     <div className="rounded-lg border bg-card">
@@ -128,12 +140,82 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
             約{messagesRemaining}通分の送信が可能（1通20円）
           </p>
           {isLowBalance && (
-            <p className="text-sm text-destructive mt-1">
-              残高が少なくなっています。チャージしてください。
-            </p>
+            <div className={`mt-2 p-3 rounded-lg ${isCriticalBalance ? 'bg-destructive/10 border border-destructive/30' : 'bg-yellow-50 border border-yellow-200'}`}>
+              <p className={`text-sm font-medium ${isCriticalBalance ? 'text-destructive' : 'text-yellow-800'}`}>
+                {isCriticalBalance 
+                  ? '⚠️ SMS残高が非常に少なくなっています！' 
+                  : '📢 残高が少なくなっています'}
+              </p>
+              <p className={`text-xs mt-1 ${isCriticalBalance ? 'text-destructive/80' : 'text-yellow-700'}`}>
+                {isCriticalBalance 
+                  ? 'SMS通知が送信できなくなる可能性があります。今すぐチャージしてください。'
+                  : '安定したSMS通知のために、早めのチャージをおすすめします。'}
+              </p>
+              <Button
+                size="sm"
+                variant={isCriticalBalance ? 'destructive' : 'outline'}
+                className="mt-2 w-full"
+                onClick={() => setShowChargePrompt(true)}
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                今すぐチャージ
+              </Button>
+            </div>
           )}
         </div>
       </div>
+      
+      {/* チャージ促進モーダル */}
+      {showChargePrompt && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="text-center mb-4">
+              <div className={`inline-flex p-3 rounded-full ${isCriticalBalance ? 'bg-destructive/10' : 'bg-yellow-100'} mb-3`}>
+                <Wallet className={`h-8 w-8 ${isCriticalBalance ? 'text-destructive' : 'text-yellow-600'}`} />
+              </div>
+              <h3 className="text-lg font-bold">
+                {isCriticalBalance ? 'SMS残高が不足しています' : 'SMS残高をチャージしませんか？'}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-2">
+                現在の残高: <span className="font-bold">¥{balance.toLocaleString()}</span>
+                （約{messagesRemaining}通分）
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {SMS_CHARGE_OPTIONS.map((option) => (
+                <Button
+                  key={option.amount}
+                  variant={option.amount === 10000 ? 'default' : 'outline'}
+                  className="flex flex-col h-auto py-3"
+                  disabled={isCharging}
+                  onClick={() => handleCharge(option.amount)}
+                >
+                  {isCharging && selectedAmount === option.amount ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <span className="font-bold">{option.label}</span>
+                      <span className="text-xs opacity-70">約{option.messages}通</span>
+                      {option.amount === 10000 && (
+                        <span className="text-xs bg-primary/20 px-2 py-0.5 rounded mt-1">おすすめ</span>
+                      )}
+                    </>
+                  )}
+                </Button>
+              ))}
+            </div>
+            
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => setShowChargePrompt(false)}
+            >
+              後でチャージする
+            </Button>
+          </div>
+        </div>
+      )}
       
       <div className="p-4 space-y-4">
         <div>
@@ -693,6 +775,19 @@ export default function Settings() {
                           onChange={(e) => updateField('smsTemplateRecall', e.target.value)}
                           placeholder="使用可能な変数: {storeName}, {number}"
                         />
+                      </div>
+                      
+                      {/* SMS送信履歴へのリンク */}
+                      <div className="pt-4 border-t">
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => navigate('/admin/sms-history')}
+                        >
+                          <History className="h-4 w-4 mr-2" />
+                          SMS送信履歴を確認
+                          <ExternalLink className="h-4 w-4 ml-auto" />
+                        </Button>
                       </div>
                     </div>
                   )}

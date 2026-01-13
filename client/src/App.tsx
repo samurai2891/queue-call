@@ -20,6 +20,7 @@ const Kiosk = lazy(() => import("./pages/store/Kiosk"));
 const Board = lazy(() => import("./pages/store/Board"));
 const Staff = lazy(() => import("./pages/store/Staff"));
 const Settings = lazy(() => import("./pages/admin/Settings"));
+const SmsHistory = lazy(() => import("./pages/admin/SmsHistory"));
 
 function LoadingFallback() {
   return (
@@ -55,6 +56,7 @@ function Router() {
         {/* Admin Settings */}
         <Route path="/admin/settings" component={Settings} />
         <Route path="/admin/settings/:section" component={Settings} />
+        <Route path="/admin/sms-history" component={SmsHistory} />
         
         {/* 404 */}
         <Route path="/404" component={NotFound} />

@@ -15,6 +15,13 @@
       "when": 1768321841763,
       "tag": "0001_exotic_excalibur",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1768325151941,
+      "tag": "0002_yielding_killer_shrike",
+      "breakpoints": true
     }
   ]
 }

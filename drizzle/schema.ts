@@ -323,3 +323,40 @@ export const smsTransactions = mysqlTable("sms_transactions", {
 
 export type SmsTransaction = typeof smsTransactions.$inferSelect;
 export type InsertSmsTransaction = typeof smsTransactions.$inferInsert;
+
+/**
+ * SmsLog - SMS送信履歴
+ */
+export const smsLogs = mysqlTable("sms_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  storeId: int("storeId").notNull(),
+  ticketId: int("ticketId"),
+  
+  // 宛先電話番号（E.164形式）
+  phoneE164: varchar("phoneE164", { length: 20 }).notNull(),
+  
+  // 送信内容
+  messageContent: text("messageContent").notNull(),
+  
+  // 送信ステータス
+  status: mysqlEnum("status", ["pending", "sent", "delivered", "failed"]).default("pending").notNull(),
+  
+  // TwilioメッセージSID
+  twilioMessageSid: varchar("twilioMessageSid", { length: 64 }),
+  
+  // エラーメッセージ（失敗時）
+  errorMessage: text("errorMessage"),
+  
+  // 消費クレジット（円）
+  creditConsumed: int("creditConsumed").default(20).notNull(),
+  
+  // 送信タイプ
+  messageType: mysqlEnum("messageType", ["call", "recall", "reminder", "custom"]).default("call").notNull(),
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  sentAt: timestamp("sentAt"),
+  deliveredAt: timestamp("deliveredAt"),
+});
+
+export type SmsLog = typeof smsLogs.$inferSelect;
+export type InsertSmsLog = typeof smsLogs.$inferInsert;

@@ -10,7 +10,8 @@ import {
   menuItems, InsertMenuItem,
   feedPosts, InsertFeedPost,
   queueAuditLogs, InsertQueueAuditLog,
-  staffSessions, InsertStaffSession
+  staffSessions, InsertStaffSession,
+  smsLogs, InsertSmsLog
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { nanoid } from 'nanoid';
@@ -575,4 +576,106 @@ export async function updateStaffSessionReorderMode(sessionToken: string, enable
   await db.update(staffSessions)
     .set({ reorderModeEnabled: enabled })
     .where(eq(staffSessions.sessionToken, sessionToken));
+}
+
+// ==================== SMS Log Functions ====================
+
+export async function createSmsLog(data: InsertSmsLog): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(smsLogs).values(data);
+  return result[0].insertId;
+}
+
+export async function updateSmsLog(id: number, data: Partial<InsertSmsLog>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(smsLogs).set(data).where(eq(smsLogs.id, id));
+}
+
+export async function getSmsLogs(storeId: number, options?: {
+  limit?: number;
+  offset?: number;
+  status?: 'pending' | 'sent' | 'delivered' | 'failed';
+  startDate?: Date;
+  endDate?: Date;
+}) {
+  const db = await getDb();
+  if (!db) return { logs: [], total: 0 };
+
+  const conditions = [eq(smsLogs.storeId, storeId)];
+  
+  if (options?.status) {
+    conditions.push(eq(smsLogs.status, options.status));
+  }
+  
+  if (options?.startDate) {
+    conditions.push(sql`${smsLogs.createdAt} >= ${options.startDate}`);
+  }
+  
+  if (options?.endDate) {
+    conditions.push(sql`${smsLogs.createdAt} <= ${options.endDate}`);
+  }
+
+  const whereClause = and(...conditions);
+
+  // Get total count
+  const countResult = await db.select({ count: sql<number>`count(*)` })
+    .from(smsLogs)
+    .where(whereClause);
+  const total = countResult[0]?.count || 0;
+
+  // Get logs with pagination
+  let query = db.select()
+    .from(smsLogs)
+    .where(whereClause)
+    .orderBy(desc(smsLogs.createdAt));
+
+  if (options?.limit) {
+    query = query.limit(options.limit) as typeof query;
+  }
+  if (options?.offset) {
+    query = query.offset(options.offset) as typeof query;
+  }
+
+  const logs = await query;
+
+  return { logs, total };
+}
+
+export async function getSmsLogStats(storeId: number, days: number = 30) {
+  const db = await getDb();
+  if (!db) return { totalSent: 0, totalFailed: 0, totalCredits: 0 };
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  const result = await db.select({
+    status: smsLogs.status,
+    count: sql<number>`count(*)`,
+    credits: sql<number>`sum(${smsLogs.creditConsumed})`,
+  })
+    .from(smsLogs)
+    .where(and(
+      eq(smsLogs.storeId, storeId),
+      sql`${smsLogs.createdAt} >= ${startDate}`
+    ))
+    .groupBy(smsLogs.status);
+
+  let totalSent = 0;
+  let totalFailed = 0;
+  let totalCredits = 0;
+
+  for (const row of result) {
+    if (row.status === 'sent' || row.status === 'delivered') {
+      totalSent += row.count;
+      totalCredits += row.credits || 0;
+    } else if (row.status === 'failed') {
+      totalFailed += row.count;
+    }
+  }
+
+  return { totalSent, totalFailed, totalCredits };
 }
