@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import { nanoid } from "nanoid";
+import { z } from "zod";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
@@ -10,6 +12,10 @@ import { serveStatic, setupVite } from "./vite";
 import { handleSSE } from "../sse";
 import { startAutoSkipJob } from "../jobs/autoSkip";
 import { constructWebhookEvent, handleCheckoutCompleted } from "../stripe";
+import { storageGet, storagePut } from "../storage";
+import * as db from "../db";
+import { sdk } from "./sdk";
+
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -30,6 +36,180 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const UPLOAD_TOKEN_TTL_MS = 10 * 60 * 1000;
+const ALLOWED_MIME_TYPES = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+]);
+const uploadTokens = new Map<
+  string,
+  { key: string; mime: string; size: number; expiresAt: number }
+>();
+
+const presignSchema = z.object({
+  mime: z.string().min(1),
+  size: z.number().positive(),
+  kind: z.string().min(1),
+  storeId: z.number(),
+});
+
+function cleanupUploadTokens() {
+  const now = Date.now();
+  uploadTokens.forEach((value, token) => {
+    if (value.expiresAt <= now) {
+      uploadTokens.delete(token);
+    }
+  });
+}
+
+function normalizeKind(kind: string) {
+  const normalized = kind.trim().toLowerCase();
+  const allowedKinds = new Set(["menu", "menu-item", "feed", "feed-post"]);
+  if (!allowedKinds.has(normalized)) {
+    return null;
+  }
+  if (normalized === "menu-item") return "menu";
+  if (normalized === "feed-post") return "feed";
+  return normalized;
+}
+
+function buildMediaKey(storeId: number, kind: string, extension: string) {
+  return `stores/${storeId}/${kind}/${Date.now()}-${nanoid(10)}.${extension}`;
+}
+
+function buildPublicUrl(key: string) {
+  return `/api/media/file?key=${encodeURIComponent(key)}`;
+}
+
+function registerMediaRoutes(app: express.Express) {
+  app.post("/api/media/presign", async (req, res) => {
+    const parsed = presignSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid payload" });
+      return;
+    }
+
+    let user;
+    try {
+      user = await sdk.authenticateRequest(req);
+    } catch (error) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const payload = parsed.data;
+    try {
+      const store = await db.getStoreById(payload.storeId);
+      if (!store || store.ownerId !== user.id) {
+        res.status(403).json({ error: "Not authorized" });
+        return;
+      }
+
+      const mime = payload.mime.toLowerCase();
+      const extension = ALLOWED_MIME_TYPES.get(mime);
+      if (!extension) {
+        res.status(400).json({ error: "Unsupported file type" });
+        return;
+      }
+      if (payload.size > MAX_UPLOAD_BYTES) {
+        res.status(400).json({ error: "File too large" });
+        return;
+      }
+
+      const kind = normalizeKind(payload.kind);
+      if (!kind) {
+        res.status(400).json({ error: "Invalid kind" });
+        return;
+      }
+
+      cleanupUploadTokens();
+      const key = buildMediaKey(payload.storeId, kind, extension);
+      const token = nanoid(32);
+      uploadTokens.set(token, {
+        key,
+        mime,
+        size: payload.size,
+        expiresAt: Date.now() + UPLOAD_TOKEN_TTL_MS,
+      });
+
+      res.json({
+        uploadUrl: `/api/media/upload?token=${token}`,
+        publicUrl: buildPublicUrl(key),
+        key,
+      });
+    } catch (error) {
+      console.error("[Media] Presign failed", error);
+      res.status(500).json({ error: "Presign failed" });
+    }
+  });
+
+  app.put(
+    "/api/media/upload",
+    express.raw({ type: "*/*", limit: MAX_UPLOAD_BYTES }),
+    async (req, res) => {
+      const token = typeof req.query.token === "string" ? req.query.token : "";
+      if (!token) {
+        res.status(400).json({ error: "token is required" });
+        return;
+      }
+
+      const uploadInfo = uploadTokens.get(token);
+      if (!uploadInfo || uploadInfo.expiresAt <= Date.now()) {
+        if (uploadInfo) {
+          uploadTokens.delete(token);
+        }
+        res.status(403).json({ error: "Upload token expired" });
+        return;
+      }
+
+      const body = req.body;
+      if (!Buffer.isBuffer(body)) {
+        res.status(400).json({ error: "Invalid upload body" });
+        return;
+      }
+
+      const contentType = (req.headers["content-type"] || uploadInfo.mime)
+        .split(";")[0]
+        .trim();
+      if (contentType !== uploadInfo.mime) {
+        res.status(415).json({ error: "Invalid content type" });
+        return;
+      }
+      if (body.length > uploadInfo.size || body.length > MAX_UPLOAD_BYTES) {
+        res.status(413).json({ error: "File too large" });
+        return;
+      }
+
+      try {
+        await storagePut(uploadInfo.key, body, contentType);
+        uploadTokens.delete(token);
+        res.json({ success: true, key: uploadInfo.key, publicUrl: buildPublicUrl(uploadInfo.key) });
+      } catch (error) {
+        console.error("[Media] Upload failed", error);
+        res.status(500).json({ error: "Upload failed" });
+      }
+    }
+  );
+
+  app.get("/api/media/file", async (req, res) => {
+    const key = typeof req.query.key === "string" ? req.query.key : "";
+    if (!key) {
+      res.status(400).json({ error: "key is required" });
+      return;
+    }
+
+    try {
+      const { url } = await storageGet(key);
+      res.redirect(url);
+    } catch (error) {
+      console.error("[Media] File fetch failed", error);
+      res.status(404).json({ error: "File not found" });
+    }
+  });
+}
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
@@ -38,6 +218,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  registerMediaRoutes(app);
   // SSE endpoint for real-time updates
   app.get('/api/sse', handleSSE);
   

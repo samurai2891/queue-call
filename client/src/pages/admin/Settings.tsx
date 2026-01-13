@@ -1,5 +1,5 @@
 import { useParams, useLocation } from 'wouter';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { 
   Settings as SettingsIcon, 
   Store, 
@@ -24,11 +24,16 @@ import {
   Save,
   RefreshCw,
   ArrowLeft,
+  Plus,
+  ChevronUp,
+  ChevronDown,
+  Trash2,
+  ImagePlus,
   CreditCard,
   MessageSquare,
   Wallet,
   History,
-  ExternalLink
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getLoginUrl } from '@/const';
@@ -40,6 +45,7 @@ const LOCALE_OPTIONS = [
   { value: 'zh-Hans', label: '简体中文' },
   { value: 'zh-Hant', label: '繁體中文' },
 ];
+
 
 // SMSチャージ金額オプション
 const SMS_CHARGE_OPTIONS = [
@@ -271,6 +277,22 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
   );
 }
 
+type MenuItemDraft = {
+  nameJa: string;
+  descJa: string;
+  price: string;
+  categoryId: string;
+  photoFile?: File | null;
+};
+
+type FeedPostDraft = {
+  titleJa: string;
+  captionJa: string;
+  price: string;
+  photoFile?: File | null;
+};
+
+
 export default function Settings() {
   const params = useParams<{ section?: string }>();
   const [, navigate] = useLocation();
@@ -322,11 +344,66 @@ export default function Settings() {
     managerPin: '',
   });
 
+  const [newMenuItem, setNewMenuItem] = useState<MenuItemDraft>({
+    nameJa: '',
+    descJa: '',
+    price: '',
+    categoryId: '',
+    photoFile: null,
+  });
+  const [newFeedPost, setNewFeedPost] = useState<FeedPostDraft>({
+    titleJa: '',
+    captionJa: '',
+    price: '',
+    photoFile: null,
+  });
+  const [menuItemDrafts, setMenuItemDrafts] = useState<Record<number, MenuItemDraft>>({});
+  const [feedPostDrafts, setFeedPostDrafts] = useState<Record<number, FeedPostDraft>>({});
+  const [menuItemFileKey, setMenuItemFileKey] = useState(0);
+  const [feedPostFileKey, setFeedPostFileKey] = useState(0);
+  const [isCreatingMenuItem, setIsCreatingMenuItem] = useState(false);
+  const [isCreatingFeedPost, setIsCreatingFeedPost] = useState(false);
+  const [updatingMenuItemId, setUpdatingMenuItemId] = useState<number | null>(null);
+  const [updatingFeedPostId, setUpdatingFeedPostId] = useState<number | null>(null);
+
   // Get user's store
   const { data: store, isLoading: storeLoading, refetch: refetchStore } = trpc.store.getByOwner.useQuery(
     undefined,
     { enabled: isAuthenticated }
   );
+
+  const { data: menuCategories } = trpc.menu.getCategories.useQuery(
+    { storeId: store?.id || 0 },
+    { enabled: !!store?.id }
+  );
+
+  const {
+    data: adminItems,
+    isLoading: adminItemsLoading,
+    refetch: refetchAdminItems,
+  } = trpc.menu.getAdminItems.useQuery(
+    { storeId: store?.id || 0 },
+    { enabled: !!store?.id }
+  );
+
+  const {
+    data: adminFeedPosts,
+    isLoading: adminFeedLoading,
+    refetch: refetchAdminFeedPosts,
+  } = trpc.menu.getAdminFeed.useQuery(
+    { storeId: store?.id || 0 },
+    { enabled: !!store?.id }
+  );
+
+  const sortedMenuItems = useMemo(() => {
+    if (!adminItems) return [];
+    return [...adminItems].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  }, [adminItems]);
+
+  const sortedFeedPosts = useMemo(() => {
+    if (!adminFeedPosts) return [];
+    return [...adminFeedPosts].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  }, [adminFeedPosts]);
 
   useEffect(() => {
     if (store) {
@@ -391,6 +468,13 @@ export default function Settings() {
       setIsSaving(false);
     },
   });
+
+  const createMenuItemMutation = trpc.menu.createItem.useMutation();
+  const updateMenuItemMutation = trpc.menu.updateItem.useMutation();
+  const deleteMenuItemMutation = trpc.menu.deleteItem.useMutation();
+  const createFeedPostMutation = trpc.menu.createFeedPost.useMutation();
+  const updateFeedPostMutation = trpc.menu.updateFeedPost.useMutation();
+  const deleteFeedPostMutation = trpc.menu.deleteFeedPost.useMutation();
 
   const handleSave = () => {
     // バリデーション
@@ -461,6 +545,350 @@ export default function Settings() {
 
   const updateField = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const parsePrice = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = Number(trimmed);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  };
+
+  const uploadImage = async (file: File, kind: 'menu' | 'feed', storeId: number) => {
+    if (!file.type) {
+      throw new Error('ファイル形式を判定できません');
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error('JPEG/PNG/WebP形式のみアップロードできます');
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error('ファイルサイズは5MB以下にしてください');
+    }
+
+    const presignResponse = await fetch('/api/media/presign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        mime: file.type,
+        size: file.size,
+        kind,
+        storeId,
+      }),
+    });
+
+    if (!presignResponse.ok) {
+      const message = await presignResponse.text().catch(() => '画像のアップロード準備に失敗しました');
+      throw new Error(message || '画像のアップロード準備に失敗しました');
+    }
+
+    const { uploadUrl, publicUrl } = await presignResponse.json();
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      credentials: 'include',
+      body: file,
+    });
+
+    if (!uploadResponse.ok) {
+      const message = await uploadResponse.text().catch(() => '画像のアップロードに失敗しました');
+      throw new Error(message || '画像のアップロードに失敗しました');
+    }
+
+    return publicUrl as string;
+  };
+
+  const getNextSortOrder = (items: Array<{ sortOrder?: number }>) => {
+    if (items.length === 0) return 0;
+    return Math.max(...items.map(item => item.sortOrder ?? 0)) + 1;
+  };
+
+  const updateMenuItemDraft = (item: NonNullable<typeof adminItems>[number], updates: Partial<MenuItemDraft>) => {
+    setMenuItemDrafts(prev => {
+      const current = prev[item.id] ?? {
+        nameJa: item.nameJa ?? '',
+        descJa: item.descJa ?? '',
+        price: item.price !== null && item.price !== undefined ? String(item.price) : '',
+        categoryId: item.categoryId ? String(item.categoryId) : '',
+        photoFile: null,
+      };
+      return { ...prev, [item.id]: { ...current, ...updates } };
+    });
+  };
+
+  const updateFeedPostDraft = (post: NonNullable<typeof adminFeedPosts>[number], updates: Partial<FeedPostDraft>) => {
+    setFeedPostDrafts(prev => {
+      const current = prev[post.id] ?? {
+        titleJa: post.titleJa ?? '',
+        captionJa: post.captionJa ?? '',
+        price: post.price !== null && post.price !== undefined ? String(post.price) : '',
+        photoFile: null,
+      };
+      return { ...prev, [post.id]: { ...current, ...updates } };
+    });
+  };
+
+  const handleCreateMenuItem = async () => {
+    if (!store) return;
+    if (!newMenuItem.nameJa.trim()) {
+      toast.error('商品名を入力してください');
+      return;
+    }
+
+    setIsCreatingMenuItem(true);
+    try {
+      let photoUrl: string | undefined;
+      if (newMenuItem.photoFile) {
+        photoUrl = await uploadImage(newMenuItem.photoFile, 'menu', store.id);
+      }
+
+      await createMenuItemMutation.mutateAsync({
+        storeId: store.id,
+        nameJa: newMenuItem.nameJa.trim(),
+        descJa: newMenuItem.descJa.trim() || undefined,
+        price: parsePrice(newMenuItem.price),
+        categoryId: newMenuItem.categoryId ? Number(newMenuItem.categoryId) : undefined,
+        photoLargeUrl: photoUrl,
+        photoSmallUrl: photoUrl,
+        sortOrder: getNextSortOrder(sortedMenuItems),
+      });
+
+      setNewMenuItem({
+        nameJa: '',
+        descJa: '',
+        price: '',
+        categoryId: '',
+        photoFile: null,
+      });
+      setMenuItemFileKey(prev => prev + 1);
+      await refetchAdminItems();
+      toast.success('メニューを追加しました');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'メニューの追加に失敗しました';
+      toast.error(message);
+    } finally {
+      setIsCreatingMenuItem(false);
+    }
+  };
+
+  const handleSaveMenuItem = async (item: NonNullable<typeof adminItems>[number]) => {
+    if (!store) return;
+    const draft = menuItemDrafts[item.id];
+    if (!draft) return;
+
+    setUpdatingMenuItemId(item.id);
+    try {
+      let photoUrl: string | undefined;
+      if (draft.photoFile) {
+        photoUrl = await uploadImage(draft.photoFile, 'menu', store.id);
+      }
+
+      await updateMenuItemMutation.mutateAsync({
+        storeId: store.id,
+        itemId: item.id,
+        nameJa: draft.nameJa.trim(),
+        descJa: draft.descJa.trim() || undefined,
+        price: parsePrice(draft.price),
+        categoryId: draft.categoryId ? Number(draft.categoryId) : null,
+        photoLargeUrl: photoUrl,
+        photoSmallUrl: photoUrl,
+      });
+
+      setMenuItemDrafts(prev => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
+      await refetchAdminItems();
+      toast.success('メニューを更新しました');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'メニューの更新に失敗しました';
+      toast.error(message);
+    } finally {
+      setUpdatingMenuItemId(null);
+    }
+  };
+
+  const handleToggleMenuItem = async (itemId: number, isActive: boolean) => {
+    if (!store) return;
+    try {
+      await updateMenuItemMutation.mutateAsync({ storeId: store.id, itemId, isActive });
+      await refetchAdminItems();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '状態の更新に失敗しました';
+      toast.error(message);
+    }
+  };
+
+  const handleMoveMenuItem = async (itemId: number, direction: 'up' | 'down') => {
+    if (!store) return;
+    const index = sortedMenuItems.findIndex(item => item.id === itemId);
+    if (index < 0) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const targetItem = sortedMenuItems[targetIndex];
+    const currentItem = sortedMenuItems[index];
+    if (!targetItem || !currentItem) return;
+
+    try {
+      await updateMenuItemMutation.mutateAsync({
+        storeId: store.id,
+        itemId: currentItem.id,
+        sortOrder: targetIndex,
+      });
+      await updateMenuItemMutation.mutateAsync({
+        storeId: store.id,
+        itemId: targetItem.id,
+        sortOrder: index,
+      });
+      await refetchAdminItems();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '並び替えに失敗しました';
+      toast.error(message);
+    }
+  };
+
+  const handleDeleteMenuItem = async (itemId: number) => {
+    if (!store) return;
+    if (!window.confirm('このメニューを削除しますか？')) return;
+
+    try {
+      await deleteMenuItemMutation.mutateAsync({ storeId: store.id, itemId });
+      await refetchAdminItems();
+      toast.success('メニューを削除しました');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '削除に失敗しました';
+      toast.error(message);
+    }
+  };
+
+  const handleCreateFeedPost = async () => {
+    if (!store) return;
+    if (!newFeedPost.photoFile) {
+      toast.error('フィード画像を選択してください');
+      return;
+    }
+
+    setIsCreatingFeedPost(true);
+    try {
+      const photoUrl = await uploadImage(newFeedPost.photoFile, 'feed', store.id);
+      await createFeedPostMutation.mutateAsync({
+        storeId: store.id,
+        photoLargeUrl: photoUrl,
+        photoSmallUrl: photoUrl,
+        titleJa: newFeedPost.titleJa.trim() || undefined,
+        captionJa: newFeedPost.captionJa.trim() || undefined,
+        price: parsePrice(newFeedPost.price),
+        sortOrder: getNextSortOrder(sortedFeedPosts),
+      });
+
+      setNewFeedPost({
+        titleJa: '',
+        captionJa: '',
+        price: '',
+        photoFile: null,
+      });
+      setFeedPostFileKey(prev => prev + 1);
+      await refetchAdminFeedPosts();
+      toast.success('フィードを追加しました');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'フィードの追加に失敗しました';
+      toast.error(message);
+    } finally {
+      setIsCreatingFeedPost(false);
+    }
+  };
+
+  const handleSaveFeedPost = async (post: NonNullable<typeof adminFeedPosts>[number]) => {
+    if (!store) return;
+    const draft = feedPostDrafts[post.id];
+    if (!draft) return;
+
+    setUpdatingFeedPostId(post.id);
+    try {
+      let photoUrl: string | undefined;
+      if (draft.photoFile) {
+        photoUrl = await uploadImage(draft.photoFile, 'feed', store.id);
+      }
+
+      await updateFeedPostMutation.mutateAsync({
+        storeId: store.id,
+        feedPostId: post.id,
+        titleJa: draft.titleJa.trim() || undefined,
+        captionJa: draft.captionJa.trim() || undefined,
+        price: parsePrice(draft.price),
+        photoLargeUrl: photoUrl,
+        photoSmallUrl: photoUrl,
+      });
+
+      setFeedPostDrafts(prev => {
+        const next = { ...prev };
+        delete next[post.id];
+        return next;
+      });
+      await refetchAdminFeedPosts();
+      toast.success('フィードを更新しました');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'フィードの更新に失敗しました';
+      toast.error(message);
+    } finally {
+      setUpdatingFeedPostId(null);
+    }
+  };
+
+  const handleToggleFeedPost = async (feedPostId: number, isActive: boolean) => {
+    if (!store) return;
+    try {
+      await updateFeedPostMutation.mutateAsync({ storeId: store.id, feedPostId, isActive });
+      await refetchAdminFeedPosts();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '状態の更新に失敗しました';
+      toast.error(message);
+    }
+  };
+
+  const handleMoveFeedPost = async (feedPostId: number, direction: 'up' | 'down') => {
+    if (!store) return;
+    const index = sortedFeedPosts.findIndex(post => post.id === feedPostId);
+    if (index < 0) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const targetPost = sortedFeedPosts[targetIndex];
+    const currentPost = sortedFeedPosts[index];
+    if (!targetPost || !currentPost) return;
+
+    try {
+      await updateFeedPostMutation.mutateAsync({
+        storeId: store.id,
+        feedPostId: currentPost.id,
+        sortOrder: targetIndex,
+      });
+      await updateFeedPostMutation.mutateAsync({
+        storeId: store.id,
+        feedPostId: targetPost.id,
+        sortOrder: index,
+      });
+      await refetchAdminFeedPosts();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '並び替えに失敗しました';
+      toast.error(message);
+    }
+  };
+
+  const handleDeleteFeedPost = async (feedPostId: number) => {
+    if (!store) return;
+    if (!window.confirm('このフィードを削除しますか？')) return;
+
+    try {
+      await deleteFeedPostMutation.mutateAsync({ storeId: store.id, feedPostId });
+      await refetchAdminFeedPosts();
+      toast.success('フィードを削除しました');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '削除に失敗しました';
+      toast.error(message);
+    }
   };
 
   if (authLoading || storeLoading) {
@@ -831,74 +1259,511 @@ export default function Settings() {
 
           {/* Menu Settings */}
           <TabsContent value="menu">
-            <Card>
-              <CardHeader>
-                <CardTitle>メニュー設定</CardTitle>
-                <CardDescription>メニュー表示の設定を行います</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="menuSwitchStyle">切替スタイル</Label>
-                    <Select
-                      value={formData.menuSwitchStyle}
-                      onValueChange={(value) => updateField('menuSwitchStyle', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="toggle">トグル</SelectItem>
-                        <SelectItem value="tabs">タブ</SelectItem>
-                      </SelectContent>
-                    </Select>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>メニュー設定</CardTitle>
+                  <CardDescription>メニュー表示の設定を行います</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="menuSwitchStyle">切替スタイル</Label>
+                      <Select
+                        value={formData.menuSwitchStyle}
+                        onValueChange={(value) => updateField('menuSwitchStyle', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="toggle">トグル</SelectItem>
+                          <SelectItem value="tabs">タブ</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="menuDefaultView">デフォルト表示</Label>
+                      <Select
+                        value={formData.menuDefaultView}
+                        onValueChange={(value) => updateField('menuDefaultView', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="feed">フィード</SelectItem>
+                          <SelectItem value="list">一覧</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="menuDefaultView">デフォルト表示</Label>
-                    <Select
-                      value={formData.menuDefaultView}
-                      onValueChange={(value) => updateField('menuDefaultView', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="feed">フィード</SelectItem>
-                        <SelectItem value="list">一覧</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
 
-                <Separator />
+                  <Separator />
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="photoDefaultSize">写真デフォルトサイズ</Label>
-                    <Select
-                      value={formData.photoDefaultSize}
-                      onValueChange={(value) => updateField('photoDefaultSize', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="large">大</SelectItem>
-                        <SelectItem value="small">小</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="photoDefaultSize">写真デフォルトサイズ</Label>
+                      <Select
+                        value={formData.photoDefaultSize}
+                        onValueChange={(value) => updateField('photoDefaultSize', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="large">大</SelectItem>
+                          <SelectItem value="small">小</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="allowPhotoSizeToggle"
+                        checked={formData.allowPhotoSizeToggle}
+                        onCheckedChange={(checked) => updateField('allowPhotoSizeToggle', checked)}
+                      />
+                      <Label htmlFor="allowPhotoSizeToggle">写真サイズ切替を許可</Label>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="allowPhotoSizeToggle"
-                      checked={formData.allowPhotoSizeToggle}
-                      onCheckedChange={(checked) => updateField('allowPhotoSizeToggle', checked)}
-                    />
-                    <Label htmlFor="allowPhotoSizeToggle">写真サイズ切替を許可</Label>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>メニュー一覧管理</CardTitle>
+                  <CardDescription>一覧表示用のメニューを管理します</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <ImagePlus className="h-4 w-4" />
+                      新規メニュー追加
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="newMenuName">商品名</Label>
+                        <Input
+                          id="newMenuName"
+                          value={newMenuItem.nameJa}
+                          onChange={(e) => setNewMenuItem(prev => ({ ...prev, nameJa: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="newMenuPrice">価格</Label>
+                        <Input
+                          id="newMenuPrice"
+                          type="number"
+                          min={0}
+                          value={newMenuItem.price}
+                          onChange={(e) => setNewMenuItem(prev => ({ ...prev, price: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="newMenuDesc">説明</Label>
+                      <Textarea
+                        id="newMenuDesc"
+                        value={newMenuItem.descJa}
+                        onChange={(e) => setNewMenuItem(prev => ({ ...prev, descJa: e.target.value }))}
+                      />
+                    </div>
+                    {menuCategories && menuCategories.length > 0 && (
+                      <div className="space-y-2">
+                        <Label htmlFor="newMenuCategory">カテゴリ</Label>
+                        <Select
+                          value={newMenuItem.categoryId || 'none'}
+                          onValueChange={(value) =>
+                            setNewMenuItem(prev => ({ ...prev, categoryId: value === 'none' ? '' : value }))
+                          }
+                        >
+                          <SelectTrigger id="newMenuCategory">
+                            <SelectValue placeholder="未選択" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">未選択</SelectItem>
+                            {menuCategories.map(category => (
+                              <SelectItem key={category.id} value={String(category.id)}>
+                                {category.nameJa}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="newMenuPhoto">画像</Label>
+                      <Input
+                        key={menuItemFileKey}
+                        id="newMenuPhoto"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(e) =>
+                          setNewMenuItem(prev => ({
+                            ...prev,
+                            photoFile: e.target.files?.[0] ?? null,
+                          }))
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">5MBまでのJPEG/PNG/WebP</p>
+                    </div>
+                    <Button onClick={handleCreateMenuItem} disabled={isCreatingMenuItem || createMenuItemMutation.isPending}>
+                      {isCreatingMenuItem ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plus className="mr-2 h-4 w-4" />
+                      )}
+                      追加する
+                    </Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+
+                  <Separator />
+
+                  <div className="space-y-4">
+                    {adminItemsLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        読み込み中...
+                      </div>
+                    ) : sortedMenuItems.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">登録されたメニューがありません</p>
+                    ) : (
+                      sortedMenuItems.map((item, index) => {
+                        const draft = menuItemDrafts[item.id] ?? {
+                          nameJa: item.nameJa ?? '',
+                          descJa: item.descJa ?? '',
+                          price: item.price !== null && item.price !== undefined ? String(item.price) : '',
+                          categoryId: item.categoryId ? String(item.categoryId) : '',
+                          photoFile: null,
+                        };
+
+                        return (
+                          <div
+                            key={item.id}
+                            className={`rounded-lg border p-4 ${item.isActive ? '' : 'opacity-60'}`}
+                          >
+                            <div className="flex flex-col gap-4 md:flex-row">
+                              <div className="h-24 w-24 shrink-0 overflow-hidden rounded-md bg-muted">
+                                {item.photoLargeUrl ? (
+                                  <img
+                                    src={item.photoLargeUrl}
+                                    alt={item.nameJa ?? ''}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                                    No Image
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 space-y-3">
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  <div className="space-y-1">
+                                    <Label>商品名</Label>
+                                    <Input
+                                      value={draft.nameJa}
+                                      onChange={(e) => updateMenuItemDraft(item, { nameJa: e.target.value })}
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label>価格</Label>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      value={draft.price}
+                                      onChange={(e) => updateMenuItemDraft(item, { price: e.target.value })}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <Label>説明</Label>
+                                  <Textarea
+                                    value={draft.descJa}
+                                    onChange={(e) => updateMenuItemDraft(item, { descJa: e.target.value })}
+                                  />
+                                </div>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  {menuCategories && menuCategories.length > 0 && (
+                                    <div className="space-y-1">
+                                      <Label>カテゴリ</Label>
+                                      <Select
+                                        value={draft.categoryId || 'none'}
+                                        onValueChange={(value) =>
+                                          updateMenuItemDraft(item, { categoryId: value === 'none' ? '' : value })
+                                        }
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="未選択" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="none">未選択</SelectItem>
+                                          {menuCategories.map(category => (
+                                            <SelectItem key={category.id} value={String(category.id)}>
+                                              {category.nameJa}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  )}
+                                  <div className="space-y-1">
+                                    <Label>画像更新</Label>
+                                    <Input
+                                      type="file"
+                                      accept="image/jpeg,image/png,image/webp"
+                                      onChange={(e) =>
+                                        updateMenuItemDraft(item, { photoFile: e.target.files?.[0] ?? null })
+                                      }
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <Switch
+                                      checked={item.isActive}
+                                      onCheckedChange={(checked) => handleToggleMenuItem(item.id, checked)}
+                                    />
+                                    <span className="text-sm">公開</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => handleMoveMenuItem(item.id, 'up')}
+                                      disabled={index === 0}
+                                    >
+                                      <ChevronUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => handleMoveMenuItem(item.id, 'down')}
+                                      disabled={index === sortedMenuItems.length - 1}
+                                    >
+                                      <ChevronDown className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleSaveMenuItem(item)}
+                                    disabled={updatingMenuItemId === item.id}
+                                  >
+                                    {updatingMenuItemId === item.id ? (
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Save className="mr-2 h-4 w-4" />
+                                    )}
+                                    保存
+                                  </Button>
+                                  <Button variant="destructive" size="sm" onClick={() => handleDeleteMenuItem(item.id)}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    削除
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>フィード投稿管理</CardTitle>
+                  <CardDescription>フィード表示用の投稿を管理します</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <ImagePlus className="h-4 w-4" />
+                      新規フィード投稿
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="newFeedTitle">タイトル</Label>
+                        <Input
+                          id="newFeedTitle"
+                          value={newFeedPost.titleJa}
+                          onChange={(e) => setNewFeedPost(prev => ({ ...prev, titleJa: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="newFeedPrice">価格</Label>
+                        <Input
+                          id="newFeedPrice"
+                          type="number"
+                          min={0}
+                          value={newFeedPost.price}
+                          onChange={(e) => setNewFeedPost(prev => ({ ...prev, price: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="newFeedCaption">キャプション</Label>
+                      <Textarea
+                        id="newFeedCaption"
+                        value={newFeedPost.captionJa}
+                        onChange={(e) => setNewFeedPost(prev => ({ ...prev, captionJa: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="newFeedPhoto">画像</Label>
+                      <Input
+                        key={feedPostFileKey}
+                        id="newFeedPhoto"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(e) =>
+                          setNewFeedPost(prev => ({
+                            ...prev,
+                            photoFile: e.target.files?.[0] ?? null,
+                          }))
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">5MBまでのJPEG/PNG/WebP</p>
+                    </div>
+                    <Button onClick={handleCreateFeedPost} disabled={isCreatingFeedPost || createFeedPostMutation.isPending}>
+                      {isCreatingFeedPost ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plus className="mr-2 h-4 w-4" />
+                      )}
+                      追加する
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-4">
+                    {adminFeedLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        読み込み中...
+                      </div>
+                    ) : sortedFeedPosts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">登録されたフィードがありません</p>
+                    ) : (
+                      sortedFeedPosts.map((post, index) => {
+                        const draft = feedPostDrafts[post.id] ?? {
+                          titleJa: post.titleJa ?? '',
+                          captionJa: post.captionJa ?? '',
+                          price: post.price !== null && post.price !== undefined ? String(post.price) : '',
+                          photoFile: null,
+                        };
+
+                        return (
+                          <div
+                            key={post.id}
+                            className={`rounded-lg border p-4 ${post.isActive ? '' : 'opacity-60'}`}
+                          >
+                            <div className="flex flex-col gap-4 md:flex-row">
+                              <div className="h-24 w-24 shrink-0 overflow-hidden rounded-md bg-muted">
+                                {post.photoLargeUrl ? (
+                                  <img
+                                    src={post.photoLargeUrl}
+                                    alt={post.titleJa ?? ''}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                                    No Image
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 space-y-3">
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  <div className="space-y-1">
+                                    <Label>タイトル</Label>
+                                    <Input
+                                      value={draft.titleJa}
+                                      onChange={(e) => updateFeedPostDraft(post, { titleJa: e.target.value })}
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label>価格</Label>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      value={draft.price}
+                                      onChange={(e) => updateFeedPostDraft(post, { price: e.target.value })}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <Label>キャプション</Label>
+                                  <Textarea
+                                    value={draft.captionJa}
+                                    onChange={(e) => updateFeedPostDraft(post, { captionJa: e.target.value })}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label>画像更新</Label>
+                                  <Input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    onChange={(e) => updateFeedPostDraft(post, { photoFile: e.target.files?.[0] ?? null })}
+                                  />
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <Switch
+                                      checked={post.isActive}
+                                      onCheckedChange={(checked) => handleToggleFeedPost(post.id, checked)}
+                                    />
+                                    <span className="text-sm">公開</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => handleMoveFeedPost(post.id, 'up')}
+                                      disabled={index === 0}
+                                    >
+                                      <ChevronUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => handleMoveFeedPost(post.id, 'down')}
+                                      disabled={index === sortedFeedPosts.length - 1}
+                                    >
+                                      <ChevronDown className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleSaveFeedPost(post)}
+                                    disabled={updatingFeedPostId === post.id}
+                                  >
+                                    {updatingFeedPostId === post.id ? (
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Save className="mr-2 h-4 w-4" />
+                                    )}
+                                    保存
+                                  </Button>
+                                  <Button variant="destructive" size="sm" onClick={() => handleDeleteFeedPost(post.id)}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    削除
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Kiosk Settings */}

@@ -159,6 +159,8 @@ function MenuContent() {
                       <img
                         src={photoSize === 'large' ? post.photoLargeUrl : (post.photoSmallUrl || post.photoLargeUrl)}
                         alt={getField(post, 'title') || ''}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
                       />
                     </div>
@@ -195,6 +197,8 @@ function MenuContent() {
                       <img
                         src={(photoSize === 'large' ? item.photoLargeUrl : (item.photoSmallUrl || item.photoLargeUrl)) || ''}
                         alt={getField(item, 'name')}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
                       />
                     </div>

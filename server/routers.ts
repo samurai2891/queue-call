@@ -663,6 +663,20 @@ const staffRouter = router({
 });
 
 // ==================== Menu Router ====================
+async function assertStoreOwner(storeId: number, userId: number) {
+  const store = await db.getStoreById(storeId);
+  if (!store || store.ownerId !== userId) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+  }
+  return store;
+}
+
+function stripUndefined<T extends Record<string, unknown>>(values: T) {
+  return Object.fromEntries(
+    Object.entries(values).filter(([, value]) => value !== undefined)
+  ) as Partial<T>;
+}
+
 const menuRouter = router({
   // Get categories (public)
   getCategories: publicProcedure
@@ -686,6 +700,25 @@ const menuRouter = router({
     .input(z.object({ storeId: z.number() }))
     .query(async ({ input }) => {
       return await db.getFeedPosts(input.storeId);
+    }),
+
+  // Get items for admin (include inactive)
+  getAdminItems: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      categoryId: z.number().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertStoreOwner(input.storeId, ctx.user.id);
+      return await db.getMenuItemsForStore(input.storeId, input.categoryId, true);
+    }),
+
+  // Get feed posts for admin (include inactive)
+  getAdminFeed: protectedProcedure
+    .input(z.object({ storeId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertStoreOwner(input.storeId, ctx.user.id);
+      return await db.getFeedPostsForStore(input.storeId, true);
     }),
 
   // Create category (protected)
@@ -739,6 +772,62 @@ const menuRouter = router({
       return { success: true };
     }),
 
+  // Update item (protected)
+  updateItem: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      itemId: z.number(),
+      categoryId: z.number().nullable().optional(),
+      nameJa: z.string().optional(),
+      nameEn: z.string().optional(),
+      nameKo: z.string().optional(),
+      nameZhHans: z.string().optional(),
+      nameZhHant: z.string().optional(),
+      descJa: z.string().optional(),
+      descEn: z.string().optional(),
+      descKo: z.string().optional(),
+      descZhHans: z.string().optional(),
+      descZhHant: z.string().optional(),
+      price: z.number().optional(),
+      photoLargeUrl: z.string().optional(),
+      photoSmallUrl: z.string().optional(),
+      isActive: z.boolean().optional(),
+      sortOrder: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertStoreOwner(input.storeId, ctx.user.id);
+      const item = await db.getMenuItemById(input.itemId);
+      if (!item || item.storeId !== input.storeId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Menu item not found' });
+      }
+
+      const { storeId, itemId, ...updates } = input;
+      const updateData = stripUndefined(updates);
+      if (Object.keys(updateData).length === 0) {
+        return { success: true };
+      }
+
+      await db.updateMenuItem(itemId, updateData, storeId);
+      return { success: true };
+    }),
+
+  // Delete item (protected)
+  deleteItem: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      itemId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertStoreOwner(input.storeId, ctx.user.id);
+      const item = await db.getMenuItemById(input.itemId);
+      if (!item || item.storeId !== input.storeId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Menu item not found' });
+      }
+
+      await db.deleteMenuItem(input.itemId, input.storeId);
+      return { success: true };
+    }),
+
   // Create feed post (protected)
   createFeedPost: protectedProcedure
     .input(z.object({
@@ -757,6 +846,7 @@ const menuRouter = router({
       captionZhHant: z.string().optional(),
       price: z.number().optional(),
       linkedMenuItemId: z.number().optional(),
+      sortOrder: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const store = await db.getStoreById(input.storeId);
@@ -765,6 +855,62 @@ const menuRouter = router({
       }
 
       await db.createFeedPost(input);
+      return { success: true };
+    }),
+
+  // Update feed post (protected)
+  updateFeedPost: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      feedPostId: z.number(),
+      photoLargeUrl: z.string().optional(),
+      photoSmallUrl: z.string().optional(),
+      titleJa: z.string().optional(),
+      titleEn: z.string().optional(),
+      titleKo: z.string().optional(),
+      titleZhHans: z.string().optional(),
+      titleZhHant: z.string().optional(),
+      captionJa: z.string().optional(),
+      captionEn: z.string().optional(),
+      captionKo: z.string().optional(),
+      captionZhHans: z.string().optional(),
+      captionZhHant: z.string().optional(),
+      price: z.number().optional(),
+      linkedMenuItemId: z.number().nullable().optional(),
+      isActive: z.boolean().optional(),
+      sortOrder: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertStoreOwner(input.storeId, ctx.user.id);
+      const post = await db.getFeedPostById(input.feedPostId);
+      if (!post || post.storeId !== input.storeId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Feed post not found' });
+      }
+
+      const { storeId, feedPostId, ...updates } = input;
+      const updateData = stripUndefined(updates);
+      if (Object.keys(updateData).length === 0) {
+        return { success: true };
+      }
+
+      await db.updateFeedPost(feedPostId, updateData, storeId);
+      return { success: true };
+    }),
+
+  // Delete feed post (protected)
+  deleteFeedPost: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      feedPostId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertStoreOwner(input.storeId, ctx.user.id);
+      const post = await db.getFeedPostById(input.feedPostId);
+      if (!post || post.storeId !== input.storeId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Feed post not found' });
+      }
+
+      await db.deleteFeedPost(input.feedPostId, input.storeId);
       return { success: true };
     }),
 });

@@ -443,10 +443,21 @@ export async function getMenuCategories(storeId: number) {
 }
 
 export async function getMenuItems(storeId: number, categoryId?: number) {
+  return await getMenuItemsForStore(storeId, categoryId, false);
+}
+
+export async function getMenuItemsForStore(
+  storeId: number,
+  categoryId?: number,
+  includeInactive: boolean = false
+) {
   const db = await getDb();
   if (!db) return [];
 
-  const conditions = [eq(menuItems.storeId, storeId), eq(menuItems.isActive, true)];
+  const conditions = [eq(menuItems.storeId, storeId)];
+  if (!includeInactive) {
+    conditions.push(eq(menuItems.isActive, true));
+  }
   if (categoryId) {
     conditions.push(eq(menuItems.categoryId, categoryId));
   }
@@ -454,8 +465,17 @@ export async function getMenuItems(storeId: number, categoryId?: number) {
   return await db.select()
     .from(menuItems)
     .where(and(...conditions))
-    .orderBy(asc(menuItems.sortOrder));
+    .orderBy(asc(menuItems.sortOrder), asc(menuItems.id));
 }
+
+export async function getMenuItemById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(menuItems).where(eq(menuItems.id, id)).limit(1);
+  return result[0];
+}
+
 
 export async function createMenuItem(data: InsertMenuItem): Promise<void> {
   const db = await getDb();
@@ -464,12 +484,32 @@ export async function createMenuItem(data: InsertMenuItem): Promise<void> {
   await db.insert(menuItems).values(data);
 }
 
-export async function updateMenuItem(id: number, data: Partial<InsertMenuItem>): Promise<void> {
+export async function updateMenuItem(
+  id: number,
+  data: Partial<InsertMenuItem>,
+  storeId?: number
+): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(menuItems).set(data).where(eq(menuItems.id, id));
+  const whereClause = storeId
+    ? and(eq(menuItems.id, id), eq(menuItems.storeId, storeId))
+    : eq(menuItems.id, id);
+
+  await db.update(menuItems).set(data).where(whereClause);
 }
+
+export async function deleteMenuItem(id: number, storeId?: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const whereClause = storeId
+    ? and(eq(menuItems.id, id), eq(menuItems.storeId, storeId))
+    : eq(menuItems.id, id);
+
+  await db.delete(menuItems).where(whereClause);
+}
+
 
 export async function createMenuCategory(data: InsertMenuCategory): Promise<void> {
   const db = await getDb();
@@ -488,14 +528,32 @@ export async function updateMenuCategory(id: number, data: Partial<InsertMenuCat
 // ==================== Feed Post Functions ====================
 
 export async function getFeedPosts(storeId: number) {
+  return await getFeedPostsForStore(storeId, false);
+}
+
+export async function getFeedPostsForStore(storeId: number, includeInactive: boolean = false) {
   const db = await getDb();
   if (!db) return [];
 
+  const conditions = [eq(feedPosts.storeId, storeId)];
+  if (!includeInactive) {
+    conditions.push(eq(feedPosts.isActive, true));
+  }
+
   return await db.select()
     .from(feedPosts)
-    .where(and(eq(feedPosts.storeId, storeId), eq(feedPosts.isActive, true)))
-    .orderBy(desc(feedPosts.createdAt));
+    .where(and(...conditions))
+    .orderBy(asc(feedPosts.sortOrder), desc(feedPosts.createdAt));
 }
+
+export async function getFeedPostById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(feedPosts).where(eq(feedPosts.id, id)).limit(1);
+  return result[0];
+}
+
 
 export async function createFeedPost(data: InsertFeedPost): Promise<void> {
   const db = await getDb();
@@ -504,12 +562,32 @@ export async function createFeedPost(data: InsertFeedPost): Promise<void> {
   await db.insert(feedPosts).values(data);
 }
 
-export async function updateFeedPost(id: number, data: Partial<InsertFeedPost>): Promise<void> {
+export async function updateFeedPost(
+  id: number,
+  data: Partial<InsertFeedPost>,
+  storeId?: number
+): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(feedPosts).set(data).where(eq(feedPosts.id, id));
+  const whereClause = storeId
+    ? and(eq(feedPosts.id, id), eq(feedPosts.storeId, storeId))
+    : eq(feedPosts.id, id);
+
+  await db.update(feedPosts).set(data).where(whereClause);
 }
+
+export async function deleteFeedPost(id: number, storeId?: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const whereClause = storeId
+    ? and(eq(feedPosts.id, id), eq(feedPosts.storeId, storeId))
+    : eq(feedPosts.id, id);
+
+  await db.delete(feedPosts).where(whereClause);
+}
+
 
 // ==================== Audit Log Functions ====================
 
