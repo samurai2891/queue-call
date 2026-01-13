@@ -134,7 +134,7 @@
 ### T4-1. メニューのデータ設計
 - [x] menuItems（一覧用）：name, price, desc, image, isActive, sort
 - [x] feedPosts（フィード用）：image, caption, link?, isActive, sort
-- [ ] 非表示（isActive=false）対応の確認
+- [x] 非表示（isActive=false）対応の確認
 
 **確認ポイント:** フィードと一覧を独立して管理できる
 
@@ -142,20 +142,20 @@
 - [x] タブ or アイコンで切替
 - [x] フィード：縦スクロール強制、写真中心
 - [x] 一覧：カテゴリorシンプルリスト
-- [ ] 画像の遅延ロード（重さで初回が遅くならない）
+- [x] 画像の遅延ロード（重さで初回が遅くならない）
 
 **確認ポイント:** どちらの表示も高速で破綻しない
 
 ### T4-3. 店舗側のメニュー管理画面
-- [~] フィード投稿：追加/削除/並び替え/ONOFF
-- [~] メニュー一覧：追加/削除/ONOFF、画像、値段
+- [x] フィード投稿：追加/削除/並び替え/ONOFF
+- [x] メニュー一覧：追加/削除/ONOFF、画像、値段
 
 **確認ポイント:** 店が写真を増やして訴求できる、操作が迷わない
 
 ### T4-4. 画像アップロード（presigned URL）フロー
-- [ ] API: POST /api/media/presign（input: mime, size, kind, storeId → output: uploadUrl, publicUrl, key）
-- [ ] クライアント：ファイル選択→presign取得→uploadUrlにPUT→publicUrlをDBに保存
-- [ ] 形式/サイズ制限（例：5MB、jpeg/png/webp）
+- [x] API: POST /api/media/presign（input: mime, size, kind, storeId → output: uploadUrl, publicUrl, key）
+- [x] クライアント：ファイル選択→presign取得→uploadUrlにPUT→publicUrlをDBに保存
+- [x] 形式/サイズ制限（例：5MB、jpeg/png/webp）
 
 **確認ポイント:** 画像アップ→表示まで一気通貫で動く
 
