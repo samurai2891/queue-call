@@ -52,6 +52,12 @@ export const stores = mysqlTable("stores", {
   // 設定JSON
   settings: json("settings").$type<StoreSettings>(),
   
+  // SMS残高（プリペイド）
+  smsBalance: int("smsBalance").default(0).notNull(),
+  
+  // Stripe顧客ID
+  stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
+  
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -284,3 +290,36 @@ export const staffSessions = mysqlTable("staff_sessions", {
 
 export type StaffSession = typeof staffSessions.$inferSelect;
 export type InsertStaffSession = typeof staffSessions.$inferInsert;
+
+/**
+ * SmsTransaction - SMS残高取引履歴
+ */
+export const smsTransactions = mysqlTable("sms_transactions", {
+  id: int("id").autoincrement().primaryKey(),
+  storeId: int("storeId").notNull(),
+  
+  // 取引タイプ: charge（チャージ）, consume（消費）, refund（返金）
+  type: mysqlEnum("type", ["charge", "consume", "refund"]).notNull(),
+  
+  // 金額（円）: チャージは正、消費は負
+  amount: int("amount").notNull(),
+  
+  // 取引後の残高
+  balanceAfter: int("balanceAfter").notNull(),
+  
+  // Stripe関連（チャージ時のみ）
+  stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }),
+  stripeCheckoutSessionId: varchar("stripeCheckoutSessionId", { length: 255 }),
+  
+  // SMS送信関連（消費時のみ）
+  ticketId: int("ticketId"),
+  smsMessageSid: varchar("smsMessageSid", { length: 64 }),
+  
+  // メモ
+  description: text("description"),
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SmsTransaction = typeof smsTransactions.$inferSelect;
+export type InsertSmsTransaction = typeof smsTransactions.$inferInsert;

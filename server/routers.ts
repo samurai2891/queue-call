@@ -8,6 +8,7 @@ import * as db from "./db";
 import { notifyTicketCalled } from "./notifications";
 import { broadcastQueueUpdate, broadcastTicketUpdate, broadcastIntakeStatus } from "./sse";
 import * as bcrypt from "bcryptjs";
+import { createCheckoutSession, getSmsBalance, getSmsTransactions, CHARGE_PLANS, SMS_COST_PER_MESSAGE } from "./stripe";
 
 
 type TicketStatus = 'WAITING' | 'CALLED' | 'ARRIVED' | 'SKIPPED' | 'DONE' | 'CANCELED' | 'EXPIRED';
@@ -439,7 +440,7 @@ const staffRouter = router({
       const storeName = store?.name ?? 'Queue Call';
       const pushEnabled = store?.settings?.notifications?.pushEnabled ?? true;
       if (pushEnabled) {
-        await notifyTicketCalled(nextTicket.id, storeName, nextTicket.number);
+        await notifyTicketCalled(nextTicket.id, input.storeId, storeName, nextTicket.number);
       }
 
       return nextTicket;
@@ -499,7 +500,7 @@ const staffRouter = router({
       const storeName = store?.name ?? 'Queue Call';
       const pushEnabled = store?.settings?.notifications?.pushEnabled ?? true;
       if (pushEnabled) {
-        await notifyTicketCalled(ticket.id, storeName, ticket.number);
+        await notifyTicketCalled(ticket.id, session.storeId, storeName, ticket.number);
       }
 
       return ticket;
@@ -538,7 +539,7 @@ const staffRouter = router({
       const storeName = store?.name ?? 'Queue Call';
       const pushEnabled = store?.settings?.notifications?.pushEnabled ?? true;
       if (pushEnabled) {
-        await notifyTicketCalled(ticket.id, storeName, ticket.number);
+        await notifyTicketCalled(ticket.id, session.storeId, storeName, ticket.number);
       }
 
       const waitingCount = await db.getWaitingCount(session.storeId);
@@ -816,6 +817,79 @@ const notificationRouter = router({
     }),
 });
 
+// ==================== Stripe Router ====================
+const stripeRouter = router({
+  // Get charge plans
+  getChargePlans: publicProcedure.query(() => {
+    return {
+      plans: CHARGE_PLANS,
+      costPerSms: SMS_COST_PER_MESSAGE,
+    };
+  }),
+
+  // Get SMS balance (protected)
+  getSmsBalance: protectedProcedure
+    .input(z.object({ storeId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      const balance = await getSmsBalance(input.storeId);
+      const estimatedSms = Math.floor(balance / SMS_COST_PER_MESSAGE);
+
+      return {
+        balance,
+        estimatedSms,
+        costPerSms: SMS_COST_PER_MESSAGE,
+      };
+    }),
+
+  // Get SMS transaction history (protected)
+  getSmsTransactions: protectedProcedure
+    .input(z.object({ storeId: z.number(), limit: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      return await getSmsTransactions(input.storeId, input.limit);
+    }),
+
+  // Create checkout session for SMS charge (protected)
+  createCheckoutSession: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      amount: z.number().min(1000).max(100000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      // Validate amount is one of the plans
+      const validPlan = CHARGE_PLANS.find(p => p.amount === input.amount);
+      if (!validPlan) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid charge amount' });
+      }
+
+      const origin = ctx.req.headers.origin || 'http://localhost:3000';
+      const session = await createCheckoutSession({
+        storeId: store.id,
+        storeName: store.name,
+        amount: input.amount,
+        successUrl: `${origin}/admin/settings?tab=notifications&charge=success`,
+        cancelUrl: `${origin}/admin/settings?tab=notifications&charge=canceled`,
+        customerEmail: ctx.user.email || undefined,
+      });
+
+      return session;
+    }),
+});
+
 // ==================== Main Router ====================
 export const appRouter = router({
   system: systemRouter,
@@ -832,6 +906,7 @@ export const appRouter = router({
   staff: staffRouter,
   menu: menuRouter,
   notification: notificationRouter,
+  stripe: stripeRouter,
 });
 
 export type AppRouter = typeof appRouter;

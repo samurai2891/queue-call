@@ -1,6 +1,7 @@
 import { getDb } from './db';
 import { pushSubscriptions, smsSubscriptions, tickets } from '../drizzle/schema';
 import { eq, and, isNull, isNotNull } from 'drizzle-orm';
+import { consumeSmsBalance } from './stripe';
 
 // Web Push notification payload
 interface PushPayload {
@@ -73,18 +74,19 @@ export async function sendPushNotification(
   }
 }
 
-// Send SMS notification via Twilio
+// Send SMS notification via Twilio with balance check
 export async function sendSmsNotification(
   ticketId: number,
+  storeId: number,
   message: string,
   twilioConfig: {
     accountSid: string;
     authToken: string;
     fromNumber: string;
   }
-): Promise<boolean> {
+): Promise<{ success: boolean; reason?: string }> {
   const db = await getDb();
-  if (!db) return false;
+  if (!db) return { success: false, reason: 'Database not available' };
 
   try {
     // Get SMS subscription for this ticket
@@ -101,10 +103,21 @@ export async function sendSmsNotification(
 
     if (subscriptions.length === 0) {
       console.log(`[SMS] No verified subscriptions found for ticket ${ticketId}`);
-      return false;
+      return { success: false, reason: 'No verified subscription' };
     }
 
     const subscription = subscriptions[0];
+
+    // Check and consume SMS balance BEFORE sending
+    const balanceResult = await consumeSmsBalance({
+      storeId,
+      ticketId,
+    });
+
+    if (!balanceResult.success) {
+      console.log(`[SMS] Insufficient balance for store ${storeId}: ${balanceResult.reason}`);
+      return { success: false, reason: balanceResult.reason };
+    }
 
     // Send via Twilio
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioConfig.accountSid}/Messages.json`;
@@ -126,8 +139,11 @@ export async function sendSmsNotification(
     if (!response.ok) {
       const error = await response.text();
       console.error('[SMS] Twilio error:', error);
-      return false;
+      // Note: Balance was already consumed. In production, consider refund logic here.
+      return { success: false, reason: 'Twilio API error' };
     }
+
+    const result = await response.json();
 
     // Update last sent time
     await db
@@ -135,10 +151,11 @@ export async function sendSmsNotification(
       .set({ lastSentAt: new Date() })
       .where(eq(smsSubscriptions.id, subscription.id));
 
-    return true;
+    console.log(`[SMS] Successfully sent to ${subscription.phoneE164}, SID: ${result.sid}`);
+    return { success: true };
   } catch (error) {
     console.error('[SMS] Error sending notification:', error);
-    return false;
+    return { success: false, reason: 'Internal error' };
   }
 }
 
@@ -223,6 +240,7 @@ export async function verifyOtp(
 // Notify ticket holder when called
 export async function notifyTicketCalled(
   ticketId: number,
+  storeId: number,
   storeName: string,
   ticketNumber: number,
   twilioConfig?: {
@@ -231,8 +249,8 @@ export async function notifyTicketCalled(
     fromNumber: string;
   },
   smsTemplate?: string
-): Promise<{ push: boolean; sms: boolean }> {
-  const results = { push: false, sms: false };
+): Promise<{ push: boolean; sms: boolean; smsReason?: string }> {
+  const results: { push: boolean; sms: boolean; smsReason?: string } = { push: false, sms: false };
 
   // Send push notification
   results.push = await sendPushNotification(ticketId, {
@@ -254,7 +272,9 @@ export async function notifyTicketCalled(
           .replace('{number}', String(ticketNumber))
       : `【${storeName}】お客様の番号 ${ticketNumber} が呼び出されました。カウンターまでお越しください。`;
 
-    results.sms = await sendSmsNotification(ticketId, message, twilioConfig);
+    const smsResult = await sendSmsNotification(ticketId, storeId, message, twilioConfig);
+    results.sms = smsResult.success;
+    results.smsReason = smsResult.reason;
   }
 
   return results;

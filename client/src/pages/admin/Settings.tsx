@@ -23,7 +23,10 @@ import {
   Loader2,
   Save,
   RefreshCw,
-  ArrowLeft
+  ArrowLeft,
+  CreditCard,
+  MessageSquare,
+  Wallet
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getLoginUrl } from '@/const';
@@ -35,6 +38,156 @@ const LOCALE_OPTIONS = [
   { value: 'zh-Hans', label: '简体中文' },
   { value: 'zh-Hant', label: '繁體中文' },
 ];
+
+// SMSチャージ金額オプション
+const SMS_CHARGE_OPTIONS = [
+  { amount: 5000, label: '¥5,000', messages: 250 },
+  { amount: 10000, label: '¥10,000', messages: 500 },
+  { amount: 30000, label: '¥30,000', messages: 1500 },
+  { amount: 50000, label: '¥50,000', messages: 2500 },
+];
+
+const SMS_COST_PER_MESSAGE = 20; // 1通あたり20円
+
+// SMS残高カードコンポーネント
+function SmsBalanceCard({ storeId }: { storeId?: number }) {
+  const [isCharging, setIsCharging] = useState(false);
+  const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
+  
+  // SMS残高取得
+  const { data: balanceData, isLoading: balanceLoading, refetch: refetchBalance } = trpc.stripe.getSmsBalance.useQuery(
+    { storeId: storeId! },
+    { enabled: !!storeId }
+  );
+  
+  // SMS取引履歴取得
+  const { data: transactions, isLoading: transactionsLoading } = trpc.stripe.getSmsTransactions.useQuery(
+    { storeId: storeId!, limit: 5 },
+    { enabled: !!storeId }
+  );
+  
+  // Stripe Checkoutセッション作成
+  const createCheckoutSession = trpc.stripe.createCheckoutSession.useMutation({
+    onSuccess: (data) => {
+      // Stripe Checkoutページにリダイレクト
+      window.location.href = data.url;
+    },
+    onError: (error) => {
+      toast.error('チャージの開始に失敗しました: ' + error.message);
+      setIsCharging(false);
+    },
+  });
+  
+  const handleCharge = async (amount: number) => {
+    if (!storeId) return;
+    setIsCharging(true);
+    setSelectedAmount(amount);
+    
+    createCheckoutSession.mutate({
+      storeId,
+      amount,
+    });
+  };
+  
+  if (balanceLoading) {
+    return (
+      <div className="rounded-lg border bg-card p-4">
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+  
+  const balance = balanceData?.balance ?? 0;
+  const messagesRemaining = Math.floor(balance / SMS_COST_PER_MESSAGE);
+  const isLowBalance = balance < 1000;
+  
+  return (
+    <div className="rounded-lg border bg-card">
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Wallet className="h-5 w-5 text-primary" />
+            <span className="font-medium">SMS残高</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => refetchBalance()}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        <div className="mt-3">
+          <div className={`text-3xl font-bold ${isLowBalance ? 'text-destructive' : ''}`}>
+            ¥{balance.toLocaleString()}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            約{messagesRemaining}通分の送信が可能（1通20円）
+          </p>
+          {isLowBalance && (
+            <p className="text-sm text-destructive mt-1">
+              残高が少なくなっています。チャージしてください。
+            </p>
+          )}
+        </div>
+      </div>
+      
+      <div className="p-4 space-y-4">
+        <div>
+          <Label className="text-sm font-medium">チャージ金額を選択</Label>
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            {SMS_CHARGE_OPTIONS.map((option) => (
+              <Button
+                key={option.amount}
+                variant="outline"
+                className="flex flex-col h-auto py-3"
+                disabled={isCharging}
+                onClick={() => handleCharge(option.amount)}
+              >
+                {isCharging && selectedAmount === option.amount ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <span className="font-bold">{option.label}</span>
+                    <span className="text-xs text-muted-foreground">約{option.messages}通</span>
+                  </>
+                )}
+              </Button>
+            ))}
+          </div>
+        </div>
+        
+        {transactions && transactions.length > 0 && (
+          <div>
+            <Label className="text-sm font-medium">最近の取引</Label>
+            <div className="mt-2 space-y-2">
+              {transactions.map((tx) => (
+                <div key={tx.id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+                  <div className="flex items-center gap-2">
+                    {tx.type === 'charge' ? (
+                      <CreditCard className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <MessageSquare className="h-4 w-4 text-blue-500" />
+                    )}
+                    <span className="text-muted-foreground">
+                      {tx.type === 'charge' ? 'チャージ' : 'SMS送信'}
+                    </span>
+                  </div>
+                  <span className={tx.amount > 0 ? 'text-green-600' : 'text-muted-foreground'}>
+                    {tx.amount > 0 ? '+' : ''}¥{tx.amount.toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Settings() {
   const params = useParams<{ section?: string }>();
@@ -511,7 +664,7 @@ export default function Settings() {
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>SMS通知</Label>
-                      <p className="text-sm text-muted-foreground">SMS通知を有効にする（Twilio連携が必要）</p>
+                      <p className="text-sm text-muted-foreground">SMS通知を有効にする（プリペイド残高が必要）</p>
                     </div>
                     <Switch
                       checked={formData.smsEnabled}
@@ -520,6 +673,9 @@ export default function Settings() {
                   </div>
                   {formData.smsEnabled && (
                     <div className="space-y-4 ml-4">
+                      {/* SMS残高表示 */}
+                      <SmsBalanceCard storeId={store?.id} />
+                      
                       <div className="space-y-2">
                         <Label htmlFor="smsTemplateCalled">呼び出しSMSテンプレート</Label>
                         <Textarea

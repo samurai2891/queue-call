@@ -8,6 +8,13 @@
       "when": 1768001805327,
       "tag": "0000_loving_alice",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1768321841763,
+      "tag": "0001_exotic_excalibur",
+      "breakpoints": true
     }
   ]
 }
