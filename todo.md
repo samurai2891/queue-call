@@ -183,6 +183,8 @@
 
 **確認ポイント:** SSEでboard/staff/ticketが更新される
 
+**注意:** `queue_audit_logs`のカラム追加に伴う`pnpm db:push`は未実行
+
 ---
 
 ## M6: i18n（JA/EN/KO/ZH）を漏れゼロにする
