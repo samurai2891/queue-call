@@ -20,8 +20,15 @@ export function usePushNotification({ ticketId, onSubscribed, onError, subscribe
 
     if (supported) {
       setPermission(Notification.permission);
+      navigator.serviceWorker.ready
+        .then((registration) => registration.pushManager.getSubscription())
+        .then((subscription) => {
+          setIsSubscribed(!!subscription);
+        })
+        .catch(() => {});
     }
   }, []);
+
 
   const requestPermission = useCallback(async () => {
     if (!isSupported) {

@@ -149,7 +149,18 @@ function StaffContent() {
     },
   });
 
+  const recallMutation = trpc.staff.recall.useMutation({
+    onSuccess: () => {
+      toast.success(t('staff.recall'));
+      refetchWaitingList();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
   const skipMutation = trpc.staff.skip.useMutation({
+
     onSuccess: () => {
       toast.success(t('staff.skip'));
       refetchWaitingList();
@@ -201,7 +212,13 @@ function StaffContent() {
     callNextMutation.mutate({ sessionToken, storeId: store.id });
   };
 
+  const handleRecall = (ticketId: number) => {
+    if (!sessionToken) return;
+    recallMutation.mutate({ sessionToken, ticketId });
+  };
+
   const handleSkip = (ticketId: number) => {
+
     setSelectedTicketId(ticketId);
     setSkipDialogOpen(true);
   };
@@ -440,13 +457,23 @@ function StaffContent() {
                       </div>
                       <div className="flex gap-2">
                         {ticket.status === 'CALLED' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSkip(ticket.id)}
-                          >
-                            <SkipForward className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRecall(ticket.id)}
+                              disabled={recallMutation.isPending}
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSkip(ticket.id)}
+                            >
+                              <SkipForward className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
                         {ticket.status === 'ARRIVED' && (
                           <Button

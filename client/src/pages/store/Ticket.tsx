@@ -25,7 +25,7 @@ import type { Locale } from '@/contexts/LocaleContext';
 type TicketStatus = 'WAITING' | 'CALLED' | 'ARRIVED' | 'SKIPPED' | 'DONE' | 'CANCELED' | 'EXPIRED';
 
 function TicketContent() {
-  const params = useParams<{ storeSlug: string; ticketToken: string }>();
+  const params = useParams<{ storeSlug: string; token: string }>();
   const [, navigate] = useLocation();
   const { t } = useLocale();
   
@@ -40,8 +40,8 @@ function TicketContent() {
   );
 
   const { data: ticket, isLoading, error, refetch } = trpc.ticket.getByToken.useQuery(
-    { token: params.ticketToken || '' },
-    { enabled: !!params.ticketToken }
+    { token: params.token || '' },
+    { enabled: !!params.token }
   );
 
   const cancelMutation = trpc.ticket.cancel.useMutation({
@@ -66,8 +66,8 @@ function TicketContent() {
   useSSE({
     scope: 'ticket',
     storeId: store?.id || 0,
-    ticketToken: params.ticketToken,
-    enabled: !!store?.id && !!params.ticketToken,
+    ticketToken: params.token,
+    enabled: !!store?.id && !!params.token,
     onQueueUpdate: (data) => {
       setCurrentNumber(data.currentNumber);
       refetch();
@@ -97,8 +97,8 @@ function TicketContent() {
   });
 
   const handleCancel = () => {
-    if (params.ticketToken) {
-      cancelMutation.mutate({ token: params.ticketToken });
+    if (params.token) {
+      cancelMutation.mutate({ token: params.token });
     }
     setShowCancelDialog(false);
   };
@@ -263,7 +263,7 @@ function TicketContent() {
           <Button
             variant="link"
             className="mt-4"
-            onClick={() => navigate(`/s/${params.storeSlug}/ticket/${params.ticketToken}/notifications`)}
+            onClick={() => navigate(`/s/${params.storeSlug}/ticket/${params.token}/notifications`)}
           >
             <Bell className="mr-2 h-4 w-4" />
             {t('notification.title')}

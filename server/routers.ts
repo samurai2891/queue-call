@@ -5,8 +5,10 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
+import { notifyTicketCalled } from "./notifications";
 import { broadcastQueueUpdate, broadcastTicketUpdate, broadcastIntakeStatus } from "./sse";
 import * as bcrypt from "bcryptjs";
+
 
 type TicketStatus = 'WAITING' | 'CALLED' | 'ARRIVED' | 'SKIPPED' | 'DONE' | 'CANCELED' | 'EXPIRED';
 
@@ -434,7 +436,14 @@ const staffRouter = router({
         number: nextTicket.number,
       });
 
+      const storeName = store?.name ?? 'Queue Call';
+      const pushEnabled = store?.settings?.notifications?.pushEnabled ?? true;
+      if (pushEnabled) {
+        await notifyTicketCalled(nextTicket.id, storeName, nextTicket.number);
+      }
+
       return nextTicket;
+
     }),
 
   // Call specific ticket
@@ -487,10 +496,63 @@ const staffRouter = router({
         number: ticket.number,
       });
 
+      const storeName = store?.name ?? 'Queue Call';
+      const pushEnabled = store?.settings?.notifications?.pushEnabled ?? true;
+      if (pushEnabled) {
+        await notifyTicketCalled(ticket.id, storeName, ticket.number);
+      }
+
       return ticket;
     }),
 
+  recall: publicProcedure
+    .input(z.object({
+      sessionToken: z.string(),
+      ticketId: z.number(),
+    }))
+    .mutation(async ({ input }) => {
+      const session = await db.getStaffSession(input.sessionToken);
+      if (!session) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
+      }
+
+      const ticket = await db.getTicketById(input.ticketId);
+      if (!ticket || ticket.storeId !== session.storeId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
+      }
+
+      if (ticket.status !== 'CALLED') {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Ticket is not currently called' });
+      }
+
+      const store = await db.getStoreById(session.storeId);
+      if (store?.settings?.queue?.auditLog) {
+        await db.createAuditLog({
+          storeId: session.storeId,
+          ticketId: ticket.id,
+          action: 'RECALL',
+          performedBy: session.role,
+        });
+      }
+
+      const storeName = store?.name ?? 'Queue Call';
+      const pushEnabled = store?.settings?.notifications?.pushEnabled ?? true;
+      if (pushEnabled) {
+        await notifyTicketCalled(ticket.id, storeName, ticket.number);
+      }
+
+      const waitingCount = await db.getWaitingCount(session.storeId);
+      broadcastQueueUpdate(session.storeId, {
+        currentNumber: ticket.number,
+        waitingCount,
+        calledTicket: { number: ticket.number, ticketToken: ticket.ticketToken },
+      });
+
+      return { success: true };
+    }),
+
   // Skip ticket
+
   skip: publicProcedure
     .input(z.object({ 
       sessionToken: z.string(),

@@ -12,7 +12,9 @@ import { Loader2 } from "lucide-react";
 const StoreTop = lazy(() => import("./pages/store/StoreTop"));
 const JoinQueue = lazy(() => import("./pages/store/JoinQueue"));
 const Ticket = lazy(() => import("./pages/store/Ticket"));
+const Notifications = lazy(() => import("./pages/store/Notifications"));
 const Checkin = lazy(() => import("./pages/store/Checkin"));
+
 const Menu = lazy(() => import("./pages/store/Menu"));
 const Kiosk = lazy(() => import("./pages/store/Kiosk"));
 const Board = lazy(() => import("./pages/store/Board"));
@@ -38,7 +40,9 @@ function Router() {
         <Route path="/s/:storeSlug" component={StoreTop} />
         <Route path="/s/:storeSlug/join" component={JoinQueue} />
         <Route path="/s/:storeSlug/ticket/:token" component={Ticket} />
+        <Route path="/s/:storeSlug/ticket/:token/notifications" component={Notifications} />
         <Route path="/s/:storeSlug/checkin" component={Checkin} />
+
         <Route path="/s/:storeSlug/menu" component={Menu} />
         
         {/* Store Kiosk & Board */}

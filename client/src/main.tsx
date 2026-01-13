@@ -10,7 +10,16 @@ import "./index.css";
 
 const queryClient = new QueryClient();
 
+if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((error) => {
+      console.warn("[ServiceWorker] Registration failed", error);
+    });
+  });
+}
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
+
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
 
