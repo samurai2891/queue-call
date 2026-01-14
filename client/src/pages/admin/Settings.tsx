@@ -423,6 +423,7 @@ export default function Settings() {
 
   const storeUrls = useMemo(() => {
     if (!store) return null;
+    const baseUrl = window.location.origin;
     const slug = store.slug;
     return {
       store: `${baseUrl}/s/${slug}`,
@@ -430,7 +431,7 @@ export default function Settings() {
       board: store.boardKey ? `${baseUrl}/s/${slug}/board?key=${store.boardKey}` : '',
       staff: `${baseUrl}/s/${slug}/staff`,
     };
-  }, [store, baseUrl]);
+  }, [store]);
 
   useEffect(() => {
 
@@ -992,8 +993,6 @@ export default function Settings() {
       </div>
     );
   }
-
-  const baseUrl = window.location.origin;
 
   const tabs = [
     { id: 'general', label: '基本設定', icon: Store },
