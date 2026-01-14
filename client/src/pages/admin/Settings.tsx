@@ -67,14 +67,20 @@ const SMS_CHARGE_OPTIONS = [
   { amount: 50000, label: '¥50,000', messages: 2500 },
 ];
 
+const MIN_SMS_CHARGE_AMOUNT = 500;
+const MAX_SMS_CHARGE_AMOUNT = 100000;
 const SMS_COST_PER_MESSAGE = 20; // 1通あたり20円
+
 
 // SMS残高カードコンポーネント
 function SmsBalanceCard({ storeId }: { storeId?: number }) {
   const [isCharging, setIsCharging] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [showChargePrompt, setShowChargePrompt] = useState(false);
+  const [chargePromptDismissed, setChargePromptDismissed] = useState(false);
+  const [customAmount, setCustomAmount] = useState('');
   const [lowBalanceThreshold, setLowBalanceThreshold] = useState(1000);
+
   
   // SMS残高取得
   const { data: balanceData, isLoading: balanceLoading, refetch: refetchBalance } = trpc.stripe.getSmsBalance.useQuery(
@@ -103,17 +109,36 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
   const balance = balanceData?.balance ?? 0;
   const messagesRemaining = Math.floor(balance / SMS_COST_PER_MESSAGE);
   const isLowBalance = balance < lowBalanceThreshold;
-  const isCriticalBalance = balance < 500;
+  const isCriticalBalance = balance < MIN_SMS_CHARGE_AMOUNT;
+  const customAmountValue = Number.parseInt(customAmount, 10);
+  const isCustomAmountValid = Number.isFinite(customAmountValue)
+    && customAmountValue >= MIN_SMS_CHARGE_AMOUNT
+    && customAmountValue <= MAX_SMS_CHARGE_AMOUNT;
+  const customMessages = isCustomAmountValid
+    ? Math.floor(customAmountValue / SMS_COST_PER_MESSAGE)
+    : 0;
   
   // 残高が少ない場合に自動でチャージ促進モーダルを表示
   useEffect(() => {
-    if (isCriticalBalance && !showChargePrompt) {
+    if (!isCriticalBalance) {
+      if (chargePromptDismissed) {
+        setChargePromptDismissed(false);
+      }
+      return;
+    }
+
+    if (isCriticalBalance && !showChargePrompt && !chargePromptDismissed) {
       setShowChargePrompt(true);
     }
-  }, [isCriticalBalance, showChargePrompt]);
+  }, [isCriticalBalance, showChargePrompt, chargePromptDismissed]);
+
   
   const handleCharge = async (amount: number) => {
     if (!storeId) return;
+    if (amount < MIN_SMS_CHARGE_AMOUNT || amount > MAX_SMS_CHARGE_AMOUNT) {
+      toast.error(`チャージ金額は${MIN_SMS_CHARGE_AMOUNT.toLocaleString()}円以上、${MAX_SMS_CHARGE_AMOUNT.toLocaleString()}円以下にしてください。`);
+      return;
+    }
     setIsCharging(true);
     setSelectedAmount(amount);
     
@@ -122,6 +147,7 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
       amount,
     });
   };
+
   
   if (balanceLoading) {
     return (
@@ -223,14 +249,50 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
                 </Button>
               ))}
             </div>
+
+            <div className="space-y-2 mb-4">
+              <Label className="text-sm font-medium">カスタム金額</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min={MIN_SMS_CHARGE_AMOUNT}
+                  max={MAX_SMS_CHARGE_AMOUNT}
+                  step={100}
+                  value={customAmount}
+                  onChange={(e) => setCustomAmount(e.target.value)}
+                  placeholder={`最低${MIN_SMS_CHARGE_AMOUNT.toLocaleString()}円`}
+                />
+                <Button
+                  disabled={isCharging || !isCustomAmountValid}
+                  onClick={() => handleCharge(customAmountValue)}
+                >
+                  {isCharging && selectedAmount === customAmountValue ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    'チャージ'
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                最低{MIN_SMS_CHARGE_AMOUNT.toLocaleString()}円（上限{MAX_SMS_CHARGE_AMOUNT.toLocaleString()}円）
+                {isCustomAmountValid && (
+                  <span className="ml-1">約{customMessages}通</span>
+                )}
+              </p>
+            </div>
             
             <Button
               variant="ghost"
               className="w-full"
-              onClick={() => setShowChargePrompt(false)}
+              onClick={() => {
+                setShowChargePrompt(false);
+                setChargePromptDismissed(true);
+              }}
             >
               後でチャージする
             </Button>
+
+
           </div>
         </div>
       )}
@@ -258,7 +320,38 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
               </Button>
             ))}
           </div>
+          <div className="mt-3 space-y-2">
+            <Label className="text-sm font-medium">カスタム金額</Label>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min={MIN_SMS_CHARGE_AMOUNT}
+                max={MAX_SMS_CHARGE_AMOUNT}
+                step={100}
+                value={customAmount}
+                onChange={(e) => setCustomAmount(e.target.value)}
+                placeholder={`最低${MIN_SMS_CHARGE_AMOUNT.toLocaleString()}円`}
+              />
+              <Button
+                disabled={isCharging || !isCustomAmountValid}
+                onClick={() => handleCharge(customAmountValue)}
+              >
+                {isCharging && selectedAmount === customAmountValue ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  'チャージ'
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              最低{MIN_SMS_CHARGE_AMOUNT.toLocaleString()}円（上限{MAX_SMS_CHARGE_AMOUNT.toLocaleString()}円）
+              {isCustomAmountValid && (
+                <span className="ml-1">約{customMessages}通</span>
+              )}
+            </p>
+          </div>
         </div>
+
         
         {transactions && transactions.length > 0 && (
           <div>

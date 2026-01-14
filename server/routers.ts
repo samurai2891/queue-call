@@ -1246,7 +1246,7 @@ const stripeRouter = router({
   createCheckoutSession: protectedProcedure
     .input(z.object({
       storeId: z.number(),
-      amount: z.number().min(1000).max(100000),
+      amount: z.number().int().min(500).max(100000),
     }))
     .mutation(async ({ ctx, input }) => {
       const store = await db.getStoreById(input.storeId);
@@ -1254,13 +1254,8 @@ const stripeRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
 
-      // Validate amount is one of the plans
-      const validPlan = CHARGE_PLANS.find(p => p.amount === input.amount);
-      if (!validPlan) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid charge amount' });
-      }
-
       const origin = ctx.req.headers.origin || 'http://localhost:3000';
+
       const session = await createCheckoutSession({
         storeId: store.id,
         storeName: store.name,
