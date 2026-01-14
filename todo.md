@@ -56,15 +56,16 @@
 
 #### T2-1. Push購読→保存→呼び出しで送信の一本化
 - [x] チケット単位で PushSubscription を保存（ticketToken から紐付け）
-- [~] スタッフの CALL / RECALL 実行時に Push を送る
-- [ ] 送信失敗（410 Gone等）は購読削除
+- [x] スタッフの CALL / RECALL 実行時に Push を送る
+- [x] 送信失敗（410 Gone等）は購読削除
 
 **確認ポイント:** 呼び出しボタンを押すとそのチケットにpushが届く、失効購読がDBに残り続けない
 
 #### T2-2. iOS対策：ホーム画面追加してない場合の導線
-- [ ] 「通知をON」押下時に display-mode を判定
-- [ ] iOS で browser モードなら、ホーム画面追加の案内を出す
-- [ ] 受付自体は止めない
+- [x] 「通知をON」押下時に display-mode を判定
+- [x] iOS で browser モードなら、ホーム画面追加の案内を出す
+- [x] 受付自体は止めない
+
 
 **確認ポイント:** iOSで未追加の時Push許可で詰まない、Android/Chromeはinstall promptも誘導
 

@@ -1,7 +1,9 @@
 import { getDb, createSmsLog, updateSmsLog } from './db';
 import { pushSubscriptions, smsSubscriptions, tickets, smsLogs } from '../drizzle/schema';
 import { eq, and, isNull, isNotNull } from 'drizzle-orm';
+import webPush from 'web-push';
 import { consumeSmsBalance } from './stripe';
+
 
 // Web Push notification payload
 interface PushPayload {
@@ -13,7 +15,24 @@ interface PushPayload {
   data?: Record<string, any>;
 }
 
+const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@example.com';
+let vapidConfigured = false;
+
+const ensureVapidConfig = () => {
+  if (vapidConfigured) return true;
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  if (!publicKey || !privateKey) {
+    console.warn('[Push] VAPID keys are not configured');
+    return false;
+  }
+  webPush.setVapidDetails(vapidSubject, publicKey, privateKey);
+  vapidConfigured = true;
+  return true;
+};
+
 // Send Web Push notification to a ticket
+
 export async function sendPushNotification(
   ticketId: number,
   payload: PushPayload
@@ -33,34 +52,36 @@ export async function sendPushNotification(
       return false;
     }
 
-    // Send to all subscriptions
+    if (!ensureVapidConfig()) {
+      return false;
+    }
+
+    const payloadJson = JSON.stringify(payload);
+
     const results = await Promise.all(
       subscriptions.map(async (sub) => {
+        const subscription = {
+          endpoint: sub.endpoint,
+          keys: {
+            p256dh: sub.p256dh,
+            auth: sub.auth,
+          },
+        };
+
         try {
-          // Use the Web Push API
-          const response = await fetch(sub.endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'TTL': '86400',
-              ...(sub.p256dh && sub.auth ? {
-                'Authorization': `vapid p256dh=${sub.p256dh};auth=${sub.auth}`,
-              } : {}),
-            },
-            body: JSON.stringify(payload),
-          });
-
-          if (!response.ok) {
-            // If subscription is invalid, remove it
-            if (response.status === 404 || response.status === 410) {
-              await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id));
-              console.log(`[Push] Removed invalid subscription ${sub.id}`);
-            }
-            return false;
-          }
-
+          await webPush.sendNotification(subscription, payloadJson, { TTL: 86400 });
           return true;
         } catch (error) {
+          const statusCode =
+            typeof error === 'object' && error && 'statusCode' in error
+              ? (error as { statusCode?: number }).statusCode
+              : undefined;
+
+          if (statusCode === 404 || statusCode === 410) {
+            await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id));
+            console.log(`[Push] Removed invalid subscription ${sub.id}`);
+          }
+
           console.error(`[Push] Failed to send to subscription ${sub.id}:`, error);
           return false;
         }
@@ -68,6 +89,7 @@ export async function sendPushNotification(
     );
 
     return results.some(r => r);
+
   } catch (error) {
     console.error('[Push] Error sending notification:', error);
     return false;

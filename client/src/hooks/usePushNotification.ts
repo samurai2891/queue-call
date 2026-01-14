@@ -76,11 +76,13 @@ export function usePushNotification({ ticketId, onSubscribed, onError, subscribe
         const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
         
         if (!vapidPublicKey) {
-          // For development, we'll skip actual push subscription
-          console.warn('VAPID public key not configured, skipping push subscription');
+          const message = 'VAPID public key is not configured';
+          console.warn(`[Push] ${message}`);
+          onError?.(message);
           setIsLoading(false);
           return false;
         }
+
 
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,

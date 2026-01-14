@@ -62,12 +62,19 @@
 - `VITE_FRONTEND_FORGE_API_URL`: フロントエンド用API URL
 
 #### オプション（機能有効化に必要）
+- `VAPID_PUBLIC_KEY`: Web Push VAPID 公開鍵
+- `VAPID_PRIVATE_KEY`: Web Push VAPID 秘密鍵
+- `VAPID_SUBJECT`: Web Push VAPID subject（例: `mailto:admin@example.com`）
+- `VITE_VAPID_PUBLIC_KEY`: ブラウザ購読用VAPID公開鍵
 - `TWILIO_ACCOUNT_SID`: Twilio アカウントSID（SMS通知用）
 - `TWILIO_AUTH_TOKEN`: Twilio 認証トークン（SMS通知用）
 - `TWILIO_VERIFY_SERVICE_SID`: Twilio Verify サービスSID（OTP用）
 - `TWILIO_FROM_NUMBER`: SMS送信元電話番号
 
+VAPIDキーは `npx web-push generate-vapid-keys` で生成できます。
+
 ### インストール
+
 
 ```bash
 # 依存関係のインストール
