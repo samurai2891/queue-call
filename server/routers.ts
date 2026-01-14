@@ -59,6 +59,38 @@ const storeRouter = router({
       };
     }),
 
+  getBySlugWithKey: publicProcedure
+    .input(z.object({
+      slug: z.string(),
+      key: z.string().optional(),
+      keyType: z.enum(['kiosk', 'board']),
+    }))
+    .query(async ({ input }) => {
+      const store = await db.getStoreBySlug(input.slug);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      const expectedKey = input.keyType === 'kiosk' ? store.kioskKey : store.boardKey;
+      if (!input.key || !expectedKey || input.key !== expectedKey) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Access key required' });
+      }
+
+      return {
+        id: store.id,
+        slug: store.slug,
+        name: store.name,
+        intakeStatus: store.intakeStatus,
+        defaultLocale: store.defaultLocale,
+        supportedLocales: store.supportedLocales,
+        settings: {
+          menu: store.settings?.menu,
+          kiosk: store.settings?.kiosk,
+          board: store.settings?.board,
+        },
+      };
+    }),
+
   // Get store queue status (public)
   getQueueStatus: publicProcedure
     .input(z.object({ storeId: z.number() }))

@@ -1,4 +1,4 @@
-import { useParams } from 'wouter';
+import { useParams, useLocation } from 'wouter';
 import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
@@ -6,18 +6,24 @@ import { useSSE } from '@/hooks/useSSE';
 import { AlertCircle, Volume2 } from 'lucide-react';
 import type { Locale } from '@/contexts/LocaleContext';
 
+
 function BoardContent() {
   const params = useParams<{ storeSlug: string }>();
+  const [location] = useLocation();
   const { t } = useLocale();
+  const accessKey = new URLSearchParams(location.split('?')[1] ?? '').get('key') ?? undefined;
   
   const [currentNumber, setCurrentNumber] = useState<number>(0);
+
   const [nextNumbers, setNextNumbers] = useState<number[]>([]);
   const [lastCalledNumber, setLastCalledNumber] = useState<number>(0);
 
-  const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
-    { slug: params.storeSlug || '' },
+  const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlugWithKey.useQuery(
+    { slug: params.storeSlug || '', key: accessKey, keyType: 'board' },
     { enabled: !!params.storeSlug }
   );
+  const accessDenied = storeError?.data?.code === 'FORBIDDEN';
+
 
   const { data: queueStatus, refetch: refetchQueue } = trpc.store.getQueueStatus.useQuery(
     { storeId: store?.id || 0 },
@@ -83,13 +89,15 @@ function BoardContent() {
   }
 
   if (storeError || !store) {
+    const message = accessDenied ? 'アクセスキーが必要です' : t('common.error');
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8">
         <AlertCircle className="h-24 w-24 text-destructive" />
-        <h1 className="text-4xl font-bold">{t('common.error')}</h1>
+        <h1 className="text-4xl font-bold">{message}</h1>
       </div>
     );
   }
+
 
   const boardSettings = store.settings?.board;
   const nextCount = boardSettings?.nextCount || 3;

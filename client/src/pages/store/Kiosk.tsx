@@ -11,20 +11,24 @@ type KioskState = 'language' | 'input' | 'success' | 'error';
 
 function KioskContent() {
   const params = useParams<{ storeSlug: string }>();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const { t, locale, setLocale } = useLocale();
+  const accessKey = new URLSearchParams(location.split('?')[1] ?? '').get('key') ?? undefined;
   
   const [state, setState] = useState<KioskState>('language');
+
   const [partySize, setPartySize] = useState(2);
   const [issuedTicket, setIssuedTicket] = useState<{ number: number; token: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
-    { slug: params.storeSlug || '' },
+  const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlugWithKey.useQuery(
+    { slug: params.storeSlug || '', key: accessKey, keyType: 'kiosk' },
     { enabled: !!params.storeSlug }
   );
+  const accessDenied = storeError?.data?.code === 'FORBIDDEN';
 
   const createTicketMutation = trpc.ticket.create.useMutation({
+
     onSuccess: (ticket) => {
       setIssuedTicket({ number: ticket.number, token: ticket.ticketToken });
       setState('success');
@@ -88,16 +92,18 @@ function KioskContent() {
   }
 
   if (storeError || !store) {
+    const message = accessDenied ? 'アクセスキーが必要です' : t('common.error');
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8">
         <AlertCircle className="h-24 w-24 text-destructive" />
-        <h1 className="text-4xl font-bold">{t('common.error')}</h1>
+        <h1 className="text-4xl font-bold">{message}</h1>
         <Button size="lg" onClick={() => navigate('/')}>
           {t('common.back')}
         </Button>
       </div>
     );
   }
+
 
   const isPaused = store.intakeStatus === 'paused';
 

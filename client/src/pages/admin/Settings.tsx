@@ -11,6 +11,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 import { 
   Settings as SettingsIcon, 
@@ -34,7 +44,9 @@ import {
   Wallet,
   History,
   ExternalLink,
+  Copy,
 } from 'lucide-react';
+
 import { toast } from 'sonner';
 import { getLoginUrl } from '@/const';
 
@@ -300,9 +312,13 @@ export default function Settings() {
   
   const [activeTab, setActiveTab] = useState(params.section || 'general');
   const [isSaving, setIsSaving] = useState(false);
+  const [reorderConfirmOpen, setReorderConfirmOpen] = useState(false);
+  const [keyConfirmOpen, setKeyConfirmOpen] = useState(false);
+  const [pendingKeyType, setPendingKeyType] = useState<'kiosk' | 'board' | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
+
     // General
     name: '',
     slug: '',
@@ -405,7 +421,19 @@ export default function Settings() {
     return [...adminFeedPosts].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [adminFeedPosts]);
 
+  const storeUrls = useMemo(() => {
+    if (!store) return null;
+    const slug = store.slug;
+    return {
+      store: `${baseUrl}/s/${slug}`,
+      kiosk: store.kioskKey ? `${baseUrl}/s/${slug}/kiosk?key=${store.kioskKey}` : '',
+      board: store.boardKey ? `${baseUrl}/s/${slug}/board?key=${store.boardKey}` : '',
+      staff: `${baseUrl}/s/${slug}/staff`,
+    };
+  }, [store, baseUrl]);
+
   useEffect(() => {
+
     if (store) {
       const settings = store.settings || {};
       setFormData({
@@ -469,7 +497,20 @@ export default function Settings() {
     },
   });
 
+  const regenerateKeyMutation = trpc.store.regenerateKey.useMutation({
+    onSuccess: () => {
+      toast.success('キーを再生成しました');
+      refetchStore();
+      setKeyConfirmOpen(false);
+      setPendingKeyType(null);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
   const createMenuItemMutation = trpc.menu.createItem.useMutation();
+
   const updateMenuItemMutation = trpc.menu.updateItem.useMutation();
   const deleteMenuItemMutation = trpc.menu.deleteItem.useMutation();
   const createFeedPostMutation = trpc.menu.createFeedPost.useMutation();
@@ -547,7 +588,47 @@ export default function Settings() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleReorderToggle = (checked: boolean) => {
+    if (checked && !formData.enableReorder) {
+      setReorderConfirmOpen(true);
+      return;
+    }
+    updateField('enableReorder', checked);
+  };
+
+  const confirmEnableReorder = () => {
+    updateField('enableReorder', true);
+    setReorderConfirmOpen(false);
+  };
+
+  const requestKeyRegeneration = (keyType: 'kiosk' | 'board') => {
+    setPendingKeyType(keyType);
+    setKeyConfirmOpen(true);
+  };
+
+  const confirmKeyRegeneration = () => {
+    if (!store || !pendingKeyType) return;
+    regenerateKeyMutation.mutate({ storeId: store.id, keyType: pendingKeyType });
+  };
+
+  const handleKeyDialogChange = (open: boolean) => {
+    setKeyConfirmOpen(open);
+    if (!open) {
+      setPendingKeyType(null);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('URLをコピーしました');
+    } catch (error) {
+      toast.error('コピーに失敗しました');
+    }
+  };
+
   const parsePrice = (value: string) => {
+
     const trimmed = value.trim();
     if (!trimmed) return undefined;
     const parsed = Number(trimmed);
@@ -912,6 +993,8 @@ export default function Settings() {
     );
   }
 
+  const baseUrl = window.location.origin;
+
   const tabs = [
     { id: 'general', label: '基本設定', icon: Store },
     { id: 'queue', label: '順番待ち設定', icon: Clock },
@@ -921,6 +1004,7 @@ export default function Settings() {
     { id: 'board', label: 'ボード設定', icon: Monitor },
     { id: 'security', label: 'セキュリティ', icon: Shield },
   ];
+
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -1115,8 +1199,9 @@ export default function Settings() {
                     </div>
                     <Switch
                       checked={formData.enableReorder}
-                      onCheckedChange={(checked) => updateField('enableReorder', checked)}
+                      onCheckedChange={handleReorderToggle}
                     />
+
                   </div>
                   {formData.enableReorder && (
                     <div className="grid gap-4 md:grid-cols-2 ml-4">
@@ -1873,25 +1958,123 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {store && (
+                {store && storeUrls && (
                   <>
                     <Separator />
-                    <div className="space-y-4">
-                      <h3 className="font-medium">アクセスURL</h3>
-                      <div className="space-y-2 text-sm">
-                        <p><strong>店舗トップ:</strong> /s/{store.slug}</p>
-                        <p><strong>キオスク:</strong> /s/{store.slug}/kiosk</p>
-                        <p><strong>呼び出しボード:</strong> /s/{store.slug}/board</p>
-                        <p><strong>スタッフ画面:</strong> /s/{store.slug}/staff</p>
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <h3 className="font-medium">アクセスURL</h3>
+                        <div className="space-y-2 text-sm">
+                          <p><strong>店舗トップ:</strong> {storeUrls.store}</p>
+                          <p><strong>スタッフ画面:</strong> {storeUrls.staff}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <h3 className="font-medium">キオスク/ボードURL</h3>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-sm font-medium">キオスクURL</span>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => copyToClipboard(storeUrls.kiosk)}
+                                  disabled={!storeUrls.kiosk}
+                                >
+                                  <Copy className="mr-2 h-4 w-4" />
+                                  URLをコピー
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => requestKeyRegeneration('kiosk')}
+                                >
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  キー再生成
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs font-mono break-all">
+                              {storeUrls.kiosk || 'キー未設定'}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-sm font-medium">呼び出しボードURL</span>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => copyToClipboard(storeUrls.board)}
+                                  disabled={!storeUrls.board}
+                                >
+                                  <Copy className="mr-2 h-4 w-4" />
+                                  URLをコピー
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => requestKeyRegeneration('board')}
+                                >
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  キー再生成
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs font-mono break-all">
+                              {storeUrls.board || 'キー未設定'}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </>
                 )}
+
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        <AlertDialog open={reorderConfirmOpen} onOpenChange={setReorderConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>順番調整を有効にしますか？</AlertDialogTitle>
+              <AlertDialogDescription>
+                順番調整を有効にすると、スタッフが並び順を変更できます。例外運用になるため慎重にご利用ください。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>キャンセル</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmEnableReorder}>有効にする</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={keyConfirmOpen} onOpenChange={handleKeyDialogChange}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {pendingKeyType === 'board' ? '呼び出しボード' : 'キオスク'}キーを再生成しますか？
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                キーを再生成すると、現在のURLは無効になります。新しいURLを各端末に再配布してください。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>キャンセル</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmKeyRegeneration}
+                disabled={!pendingKeyType || regenerateKeyMutation.isPending}
+              >
+                {regenerateKeyMutation.isPending ? '再生成中...' : '再生成する'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );
 }
+
