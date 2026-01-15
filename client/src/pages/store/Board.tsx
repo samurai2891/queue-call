@@ -11,7 +11,8 @@ function BoardContent() {
   const params = useParams<{ storeSlug: string }>();
   const [location] = useLocation();
   const { t } = useLocale();
-  const accessKey = new URLSearchParams(location.split('?')[1] ?? '').get('key') ?? undefined;
+  const searchParams = new URLSearchParams(location.split('?')[1] ?? '');
+  const accessKey = searchParams.get('key') ?? undefined;
   
   const [currentNumber, setCurrentNumber] = useState<number>(0);
 
@@ -20,8 +21,11 @@ function BoardContent() {
 
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlugWithKey.useQuery(
     { slug: params.storeSlug || '', key: accessKey, keyType: 'board' },
-    { enabled: !!params.storeSlug }
+    { enabled: !!params.storeSlug && !!accessKey }
   );
+  
+  // Show error if no access key provided
+  const noAccessKey = !accessKey && !!params.storeSlug;
   const accessDenied = storeError?.data?.code === 'FORBIDDEN';
 
 
@@ -90,8 +94,8 @@ function BoardContent() {
     );
   }
 
-  if (storeError || !store) {
-    const message = accessDenied ? t('common.accessKeyRequired') : t('common.error');
+  if (noAccessKey || storeError || !store) {
+    const message = (noAccessKey || accessDenied) ? t('common.accessKeyRequired') : t('common.error');
 
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8">

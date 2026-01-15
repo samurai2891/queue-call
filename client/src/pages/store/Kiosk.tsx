@@ -25,8 +25,11 @@ function KioskContent() {
 
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlugWithKey.useQuery(
     { slug: params.storeSlug || '', key: accessKey, keyType: 'kiosk' },
-    { enabled: !!params.storeSlug }
+    { enabled: !!params.storeSlug && !!accessKey }
   );
+  
+  // Show error if no access key provided
+  const noAccessKey = !accessKey && !!params.storeSlug;
   const accessDenied = storeError?.data?.code === 'FORBIDDEN';
 
   const createTicketMutation = trpc.ticket.create.useMutation({
@@ -98,8 +101,8 @@ function KioskContent() {
     );
   }
 
-  if (storeError || !store) {
-    const message = accessDenied ? t('common.accessKeyRequired') : t('common.error');
+  if (noAccessKey || storeError || !store) {
+    const message = (noAccessKey || accessDenied) ? t('common.accessKeyRequired') : t('common.error');
 
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8">
