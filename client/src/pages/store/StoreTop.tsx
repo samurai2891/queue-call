@@ -38,8 +38,10 @@ function StoreTopContent() {
   useSSE({
     scope: 'board',
     storeId: store?.id || 0,
+    storeSlug: params.storeSlug,
     enabled: !!store?.id,
     onQueueUpdate: (data) => {
+
       setCurrentNumber(data.currentNumber);
       setWaitingCount(data.waitingCount);
     },

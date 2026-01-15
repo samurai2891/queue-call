@@ -67,9 +67,11 @@ function TicketContent() {
   useSSE({
     scope: 'ticket',
     storeId: store?.id || 0,
+    storeSlug: params.storeSlug,
     ticketToken: params.token,
     enabled: !!store?.id && !!params.token,
     onQueueUpdate: (data) => {
+
       setCurrentNumber(data.currentNumber);
       refetch();
     },

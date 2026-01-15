@@ -15,7 +15,25 @@ interface PushPayload {
   data?: Record<string, any>;
 }
 
+type NotificationLogContext = {
+  storeId?: number;
+  storeSlug?: string;
+  ticketId?: number;
+  requestId?: string;
+};
+
+const buildLogContext = (context?: NotificationLogContext) => {
+  if (!context) return {};
+  return {
+    storeId: context.storeId,
+    storeSlug: context.storeSlug,
+    ticketId: context.ticketId,
+    requestId: context.requestId,
+  };
+};
+
 const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@example.com';
+
 let vapidConfigured = false;
 
 const ensureVapidConfig = () => {
@@ -35,12 +53,16 @@ const ensureVapidConfig = () => {
 
 export async function sendPushNotification(
   ticketId: number,
-  payload: PushPayload
+  payload: PushPayload,
+  context?: NotificationLogContext
 ): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
 
+  const logContext = buildLogContext({ ticketId, ...context });
+
   try {
+
     // Get push subscriptions for this ticket
     const subscriptions = await db
       .select()
@@ -48,9 +70,10 @@ export async function sendPushNotification(
       .where(eq(pushSubscriptions.ticketId, ticketId));
 
     if (subscriptions.length === 0) {
-      console.log(`[Push] No subscriptions found for ticket ${ticketId}`);
+      console.log(`[Push] No subscriptions found for ticket ${ticketId}`, logContext);
       return false;
     }
+
 
     if (!ensureVapidConfig()) {
       return false;
@@ -79,11 +102,18 @@ export async function sendPushNotification(
 
           if (statusCode === 404 || statusCode === 410) {
             await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id));
-            console.log(`[Push] Removed invalid subscription ${sub.id}`);
+            console.log(`[Push] Removed invalid subscription ${sub.id}`, {
+              ...logContext,
+              subscriptionId: sub.id,
+            });
           }
 
-          console.error(`[Push] Failed to send to subscription ${sub.id}:`, error);
+          console.error(`[Push] Failed to send to subscription ${sub.id}:`, {
+            ...logContext,
+            subscriptionId: sub.id,
+          }, error);
           return false;
+
         }
       })
     );
@@ -91,9 +121,10 @@ export async function sendPushNotification(
     return results.some(r => r);
 
   } catch (error) {
-    console.error('[Push] Error sending notification:', error);
+    console.error('[Push] Error sending notification:', logContext, error);
     return false;
   }
+
 }
 
 // Send SMS notification via Twilio with balance check
@@ -110,12 +141,20 @@ export async function sendSmsNotification(
     messageType?: 'call' | 'recall' | 'reminder' | 'custom';
     recallLimitSeconds?: number;
     recallMaxCount?: number;
+    logContext?: NotificationLogContext;
   }
 ): Promise<{ success: boolean; reason?: string }> {
   const db = await getDb();
   if (!db) return { success: false, reason: 'Database not available' };
 
+  const logContext = buildLogContext({
+    storeId,
+    ticketId,
+    ...options?.logContext,
+  });
+
   try {
+
     // Get SMS subscription for this ticket
     const subscriptions = await db
       .select()
@@ -129,9 +168,10 @@ export async function sendSmsNotification(
       );
 
     if (subscriptions.length === 0) {
-      console.log(`[SMS] No verified subscriptions found for ticket ${ticketId}`);
+      console.log("[SMS] No verified subscriptions found", logContext);
       return { success: false, reason: 'No verified subscription' };
     }
+
 
     const subscription = subscriptions[0];
     const messageType = options?.messageType ?? 'call';
@@ -155,7 +195,9 @@ export async function sendSmsNotification(
             messageType,
             errorMessage: 'Recall throttled',
           });
+          console.warn("[SMS] Recall throttled", logContext);
           return { success: false, reason: 'Recall throttled' };
+
         }
       }
 
@@ -191,7 +233,9 @@ export async function sendSmsNotification(
               messageType,
               errorMessage: 'Recall limit reached',
             });
+            console.warn("[SMS] Recall limit reached", logContext);
             return { success: false, reason: 'Recall limit reached' };
+
           }
         }
       }
@@ -215,10 +259,14 @@ export async function sendSmsNotification(
     });
 
     if (!balanceResult.success) {
-      console.log(`[SMS] Insufficient balance for store ${storeId}: ${balanceResult.reason}`);
+      console.warn("[SMS] Insufficient balance", {
+        ...logContext,
+        reason: balanceResult.reason,
+      });
       await updateSmsLog(smsLogId, { status: 'failed', errorMessage: balanceResult.reason });
       return { success: false, reason: balanceResult.reason };
     }
+
 
     // Send via Twilio
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioConfig.accountSid}/Messages.json`;
@@ -239,11 +287,12 @@ export async function sendSmsNotification(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[SMS] Twilio error:', error);
+      console.error('[SMS] Twilio error:', logContext, error);
       await updateSmsLog(smsLogId, { status: 'failed', errorMessage: error });
       // Note: Balance was already consumed. In production, consider refund logic here.
       return { success: false, reason: 'Twilio API error' };
     }
+
 
     const result = await response.json();
 
@@ -260,12 +309,17 @@ export async function sendSmsNotification(
       .set({ lastSentAt: new Date() })
       .where(eq(smsSubscriptions.id, subscription.id));
 
-    console.log(`[SMS] Successfully sent to ${subscription.phoneE164}, SID: ${result.sid}`);
+    console.log('[SMS] Successfully sent', {
+      ...logContext,
+      phoneE164: subscription.phoneE164,
+      messageSid: result.sid,
+    });
     return { success: true };
   } catch (error) {
-    console.error('[SMS] Error sending notification:', error);
+    console.error('[SMS] Error sending notification:', logContext, error);
     return { success: false, reason: 'Internal error' };
   }
+
 }
 
 // Send OTP via Twilio Verify
@@ -364,10 +418,18 @@ export async function notifyTicketCalled(
     ticketUrl?: string;
     recallLimitSeconds?: number;
     recallMaxCount?: number;
+    storeSlug?: string;
+    requestId?: string;
   }
 ): Promise<{ push: boolean; sms: boolean; smsReason?: string }> {
   const results: { push: boolean; sms: boolean; smsReason?: string } = { push: false, sms: false };
   const pushEnabled = options?.pushEnabled ?? true;
+  const logContext: NotificationLogContext = {
+    storeId,
+    storeSlug: options?.storeSlug,
+    ticketId,
+    requestId: options?.requestId,
+  };
 
   if (pushEnabled) {
     results.push = await sendPushNotification(ticketId, {
@@ -379,8 +441,9 @@ export async function notifyTicketCalled(
         ticketId,
         ticketNumber,
       },
-    });
+    }, logContext);
   }
+
 
   const twilioConfig = options?.twilioConfig;
   if (twilioConfig) {
@@ -399,7 +462,9 @@ export async function notifyTicketCalled(
       messageType,
       recallLimitSeconds: options?.recallLimitSeconds,
       recallMaxCount: options?.recallMaxCount,
+      logContext,
     });
+
     results.sms = smsResult.success;
     results.smsReason = smsResult.reason;
   }

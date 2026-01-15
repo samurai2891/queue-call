@@ -14,9 +14,21 @@ import {
   smsLogs, InsertSmsLog
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { getRequestId } from './_core/requestContext';
 import { nanoid } from 'nanoid';
 
+
 let _db: ReturnType<typeof drizzle> | null = null;
+
+const logDbError = (
+  message: string,
+  error: unknown,
+  context: Record<string, unknown> = {}
+) => {
+  const requestId = getRequestId();
+  const details = { requestId, ...context };
+  console.error(`[Database] ${message}`, details, error);
+};
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -24,12 +36,13 @@ export async function getDb() {
     try {
       _db = drizzle(process.env.DATABASE_URL);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      logDbError("Failed to connect", error);
       _db = null;
     }
   }
   return _db;
 }
+
 
 // ==================== User Functions ====================
 
@@ -87,9 +100,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       set: updateSet,
     });
   } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
+    logDbError("Failed to upsert user", error, { openId: user.openId });
     throw error;
   }
+
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -124,8 +138,10 @@ export async function createStore(data: {
 
   const defaultSettings: StoreSettings = {
     queue: {
+      dailyResetTime: "04:00",
       checkinGraceMinutes: 5,
       autoSkip: false,
+
       enableReorder: false,
       reorderMaxMove: 3,
       reorderReasonRequired: true,
@@ -211,7 +227,14 @@ export async function updateStoreSettings(id: number, settings: StoreSettings): 
     ...settings,
   };
 
-  await db.update(stores).set({ settings: mergedSettings }).where(eq(stores.id, id));
+  const resetTime = mergedSettings.queue?.dailyResetTime;
+  const updateData: Partial<InsertStore> = { settings: mergedSettings };
+  if (typeof resetTime === "string" && resetTime.trim().length > 0) {
+    updateData.resetTime = resetTime;
+  }
+
+  await db.update(stores).set(updateData).where(eq(stores.id, id));
+
 }
 
 export async function regenerateStoreKey(id: number, keyType: 'kiosk' | 'board'): Promise<string> {
@@ -227,9 +250,93 @@ export async function regenerateStoreKey(id: number, keyType: 'kiosk' | 'board')
 
 // ==================== Ticket Functions ====================
 
-function getTodayKey(): string {
-  return new Date().toISOString().split('T')[0];
+const DEFAULT_RESET_TIME = "04:00";
+const ACTIVE_TICKET_STATUSES = ["WAITING", "CALLED", "ARRIVED"] as const;
+
+type ResetTimeParts = { hours: number; minutes: number };
+
+type ActiveTicketStatus = (typeof ACTIVE_TICKET_STATUSES)[number];
+
+const formatDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const parseResetTime = (value?: string): ResetTimeParts => {
+  if (!value) {
+    return { hours: 4, minutes: 0 };
+  }
+  const [hoursText, minutesText] = value.split(":");
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return { hours: 4, minutes: 0 };
+  }
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return { hours: 4, minutes: 0 };
+  }
+  return { hours, minutes };
+};
+
+export const resolveStoreResetTime = (store: Store): string => {
+  const candidate = store.settings?.queue?.dailyResetTime || store.resetTime || DEFAULT_RESET_TIME;
+  const { hours, minutes } = parseResetTime(candidate);
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+export const getStoreDayKey = (store: Store, now: Date = new Date()): string => {
+  const resetTime = resolveStoreResetTime(store);
+  const { hours, minutes } = parseResetTime(resetTime);
+  const resetDate = new Date(now);
+  resetDate.setHours(hours, minutes, 0, 0);
+  if (now < resetDate) {
+    resetDate.setDate(resetDate.getDate() - 1);
+  }
+  return formatDateKey(resetDate);
+};
+
+export async function expireTicketsBeforeDayKey(
+  storeId: number,
+  dayKey: string,
+  now: Date = new Date()
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(tickets)
+    .set({ status: "EXPIRED", updatedAt: now })
+    .where(
+      and(
+        eq(tickets.storeId, storeId),
+        lt(tickets.dayKey, dayKey),
+        inArray(tickets.status, ACTIVE_TICKET_STATUSES as unknown as ActiveTicketStatus[])
+      )
+    );
 }
+
+const resetStoreDay = async (storeId: number, dayKey: string, now: Date) => {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(stores)
+    .set({ dayKey, currentNumber: 0, updatedAt: now })
+    .where(eq(stores.id, storeId));
+
+  await expireTicketsBeforeDayKey(storeId, dayKey, now);
+};
+
+const ensureStoreDayKey = async (store: Store, now: Date = new Date()) => {
+  const dayKey = getStoreDayKey(store, now);
+  if (store.dayKey !== dayKey) {
+    await resetStoreDay(store.id, dayKey, now);
+  }
+  return dayKey;
+};
+
 
 export async function createTicket(data: {
   storeId: number;
@@ -241,42 +348,46 @@ export async function createTicket(data: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const dayKey = getTodayKey();
   const ticketToken = nanoid(16);
 
-  // Get next number for today
   const store = await getStoreById(data.storeId);
   if (!store) throw new Error("Store not found");
 
-  let nextNumber: number;
-  if (store.dayKey === dayKey) {
-    nextNumber = store.currentNumber + 1;
-  } else {
-    nextNumber = 1;
+  const dayKey = await ensureStoreDayKey(store);
+  const isSameDay = store.dayKey === dayKey;
+  const nextNumber = isSameDay ? store.currentNumber + 1 : 1;
+
+  try {
+    // Update store counter
+    await db.update(stores).set({
+      currentNumber: nextNumber,
+      dayKey,
+    }).where(eq(stores.id, data.storeId));
+
+    // Create ticket
+    await db.insert(tickets).values({
+      storeId: data.storeId,
+      ticketToken,
+      dayKey,
+      number: nextNumber,
+      partySize: data.partySize,
+      note: data.note,
+      locale: data.locale || 'ja',
+      source: data.source || 'web',
+      status: 'WAITING',
+      queueRank: String(nextNumber).padStart(6, '0'),
+    });
+
+    const result = await db.select().from(tickets).where(eq(tickets.ticketToken, ticketToken)).limit(1);
+    return result[0];
+  } catch (error) {
+    logDbError("Failed to create ticket", error, {
+      storeId: data.storeId,
+      storeSlug: store.slug,
+    });
+    throw error;
   }
 
-  // Update store counter
-  await db.update(stores).set({
-    currentNumber: nextNumber,
-    dayKey: dayKey,
-  }).where(eq(stores.id, data.storeId));
-
-  // Create ticket
-  await db.insert(tickets).values({
-    storeId: data.storeId,
-    ticketToken,
-    dayKey,
-    number: nextNumber,
-    partySize: data.partySize,
-    note: data.note,
-    locale: data.locale || 'ja',
-    source: data.source || 'web',
-    status: 'WAITING',
-    queueRank: String(nextNumber).padStart(6, '0'),
-  });
-
-  const result = await db.select().from(tickets).where(eq(tickets.ticketToken, ticketToken)).limit(1);
-  return result[0];
 }
 
 export async function getTicketByToken(token: string): Promise<Ticket | undefined> {
@@ -299,7 +410,10 @@ export async function getWaitingTickets(storeId: number): Promise<Ticket[]> {
   const db = await getDb();
   if (!db) return [];
 
-  const dayKey = getTodayKey();
+  const store = await getStoreById(storeId);
+  if (!store) return [];
+
+  const dayKey = await ensureStoreDayKey(store);
   return await db.select()
     .from(tickets)
     .where(and(
@@ -310,11 +424,15 @@ export async function getWaitingTickets(storeId: number): Promise<Ticket[]> {
     .orderBy(asc(tickets.queueRank));
 }
 
+
 export async function getCalledTicket(storeId: number): Promise<Ticket | undefined> {
   const db = await getDb();
   if (!db) return undefined;
 
-  const dayKey = getTodayKey();
+  const store = await getStoreById(storeId);
+  if (!store) return undefined;
+
+  const dayKey = await ensureStoreDayKey(store);
   const result = await db.select()
     .from(tickets)
     .where(and(
@@ -327,6 +445,7 @@ export async function getCalledTicket(storeId: number): Promise<Ticket | undefin
 
   return result[0];
 }
+
 
 export async function updateTicketStatus(
   id: number, 
@@ -355,7 +474,13 @@ export async function updateTicketStatus(
       break;
   }
 
-  await db.update(tickets).set(updateData).where(eq(tickets.id, id));
+  try {
+    await db.update(tickets).set(updateData).where(eq(tickets.id, id));
+  } catch (error) {
+    logDbError("Failed to update ticket status", error, { ticketId: id, status });
+    throw error;
+  }
+
 }
 
 export async function updateTicketQueueRank(id: number, queueRank: string): Promise<void> {
@@ -385,7 +510,10 @@ export async function getWaitingCount(storeId: number): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
 
-  const dayKey = getTodayKey();
+  const store = await getStoreById(storeId);
+  if (!store) return 0;
+
+  const dayKey = await ensureStoreDayKey(store);
   const result = await db.select({ count: sql<number>`count(*)` })
     .from(tickets)
     .where(and(
@@ -396,6 +524,7 @@ export async function getWaitingCount(storeId: number): Promise<number> {
 
   return result[0]?.count || 0;
 }
+
 
 // ==================== Push Subscription Functions ====================
 
@@ -617,15 +746,19 @@ export async function createAuditLog(data: InsertQueueAuditLog): Promise<void> {
 
 // ==================== Staff Session Functions ====================
 
+const STAFF_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+
 export async function createStaffSession(data: {
   storeId: number;
   role: 'staff' | 'manager';
 }): Promise<string> {
+
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   const sessionToken = nanoid(32);
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+  const expiresAt = new Date(Date.now() + STAFF_SESSION_TTL_MS);
+
 
   await db.insert(staffSessions).values({
     storeId: data.storeId,
@@ -648,13 +781,21 @@ export async function getStaffSession(sessionToken: string) {
 
   if (!result[0]) return undefined;
 
+  const now = new Date();
+
   // Check if expired
-  if (new Date(result[0].expiresAt) < new Date()) {
+  if (new Date(result[0].expiresAt) < now) {
     await db.delete(staffSessions).where(eq(staffSessions.id, result[0].id));
     return undefined;
   }
 
-  return result[0];
+  const refreshedExpiresAt = new Date(now.getTime() + STAFF_SESSION_TTL_MS);
+  await db.update(staffSessions)
+    .set({ expiresAt: refreshedExpiresAt })
+    .where(eq(staffSessions.id, result[0].id));
+
+  return { ...result[0], expiresAt: refreshedExpiresAt };
+
 }
 
 export async function deleteStaffSession(sessionToken: string): Promise<void> {

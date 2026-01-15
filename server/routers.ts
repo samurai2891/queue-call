@@ -1,14 +1,16 @@
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, RATE_LIMITED_ERR_MSG } from "@shared/const";
+import { TRPCError } from "@trpc/server";
+import type { Request } from "express";
+import * as bcrypt from "bcryptjs";
+import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
-import { z } from "zod";
-import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { notifyTicketCalled } from "./notifications";
 import { broadcastQueueUpdate, broadcastTicketUpdate, broadcastIntakeStatus } from "./sse";
-import * as bcrypt from "bcryptjs";
 import { createCheckoutSession, getSmsBalance, getSmsTransactions, CHARGE_PLANS, SMS_COST_PER_MESSAGE } from "./stripe";
+
 
 
 type TicketStatus = 'WAITING' | 'CALLED' | 'ARRIVED' | 'SKIPPED' | 'DONE' | 'CANCELED' | 'EXPIRED';
@@ -54,7 +56,94 @@ const isTwilioConfigured = (twilioConfig: { accountSid: string; authToken: strin
   return Boolean(twilioConfig.accountSid && twilioConfig.authToken && twilioConfig.fromNumber);
 };
 
+type RateLimitWindow = {
+  windowMs: number;
+  limit: number;
+};
+
+type RateLimitEntry = {
+  count: number;
+  resetAt: number;
+};
+
+const RATE_LIMITS = {
+  ticket: {
+    web: [
+      { windowMs: 60_000, limit: 5 },
+      { windowMs: 60 * 60 * 1000, limit: 50 },
+    ],
+    kiosk: [
+      { windowMs: 60_000, limit: 20 },
+      { windowMs: 60 * 60 * 1000, limit: 300 },
+    ],
+  },
+  smsOtp: [{ windowMs: 30 * 60 * 1000, limit: 3 }],
+  staffLogin: [{ windowMs: 10 * 60 * 1000, limit: 5 }],
+};
+
+const rateLimitBuckets = new Map<string, RateLimitEntry>();
+
+const getRequestIp = (req: Request) => {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim().length > 0) {
+    return forwarded.split(",")[0]?.trim() || "unknown";
+  }
+  if (Array.isArray(forwarded) && forwarded.length > 0) {
+    return forwarded[0]?.trim() || "unknown";
+  }
+  return req.ip || req.socket.remoteAddress || "unknown";
+};
+
+const applyRateLimit = (scope: string, key: string, window: RateLimitWindow) => {
+  const now = Date.now();
+  const bucketKey = `${scope}:${key}:${window.windowMs}`;
+  const entry = rateLimitBuckets.get(bucketKey);
+
+  if (!entry || entry.resetAt <= now) {
+    const nextEntry = { count: 1, resetAt: now + window.windowMs };
+    rateLimitBuckets.set(bucketKey, nextEntry);
+    return { allowed: true, resetAt: nextEntry.resetAt };
+  }
+
+  entry.count += 1;
+  if (entry.count > window.limit) {
+    return { allowed: false, resetAt: entry.resetAt };
+  }
+
+  return { allowed: true, resetAt: entry.resetAt };
+};
+
+const enforceRateLimits = (options: {
+  scope: string;
+  key: string;
+  windows: RateLimitWindow[];
+  requestId?: string;
+  storeSlug?: string;
+  ticketId?: number;
+}) => {
+  for (const window of options.windows) {
+    const result = applyRateLimit(options.scope, options.key, window);
+    if (!result.allowed) {
+      console.warn("[RateLimit] Limit exceeded", {
+        scope: options.scope,
+        key: options.key,
+        limit: window.limit,
+        windowMs: window.windowMs,
+        resetAt: new Date(result.resetAt).toISOString(),
+        storeSlug: options.storeSlug,
+        ticketId: options.ticketId,
+        requestId: options.requestId,
+      });
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: RATE_LIMITED_ERR_MSG,
+      });
+    }
+  }
+};
+
 // ==================== Store Router ====================
+
 const storeRouter = router({
   // Get store by slug (public)
   getBySlug: publicProcedure
@@ -293,7 +382,7 @@ const ticketRouter = router({
       locale: z.string().optional(),
       source: z.enum(['web', 'qr', 'kiosk']).optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const store = await db.getStoreById(input.storeId);
       if (!store) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
@@ -302,7 +391,21 @@ const ticketRouter = router({
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Intake is paused' });
       }
 
+      const ipAddress = getRequestIp(ctx.req);
+      const source = input.source ?? 'web';
+      const isKiosk = source === 'kiosk';
+      const rateKey = isKiosk ? `${store.id}` : `${store.id}:${ipAddress}`;
+      const rateWindows = isKiosk ? RATE_LIMITS.ticket.kiosk : RATE_LIMITS.ticket.web;
+      enforceRateLimits({
+        scope: isKiosk ? 'ticket-kiosk' : 'ticket',
+        key: rateKey,
+        windows: rateWindows,
+        requestId: ctx.requestId,
+        storeSlug: store.slug,
+      });
+
       const ticket = await db.createTicket(input);
+
 
       // Broadcast update
       const waitingCount = await db.getWaitingCount(input.storeId);
@@ -337,101 +440,9 @@ const ticketRouter = router({
   // Cancel ticket (public)
   cancel: publicProcedure
     .input(z.object({ token: z.string() }))
-    .mutation(async ({ input }) => {
-      const ticket = await db.getTicketByToken(input.token);
-      if (!ticket) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
-      }
-      if (ticket.status !== 'WAITING' && ticket.status !== 'CALLED') {
-        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Cannot cancel ticket' });
-      }
-
-      await db.updateTicketStatus(ticket.id, 'CANCELED');
-
-      // Broadcast update
-      const waitingCount = await db.getWaitingCount(ticket.storeId);
-      const calledTicket = await db.getCalledTicket(ticket.storeId);
-      broadcastQueueUpdate(ticket.storeId, {
-        currentNumber: calledTicket?.number || 0,
-        waitingCount,
-      });
-
-      return { success: true };
-    }),
-
-  // Checkin (public)
-  checkin: publicProcedure
-    .input(z.object({ 
-      storeId: z.number(),
-      number: z.number() 
-    }))
-    .mutation(async ({ input }) => {
-      const tickets = await db.getWaitingTickets(input.storeId);
-      const ticket = tickets.find(t => t.number === input.number && t.status === 'CALLED');
-      
-      if (!ticket) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found or not called' });
-      }
-
-      await db.updateTicketStatus(ticket.id, 'ARRIVED');
-
-      broadcastTicketUpdate(ticket.storeId, ticket.ticketToken, {
-        status: 'ARRIVED',
-        number: ticket.number,
-      });
-
-      return { success: true };
-    }),
-});
-
-// ==================== Staff Router ====================
-const staffRouter = router({
-  // Login with PIN
-  login: publicProcedure
-    .input(z.object({
-      storeId: z.number(),
-      pin: z.string(),
-    }))
-    .mutation(async ({ input }) => {
-      const store = await db.getStoreById(input.storeId);
-      if (!store) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
-      }
-
-      // Check manager PIN first
-      if (store.managerPinHash) {
-        const isManager = await bcrypt.compare(input.pin, store.managerPinHash);
-        if (isManager) {
-          const sessionToken = await db.createStaffSession({ storeId: input.storeId, role: 'manager' });
-          return { sessionToken, role: 'manager' as const };
-        }
-      }
-
-      // Check staff PIN
-      if (store.staffPinHash) {
-        const isStaff = await bcrypt.compare(input.pin, store.staffPinHash);
-        if (isStaff) {
-          const sessionToken = await db.createStaffSession({ storeId: input.storeId, role: 'staff' });
-          return { sessionToken, role: 'staff' as const };
-        }
-      }
-
-      throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid PIN' });
-    }),
-
-  // Logout
-  logout: publicProcedure
-    .input(z.object({ sessionToken: z.string() }))
-    .mutation(async ({ input }) => {
-      await db.deleteStaffSession(input.sessionToken);
-      return { success: true };
-    }),
-
-  // Get session
-  getSession: publicProcedure
-    .input(z.object({ sessionToken: z.string() }))
-    .query(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const session = await db.getStaffSession(input.sessionToken);
+
       if (!session) {
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
       }
@@ -461,112 +472,9 @@ const staffRouter = router({
       delta: z.number().int().refine(value => value !== 0, { message: 'Delta must be non-zero' }),
       reason: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const session = await db.getStaffSession(input.sessionToken);
-      if (!session) {
-        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
-      }
 
-      const store = await db.getStoreById(session.storeId);
-      if (!store) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
-      }
-
-      const queueSettings = store.settings?.queue;
-      if (!queueSettings?.enableReorder) {
-        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Reorder is disabled' });
-      }
-
-      const delta = Math.trunc(input.delta);
-      const maxMove = queueSettings?.reorderMaxMove ?? 3;
-      if (maxMove <= 0 || Math.abs(delta) > maxMove) {
-        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Move exceeds maximum allowed distance' });
-      }
-
-      const reason = input.reason?.trim();
-      if (queueSettings?.reorderReasonRequired && !reason) {
-        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Reason is required' });
-      }
-
-      const ticket = await db.getTicketById(input.ticketId);
-      if (!ticket || ticket.storeId !== session.storeId) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
-      }
-
-      if (ticket.status !== 'WAITING') {
-        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Only waiting tickets can be moved' });
-      }
-
-      const waitingTickets = (await db.getWaitingTickets(session.storeId))
-        .filter(t => t.status === 'WAITING');
-      const currentIndex = waitingTickets.findIndex(t => t.id === ticket.id);
-      if (currentIndex < 0) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found in waiting list' });
-      }
-
-      const targetIndex = currentIndex + delta;
-      if (targetIndex < 0 || targetIndex >= waitingTickets.length) {
-        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Cannot move outside queue' });
-      }
-
-      const direction = delta > 0 ? 1 : -1;
-      const steps = Math.abs(delta);
-      const workingTickets = [...waitingTickets];
-      let index = currentIndex;
-
-      for (let step = 0; step < steps; step++) {
-        const swapIndex = index + direction;
-        const currentTicket = workingTickets[index];
-        const swapTicket = workingTickets[swapIndex];
-        if (!currentTicket || !swapTicket) {
-          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Cannot move ticket' });
-        }
-
-        const currentRank = currentTicket.queueRank;
-        const swapRank = swapTicket.queueRank;
-        if (!currentRank || !swapRank) {
-          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Queue rank missing' });
-        }
-
-        await db.updateTicketQueueRank(currentTicket.id, swapRank);
-        await db.updateTicketQueueRank(swapTicket.id, currentRank);
-        workingTickets[index] = swapTicket;
-        workingTickets[swapIndex] = currentTicket;
-        index = swapIndex;
-      }
-
-      if (queueSettings?.auditLog) {
-        await db.createAuditLog({
-          storeId: session.storeId,
-          ticketId: ticket.id,
-          staffSessionId: session.id,
-          fromPos: currentIndex + 1,
-          toPos: targetIndex + 1,
-          action: delta < 0 ? 'MOVE_UP' : 'MOVE_DOWN',
-          reason: reason || undefined,
-          performedBy: session.role,
-        });
-      }
-
-      const waitingCount = await db.getWaitingCount(session.storeId);
-      const calledTicket = await db.getCalledTicket(session.storeId);
-
-      broadcastQueueUpdate(session.storeId, {
-        currentNumber: calledTicket?.number || 0,
-        waitingCount,
-      });
-
-      return { success: true };
-    }),
-
-  // Call next
-  callNext: publicProcedure
-    .input(z.object({ 
-      sessionToken: z.string(),
-      storeId: z.number() 
-    }))
-    .mutation(async ({ input }) => {
-      const session = await db.getStaffSession(input.sessionToken);
       if (!session || session.storeId !== input.storeId) {
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
       }
@@ -619,7 +527,10 @@ const staffRouter = router({
           ticketUrl,
           recallLimitSeconds,
           recallMaxCount,
+          storeSlug: store?.slug,
+          requestId: ctx.requestId,
         });
+
       }
 
       return nextTicket;
@@ -633,84 +544,9 @@ const staffRouter = router({
       ticketId: z.number(),
       reason: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const session = await db.getStaffSession(input.sessionToken);
-      if (!session) {
-        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
-      }
 
-      const ticket = await db.getTicketById(input.ticketId);
-      if (!ticket || ticket.storeId !== session.storeId) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
-      }
-
-      assertTicketTransition(ticket.status as TicketStatus, 'CALLED');
-
-      const store = await db.getStoreById(session.storeId);
-      const graceMinutes = store?.settings?.queue?.checkinGraceMinutes || 5;
-      const checkinDeadlineAt = new Date(Date.now() + graceMinutes * 60 * 1000);
-
-      await db.updateTicketStatus(ticket.id, 'CALLED', { checkinDeadlineAt });
-
-      // Log if audit enabled
-      if (store?.settings?.queue?.auditLog) {
-        await db.createAuditLog({
-          storeId: session.storeId,
-          ticketId: ticket.id,
-          staffSessionId: session.id,
-          action: 'CALL_SPECIFIC',
-          reason: input.reason,
-          performedBy: session.role,
-        });
-      }
-
-      // Broadcast updates
-      const waitingCount = await db.getWaitingCount(session.storeId);
-      broadcastQueueUpdate(session.storeId, {
-        currentNumber: ticket.number,
-        waitingCount,
-        calledTicket: { number: ticket.number, ticketToken: ticket.ticketToken },
-      });
-
-      broadcastTicketUpdate(session.storeId, ticket.ticketToken, {
-        status: 'CALLED',
-        number: ticket.number,
-      });
-
-      const storeName = store?.name ?? 'Queue Call';
-      const notificationSettings = store?.settings?.notifications;
-      const pushEnabled = notificationSettings?.pushEnabled ?? true;
-      const smsEnabled = notificationSettings?.smsEnabled ?? false;
-      const twilioConfig = getTwilioConfig();
-      const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig);
-      const smsTemplate = notificationSettings?.smsTemplateCalled;
-      const ticketUrl = buildTicketUrl(store?.slug, ticket.ticketToken);
-      const recallLimitSeconds = notificationSettings?.recallLimitSeconds;
-      const recallMaxCount = notificationSettings?.recallMaxCount;
-      const shouldNotify = pushEnabled || twilioConfigured;
-
-      if (shouldNotify) {
-        await notifyTicketCalled(ticket.id, session.storeId, storeName, ticket.number, {
-          pushEnabled,
-          twilioConfig: twilioConfigured ? twilioConfig : undefined,
-          smsTemplate,
-          messageType: 'call',
-          ticketUrl,
-          recallLimitSeconds,
-          recallMaxCount,
-        });
-      }
-
-      return ticket;
-    }),
-
-  recall: publicProcedure
-    .input(z.object({
-      sessionToken: z.string(),
-      ticketId: z.number(),
-    }))
-    .mutation(async ({ input }) => {
-      const session = await db.getStaffSession(input.sessionToken);
       if (!session) {
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
       }
@@ -756,7 +592,10 @@ const staffRouter = router({
           ticketUrl,
           recallLimitSeconds,
           recallMaxCount,
+          storeSlug: store?.slug,
+          requestId: ctx.requestId,
         });
+
       }
 
       const waitingCount = await db.getWaitingCount(session.storeId);
@@ -1170,7 +1009,7 @@ const notificationRouter = router({
       ticketId: z.number(),
       phoneE164: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Invalid phone number format'),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       // Get ticket to find store
       const ticket = await db.getTicketById(input.ticketId);
       if (!ticket) {
@@ -1183,7 +1022,18 @@ const notificationRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
       }
 
+      const ipAddress = getRequestIp(ctx.req);
+      enforceRateLimits({
+        scope: 'sms-otp',
+        key: `${store.id}:${ipAddress}:${input.phoneE164}`,
+        windows: RATE_LIMITS.smsOtp,
+        requestId: ctx.requestId,
+        storeSlug: store.slug,
+        ticketId: ticket.id,
+      });
+
       // Check if SMS notifications are enabled
+
       if (!store.settings?.notifications?.smsEnabled) {
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'SMS notifications are not enabled for this store' });
       }

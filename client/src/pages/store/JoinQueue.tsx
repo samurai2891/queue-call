@@ -11,7 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Minus, Plus, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { RATE_LIMITED_ERR_MSG } from '@shared/const';
 import type { Locale } from '@/contexts/LocaleContext';
+
 
 function JoinQueueContent() {
   const params = useParams<{ storeSlug: string }>();
@@ -31,8 +33,12 @@ function JoinQueueContent() {
       navigate(`/s/${params.storeSlug}/ticket/${ticket.ticketToken}`);
     },
     onError: (error) => {
-      toast.error(error.message);
+      const message = error.message === RATE_LIMITED_ERR_MSG
+        ? t('common.rateLimited')
+        : error.message;
+      toast.error(message);
     },
+
   });
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -616,7 +616,8 @@ function SettingsContent() {
         defaultLocale: store.defaultLocale || 'ja',
         supportedLocales: store.supportedLocales || ['ja', 'en'],
         
-        dailyResetTime: (settings.queue as any)?.dailyResetTime || '04:00',
+        dailyResetTime: (settings.queue as any)?.dailyResetTime || store.resetTime || '04:00',
+
         checkinGraceMinutes: settings.queue?.checkinGraceMinutes || 5,
         autoSkipEnabled: settings.queue?.autoSkip ?? true,
         autoSkipMinutes: settings.queue?.checkinGraceMinutes || 5,
@@ -716,7 +717,7 @@ function SettingsContent() {
         reorderMaxMove: formData.reorderMaxMove,
         reorderReasonRequired: formData.reorderReasonRequired,
       },
-      notification: {
+      notifications: {
         pushEnabled: formData.pushEnabled,
         smsEnabled: formData.smsEnabled,
         recallLimitSeconds: formData.recallLimitSeconds,

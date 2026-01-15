@@ -1,4 +1,6 @@
 import { Request, Response } from 'express';
+import { getRequestId } from './_core/requestContext';
+
 
 // SSE connection types
 type SSEScope = 'board' | 'staff' | 'ticket';
@@ -8,8 +10,11 @@ interface SSEClient {
   res: Response;
   scope: SSEScope;
   storeId: number;
+  storeSlug?: string;
   ticketToken?: string;
+  requestId?: string;
 }
+
 
 // Store active SSE connections
 const clients: Map<string, SSEClient> = new Map();
@@ -24,10 +29,16 @@ function sendSSEMessage(client: SSEClient, event: string, data: any) {
   try {
     client.res.write(`event: ${event}\n`);
     client.res.write(`data: ${JSON.stringify(data)}\n\n`);
-  } catch (e) {
-    console.error('SSE send error:', e);
+  } catch (error) {
+    console.error('SSE send error:', {
+      storeId: client.storeId,
+      storeSlug: client.storeSlug,
+      ticketToken: client.ticketToken,
+      requestId: client.requestId,
+    }, error);
     clients.delete(client.id);
   }
+
 }
 
 // Broadcast to all clients of a specific scope and store
@@ -90,9 +101,12 @@ export function broadcastIntakeStatus(storeId: number, status: 'open' | 'paused'
 
 // SSE endpoint handler
 export function handleSSE(req: Request, res: Response) {
-  const { scope, storeId, ticketToken } = req.query;
+  const { scope, storeId, ticketToken, storeSlug } = req.query;
+  const requestId = getRequestId();
+  const storeSlugValue = Array.isArray(storeSlug) ? storeSlug[0] : storeSlug;
   
   if (!scope || !storeId) {
+
     res.status(400).json({ error: 'Missing scope or storeId' });
     return;
   }
@@ -117,8 +131,11 @@ export function handleSSE(req: Request, res: Response) {
     res,
     scope: scope as SSEScope,
     storeId: parseInt(storeId as string, 10),
+    storeSlug: typeof storeSlugValue === 'string' ? storeSlugValue : undefined,
     ticketToken: ticketToken as string | undefined,
+    requestId,
   };
+
 
   clients.set(clientId, client);
 
@@ -134,7 +151,14 @@ export function handleSSE(req: Request, res: Response) {
   req.on('close', () => {
     clearInterval(pingInterval);
     clients.delete(clientId);
+    console.info('[SSE] Connection closed', {
+      storeId: client.storeId,
+      storeSlug: client.storeSlug,
+      ticketToken: client.ticketToken,
+      requestId: client.requestId,
+    });
   });
+
 }
 
 // Get connected client count for monitoring

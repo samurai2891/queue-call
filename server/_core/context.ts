@@ -1,11 +1,14 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
+import { nanoid } from "nanoid";
+import { getRequestId } from "./requestContext";
 import { sdk } from "./sdk";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: User | null;
+  requestId: string;
 };
 
 export async function createContext(
@@ -20,9 +23,13 @@ export async function createContext(
     user = null;
   }
 
+  const requestId = getRequestId() ?? nanoid(12);
+
   return {
     req: opts.req,
     res: opts.res,
     user,
+    requestId,
   };
 }
+
