@@ -164,7 +164,7 @@ function StaffContent() {
       setPin('');
       setIsLoggingIn(false);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       if (error.message === RATE_LIMITED_ERR_MSG) {
         toast.error(t('common.rateLimited'));
       } else {
@@ -188,7 +188,7 @@ function StaffContent() {
       toast.success(`${t('staff.call')}: #${ticket.number}`);
       refetchWaitingList();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(error.message);
     },
   });
@@ -200,7 +200,7 @@ function StaffContent() {
       setManualNote('');
       setManualPartySize(Math.min(2, manualMaxPartySize));
     },
-    onError: (error) => {
+    onError: (error: any) => {
       const message = error.message === 'Intake is paused'
         ? t('staff.manualAddDisabled')
         : error.message;
@@ -214,7 +214,7 @@ function StaffContent() {
       toast.success(t('staff.recall'));
       refetchWaitingList();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(error.message);
     },
   });
@@ -228,7 +228,7 @@ function StaffContent() {
       setSkipReason('');
       setSelectedTicketId(null);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(error.message);
     },
   });
@@ -241,7 +241,7 @@ function StaffContent() {
       setReorderReason('');
       setReorderTarget(null);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(error.message);
     },
   });
@@ -251,7 +251,7 @@ function StaffContent() {
       toast.success(t('staff.done'));
       refetchWaitingList();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(error.message);
     },
   });
@@ -262,7 +262,7 @@ function StaffContent() {
       setIntakeStatus(newStatus);
       toast.success(newStatus === 'open' ? t('staff.intakeOpen') : t('staff.intakePaused'));
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(error.message);
     },
   });

@@ -587,12 +587,14 @@ const ticketRouter = router({
         .map((waitingTicket, index) => waitingTicket.queueRank ?? String(index + 1).padStart(6, '0'))
         .sort();
  
-      for (const [index, waitingTicket] of reordered.entries()) {
-        const nextRank = rankPool[index];
-        if (waitingTicket.queueRank !== nextRank) {
-          await db.updateTicketQueueRank(waitingTicket.id, nextRank);
-        }
-      }
+      await Promise.all(
+        reordered.map(async (waitingTicket, index) => {
+          const nextRank = rankPool[index];
+          if (waitingTicket.queueRank !== nextRank) {
+            await db.updateTicketQueueRank(waitingTicket.id, nextRank);
+          }
+        })
+      );
  
       if (queueSettings?.auditLog) {
         await db.createAuditLog({
@@ -948,6 +950,82 @@ const ticketRouter = router({
 
       await db.updateStore(input.storeId, { intakeStatus: input.status });
       broadcastIntakeStatus(input.storeId, input.status);
+
+      return { success: true };
+    }),
+
+  // Login with PIN
+  login: publicProcedure
+    .input(z.object({
+      storeId: z.number(),
+      pin: z.string(),
+    }))
+    .mutation(async ({ input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      // Check manager PIN first
+      if (store.managerPinHash) {
+        const isManager = await bcrypt.compare(input.pin, store.managerPinHash);
+        if (isManager) {
+          const sessionToken = await db.createStaffSession({ storeId: input.storeId, role: 'manager' });
+          return { sessionToken, role: 'manager' as const };
+        }
+      }
+
+      // Check staff PIN
+      if (store.staffPinHash) {
+        const isStaff = await bcrypt.compare(input.pin, store.staffPinHash);
+        if (isStaff) {
+          const sessionToken = await db.createStaffSession({ storeId: input.storeId, role: 'staff' });
+          return { sessionToken, role: 'staff' as const };
+        }
+      }
+
+      throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid PIN' });
+    }),
+
+  // Logout
+  logout: publicProcedure
+    .input(z.object({ sessionToken: z.string() }))
+    .mutation(async ({ input }) => {
+      await db.deleteStaffSession(input.sessionToken);
+      return { success: true };
+    }),
+
+  // Get session
+  getSession: publicProcedure
+    .input(z.object({ sessionToken: z.string() }))
+    .query(async ({ input }) => {
+      const session = await db.getStaffSession(input.sessionToken);
+      if (!session) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
+      }
+      return session;
+    }),
+
+  // Checkin (public)
+  checkin: publicProcedure
+    .input(z.object({ 
+      storeId: z.number(),
+      number: z.number() 
+    }))
+    .mutation(async ({ input }) => {
+      const tickets = await db.getWaitingTickets(input.storeId);
+      const ticket = tickets.find(t => t.number === input.number && t.status === 'CALLED');
+      
+      if (!ticket) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found or not called' });
+      }
+
+      await db.updateTicketStatus(ticket.id, 'ARRIVED');
+
+      broadcastTicketUpdate(ticket.storeId, ticket.ticketToken, {
+        status: 'ARRIVED',
+        number: ticket.number,
+      });
 
       return { success: true };
     }),
