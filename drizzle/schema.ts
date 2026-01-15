@@ -81,9 +81,12 @@ export interface StoreSettings {
     smsEnabled?: boolean;
     recallLimitSeconds?: number;
     recallMaxCount?: number;
+    pushTemplateCalled?: string;
+    pushTemplateRecall?: string;
     smsTemplateCalled?: string;
     smsTemplateRecall?: string;
   };
+
   menu?: {
     switchStyle?: "icons" | "tabs";
     defaultView?: "feed" | "list";

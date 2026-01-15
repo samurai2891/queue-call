@@ -11,7 +11,10 @@ vi.mock('./_core/notification', () => ({
 }));
 
 import { getDb } from './db';
-import { consumeSmsBalance, getSmsBalance, getSmsTransactions, SMS_COST_PER_MESSAGE } from './stripe';
+
+process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'test';
+const stripeModule = await import('./stripe');
+
 
 describe('SMS Balance Functions', () => {
   let mockDb: any;
@@ -45,10 +48,11 @@ describe('SMS Balance Functions', () => {
       // Mock store with sufficient balance
       mockDb.limit.mockResolvedValueOnce([{ id: storeId, smsBalance: initialBalance, name: 'Test Store' }]);
       
-      const result = await consumeSmsBalance({ storeId, ticketId });
-      
+      const result = await stripeModule.consumeSmsBalance({ storeId, ticketId });
+
       expect(result.success).toBe(true);
-      expect(result.newBalance).toBe(initialBalance - SMS_COST_PER_MESSAGE);
+      expect(result.newBalance).toBe(initialBalance - stripeModule.SMS_COST_PER_MESSAGE);
+
     });
     
     it('should fail when balance is insufficient', async () => {
@@ -59,7 +63,7 @@ describe('SMS Balance Functions', () => {
       // Mock store with insufficient balance
       mockDb.limit.mockResolvedValueOnce([{ id: storeId, smsBalance: initialBalance, name: 'Test Store' }]);
       
-      const result = await consumeSmsBalance({ storeId, ticketId });
+      const result = await stripeModule.consumeSmsBalance({ storeId, ticketId });
       
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Insufficient balance');
@@ -73,7 +77,7 @@ describe('SMS Balance Functions', () => {
       // Mock empty result
       mockDb.limit.mockResolvedValueOnce([]);
       
-      const result = await consumeSmsBalance({ storeId, ticketId });
+      const result = await stripeModule.consumeSmsBalance({ storeId, ticketId });
       
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Store not found');
@@ -82,7 +86,7 @@ describe('SMS Balance Functions', () => {
     it('should fail when database is not available', async () => {
       vi.mocked(getDb).mockResolvedValueOnce(null);
       
-      const result = await consumeSmsBalance({ storeId: 1, ticketId: 100 });
+      const result = await stripeModule.consumeSmsBalance({ storeId: 1, ticketId: 100 });
       
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Database not available');
@@ -96,7 +100,7 @@ describe('SMS Balance Functions', () => {
       
       mockDb.limit.mockResolvedValueOnce([{ smsBalance: expectedBalance }]);
       
-      const balance = await getSmsBalance(storeId);
+      const balance = await stripeModule.getSmsBalance(storeId);
       
       expect(balance).toBe(expectedBalance);
     });
@@ -106,7 +110,7 @@ describe('SMS Balance Functions', () => {
       
       mockDb.limit.mockResolvedValueOnce([]);
       
-      const balance = await getSmsBalance(storeId);
+      const balance = await stripeModule.getSmsBalance(storeId);
       
       expect(balance).toBe(0);
     });
@@ -114,7 +118,7 @@ describe('SMS Balance Functions', () => {
     it('should return 0 when database is not available', async () => {
       vi.mocked(getDb).mockResolvedValueOnce(null);
       
-      const balance = await getSmsBalance(1);
+      const balance = await stripeModule.getSmsBalance(1);
       
       expect(balance).toBe(0);
     });
@@ -130,7 +134,7 @@ describe('SMS Balance Functions', () => {
       
       mockDb.limit.mockResolvedValueOnce(mockTransactions);
       
-      const transactions = await getSmsTransactions(storeId);
+      const transactions = await stripeModule.getSmsTransactions(storeId);
       
       expect(transactions).toEqual(mockTransactions);
     });
@@ -138,7 +142,7 @@ describe('SMS Balance Functions', () => {
     it('should return empty array when database is not available', async () => {
       vi.mocked(getDb).mockResolvedValueOnce(null);
       
-      const transactions = await getSmsTransactions(1);
+      const transactions = await stripeModule.getSmsTransactions(1);
       
       expect(transactions).toEqual([]);
     });
@@ -149,7 +153,7 @@ describe('SMS Balance Functions', () => {
       
       mockDb.limit.mockResolvedValueOnce([]);
       
-      await getSmsTransactions(storeId, limit);
+      await stripeModule.getSmsTransactions(storeId, limit);
       
       expect(mockDb.limit).toHaveBeenCalledWith(limit);
     });
@@ -157,7 +161,8 @@ describe('SMS Balance Functions', () => {
   
   describe('SMS_COST_PER_MESSAGE', () => {
     it('should be 20 yen per message', () => {
-      expect(SMS_COST_PER_MESSAGE).toBe(20);
+      expect(stripeModule.SMS_COST_PER_MESSAGE).toBe(20);
     });
   });
+
 });

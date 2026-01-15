@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
+
 
 // Mock database functions
 vi.mock('./db', () => ({
@@ -33,20 +33,32 @@ vi.mock('./sse', () => ({
   broadcastIntakeStatus: vi.fn(),
 }));
 
+// Mock notifications
+vi.mock('./notifications', () => ({
+  notifyTicketCalled: vi.fn(),
+}));
+
 // Mock bcrypt
 vi.mock('bcryptjs', () => ({
   hash: vi.fn().mockResolvedValue('hashed_pin'),
   compare: vi.fn().mockResolvedValue(true),
 }));
 
+process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "test";
+const { appRouter } = await import("./routers");
+
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
 function createPublicContext(): TrpcContext {
+
+
   return {
     user: null,
     req: {
       protocol: "https",
       headers: {},
+      ip: "127.0.0.1",
+      socket: { remoteAddress: "127.0.0.1" },
     } as TrpcContext["req"],
     res: {
       clearCookie: vi.fn(),
@@ -72,6 +84,8 @@ function createAuthContext(): TrpcContext {
     req: {
       protocol: "https",
       headers: {},
+      ip: "127.0.0.1",
+      socket: { remoteAddress: "127.0.0.1" },
     } as TrpcContext["req"],
     res: {
       clearCookie: vi.fn(),
@@ -455,5 +469,117 @@ describe("Staff Router", () => {
     await expect(
       caller.staff.moveTicket({ sessionToken: 'session-token', ticketId: 10, delta: 1 })
     ).rejects.toThrow('Reorder is disabled');
+  });
+
+  it("creates manual ticket when intake is open", async () => {
+    const { getStaffSession, getStoreById, createTicket, getWaitingCount, getCalledTicket } = await import('./db');
+    const { broadcastQueueUpdate } = await import('./sse');
+
+    (getStaffSession as any).mockResolvedValue({ id: 42, storeId: 2, role: 'staff' });
+    (getStoreById as any).mockResolvedValue({
+      id: 2,
+      intakeStatus: 'open',
+      defaultLocale: 'en',
+    });
+    (createTicket as any).mockResolvedValue({
+      id: 5,
+      storeId: 2,
+      number: 12,
+      ticketToken: 'token-123',
+      status: 'WAITING',
+    });
+    (getWaitingCount as any).mockResolvedValue(3);
+    (getCalledTicket as any).mockResolvedValue(null);
+
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.staff.createManual({
+      sessionToken: 'session-token',
+      storeId: 2,
+      partySize: 4,
+      note: 'Table seat',
+    });
+
+    expect(createTicket).toHaveBeenCalledWith({
+      storeId: 2,
+      partySize: 4,
+      note: 'Table seat',
+      locale: 'en',
+      source: 'web',
+    });
+    expect(broadcastQueueUpdate).toHaveBeenCalledWith(2, {
+      currentNumber: 0,
+      waitingCount: 3,
+    });
+    expect(result).toMatchObject({
+      number: 12,
+      ticketToken: 'token-123',
+    });
+  });
+
+  it("rejects manual ticket when intake is paused", async () => {
+    const { getStaffSession, getStoreById } = await import('./db');
+
+    (getStaffSession as any).mockResolvedValue({ id: 42, storeId: 2, role: 'staff' });
+    (getStoreById as any).mockResolvedValue({
+      id: 2,
+      intakeStatus: 'paused',
+      defaultLocale: 'ja',
+    });
+
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.staff.createManual({
+        sessionToken: 'session-token',
+        storeId: 2,
+        partySize: 2,
+      })
+    ).rejects.toThrow('Intake is paused');
+  });
+
+  it("passes push template on recall notification", async () => {
+    const { getStaffSession, getStoreById, getTicketById, getWaitingCount } = await import('./db');
+    const { notifyTicketCalled } = await import('./notifications');
+
+    (getStaffSession as any).mockResolvedValue({ id: 99, storeId: 1, role: 'staff' });
+    (getTicketById as any).mockResolvedValue({
+      id: 10,
+      storeId: 1,
+      status: 'CALLED',
+      number: 7,
+      ticketToken: 'ticket-token',
+    });
+    (getStoreById as any).mockResolvedValue({
+      id: 1,
+      name: 'Demo Store',
+      slug: 'demo',
+      settings: {
+        notifications: {
+          pushEnabled: true,
+          smsEnabled: false,
+          pushTemplateRecall: 'Please return #{number}',
+        },
+      },
+    });
+    (getWaitingCount as any).mockResolvedValue(1);
+
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await caller.staff.callSpecific({ sessionToken: 'session-token', ticketId: 10 });
+
+    expect(notifyTicketCalled).toHaveBeenCalledWith(
+      10,
+      1,
+      'Demo Store',
+      7,
+      expect.objectContaining({
+        messageType: 'recall',
+        pushTemplate: 'Please return #{number}',
+      })
+    );
   });
 });

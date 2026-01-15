@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { appRouter } from "./routers";
 import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
+
+process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "test";
+const { appRouter } = await import("./routers");
+
 
 type CookieCall = {
   name: string;

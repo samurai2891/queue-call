@@ -408,6 +408,7 @@ export async function notifyTicketCalled(
   ticketNumber: number,
   options?: {
     pushEnabled?: boolean;
+    pushTemplate?: string;
     twilioConfig?: {
       accountSid: string;
       authToken: string;
@@ -416,6 +417,7 @@ export async function notifyTicketCalled(
     smsTemplate?: string;
     messageType?: 'call' | 'recall' | 'reminder' | 'custom';
     ticketUrl?: string;
+
     recallLimitSeconds?: number;
     recallMaxCount?: number;
     storeSlug?: string;
@@ -430,11 +432,20 @@ export async function notifyTicketCalled(
     ticketId,
     requestId: options?.requestId,
   };
+  const messageType = options?.messageType ?? 'call';
 
   if (pushEnabled) {
+    const fallbackMessage = messageType === 'recall'
+      ? `お客様の番号 ${ticketNumber} が呼び出されています。再度ご確認ください。`
+      : `お客様の番号 ${ticketNumber} が呼び出されました。カウンターまでお越しください。`;
+    const message = (options?.pushTemplate ?? fallbackMessage)
+      .replace('{storeName}', storeName)
+      .replace('{number}', String(ticketNumber))
+      .trim();
+
     results.push = await sendPushNotification(ticketId, {
       title: `${storeName}`,
-      body: `お客様の番号 ${ticketNumber} が呼び出されました。カウンターまでお越しください。`,
+      body: message,
       tag: `ticket-${ticketId}`,
       data: {
         type: 'called',
@@ -447,10 +458,10 @@ export async function notifyTicketCalled(
 
   const twilioConfig = options?.twilioConfig;
   if (twilioConfig) {
-    const messageType = options?.messageType ?? 'call';
     const fallbackMessage = messageType === 'recall'
       ? `【${storeName}】再度のご案内です。お客様の番号 ${ticketNumber} が呼び出されています。`
       : `【${storeName}】お客様の番号 ${ticketNumber} が呼び出されました。カウンターまでお越しください。`;
+
     const ticketUrl = options?.ticketUrl ?? '';
     const message = (options?.smsTemplate ?? fallbackMessage)
       .replace('{storeName}', storeName)

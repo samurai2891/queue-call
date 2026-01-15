@@ -4,7 +4,9 @@ import { createServer } from "http";
 import { createHmac, timingSafeEqual } from "crypto";
 import net from "net";
 import { nanoid } from "nanoid";
+import sharp from "sharp";
 import { z } from "zod";
+
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
@@ -88,7 +90,11 @@ const ALLOWED_MIME_TYPES = new Map([
   ["image/png", "png"],
   ["image/webp", "webp"],
 ]);
+const OUTPUT_IMAGE_EXTENSION = "webp";
+const OUTPUT_IMAGE_MIME = "image/webp";
+const WEBP_QUALITY = 80;
 const uploadTokens = new Map<
+
   string,
   { key: string; mime: string; size: number; expiresAt: number }
 >();
@@ -153,11 +159,12 @@ function registerMediaRoutes(app: express.Express) {
       }
 
       const mime = payload.mime.toLowerCase();
-      const extension = ALLOWED_MIME_TYPES.get(mime);
-      if (!extension) {
+      const inputExtension = ALLOWED_MIME_TYPES.get(mime);
+      if (!inputExtension) {
         res.status(400).json({ error: "Unsupported file type" });
         return;
       }
+
       if (payload.size > MAX_UPLOAD_BYTES) {
         res.status(400).json({ error: "File too large" });
         return;
@@ -170,8 +177,9 @@ function registerMediaRoutes(app: express.Express) {
       }
 
       cleanupUploadTokens();
-      const key = buildMediaKey(payload.storeId, kind, extension);
+      const key = buildMediaKey(payload.storeId, kind, OUTPUT_IMAGE_EXTENSION);
       const token = nanoid(32);
+
       uploadTokens.set(token, {
         key,
         mime,
@@ -228,13 +236,18 @@ function registerMediaRoutes(app: express.Express) {
       }
 
       try {
-        await storagePut(uploadInfo.key, body, contentType);
+        const outputBuffer = await sharp(body)
+          .webp({ quality: WEBP_QUALITY })
+          .toBuffer();
+
+        await storagePut(uploadInfo.key, outputBuffer, OUTPUT_IMAGE_MIME);
         uploadTokens.delete(token);
         res.json({ success: true, key: uploadInfo.key, publicUrl: buildPublicUrl(uploadInfo.key) });
       } catch (error) {
         console.error("[Media] Upload failed", error);
         res.status(500).json({ error: "Upload failed" });
       }
+
     }
   );
 

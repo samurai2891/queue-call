@@ -4,10 +4,13 @@ import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
@@ -83,6 +86,9 @@ function StaffContent() {
   const [reorderDialogOpen, setReorderDialogOpen] = useState(false);
   const [reorderReason, setReorderReason] = useState('');
   const [reorderTarget, setReorderTarget] = useState<{ ticketId: number; delta: number } | null>(null);
+  const [manualPartySize, setManualPartySize] = useState(2);
+  const [manualNote, setManualNote] = useState('');
+
 
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
     { slug: params.storeSlug || '' },
@@ -92,6 +98,8 @@ function StaffContent() {
   const reorderEnabled = store?.settings?.queue?.enableReorder ?? false;
   const reorderMaxMove = store?.settings?.queue?.reorderMaxMove ?? 3;
   const reorderReasonRequired = store?.settings?.queue?.reorderReasonRequired ?? false;
+  const manualMaxPartySize = store?.settings?.kiosk?.maxPartySize ?? 10;
+
 
   // Verify session
   const { data: session, isLoading: sessionLoading, error: sessionError } = trpc.staff.getSession.useQuery(
@@ -185,7 +193,23 @@ function StaffContent() {
     },
   });
 
+  const manualCreateMutation = trpc.staff.createManual.useMutation({
+    onSuccess: () => {
+      toast.success(t('staff.manualAddSuccess'));
+      refetchWaitingList();
+      setManualNote('');
+      setManualPartySize(Math.min(2, manualMaxPartySize));
+    },
+    onError: (error) => {
+      const message = error.message === 'Intake is paused'
+        ? t('staff.manualAddDisabled')
+        : error.message;
+      toast.error(message);
+    },
+  });
+ 
   const recallMutation = trpc.staff.recall.useMutation({
+
     onSuccess: () => {
       toast.success(t('staff.recall'));
       refetchWaitingList();
@@ -261,7 +285,29 @@ function StaffContent() {
     callNextMutation.mutate({ sessionToken, storeId: store.id });
   };
 
+  const handleManualCreate = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!sessionToken || !store) return;
+    manualCreateMutation.mutate({
+      sessionToken,
+      storeId: store.id,
+      partySize: manualPartySize,
+      note: manualNote.trim() || undefined,
+    });
+  };
+
+  const handleManualPartySizeChange = (value: string) => {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isNaN(parsed)) {
+      setManualPartySize(1);
+      return;
+    }
+    const clamped = Math.max(1, Math.min(parsed, manualMaxPartySize));
+    setManualPartySize(clamped);
+  };
+ 
   const handleRecall = (ticketId: number) => {
+
     if (!sessionToken) return;
     recallMutation.mutate({ sessionToken, ticketId });
   };
@@ -459,7 +505,56 @@ function StaffContent() {
           </Button>
         </div>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('staff.manualAddTitle')}</CardTitle>
+            <CardDescription>{t('staff.manualAddDescription')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-4" onSubmit={handleManualCreate}>
+              <div className="grid gap-4 md:grid-cols-[160px,1fr]">
+                <div className="space-y-2">
+                  <Label htmlFor="manualPartySize">{t('join.partySize')}</Label>
+                  <Input
+                    id="manualPartySize"
+                    type="number"
+                    min={1}
+                    max={manualMaxPartySize}
+                    value={manualPartySize}
+                    onChange={(e) => handleManualPartySizeChange(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="manualNote">{t('join.note')}</Label>
+                  <Textarea
+                    id="manualNote"
+                    value={manualNote}
+                    onChange={(e) => setManualNote(e.target.value)}
+                    placeholder={t('join.notePlaceholder')}
+                    rows={3}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Button
+                  type="submit"
+                  disabled={manualCreateMutation.isPending || intakeStatus !== 'open'}
+                >
+                  {manualCreateMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {t('staff.manualAddAction')}
+                </Button>
+                {intakeStatus !== 'open' && (
+                  <p className="text-xs text-muted-foreground">{t('staff.manualAddDisabled')}</p>
+                )}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
         {reorderEnabled && (
+
           <div className="flex items-center justify-between p-4 bg-card rounded-lg border">
             <div className="space-y-1">
               <span className="text-sm font-medium">{t('staff.reorderMode')}</span>

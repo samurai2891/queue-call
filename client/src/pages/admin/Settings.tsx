@@ -511,11 +511,14 @@ function SettingsContent() {
     smsEnabled: false,
     recallLimitSeconds: 60,
     recallMaxCount: 3,
+    pushTemplateCalled: t('settings.pushTemplateDefaultCalled'),
+    pushTemplateRecall: t('settings.pushTemplateDefaultRecall'),
     smsTemplateCalled: t('settings.smsTemplateDefaultCalled'),
     smsTemplateRecall: t('settings.smsTemplateDefaultRecall'),
 
     
     // Menu
+
     menuSwitchStyle: 'toggle',
     menuDefaultView: 'feed',
     photoDefaultSize: 'large',
@@ -629,11 +632,14 @@ function SettingsContent() {
         smsEnabled: settings.notifications?.smsEnabled || false,
         recallLimitSeconds: settings.notifications?.recallLimitSeconds || 60,
         recallMaxCount: settings.notifications?.recallMaxCount || 3,
+        pushTemplateCalled: settings.notifications?.pushTemplateCalled || t('settings.pushTemplateDefaultCalled'),
+        pushTemplateRecall: settings.notifications?.pushTemplateRecall || t('settings.pushTemplateDefaultRecall'),
         smsTemplateCalled: settings.notifications?.smsTemplateCalled || t('settings.smsTemplateDefaultCalled'),
         smsTemplateRecall: settings.notifications?.smsTemplateRecall || t('settings.smsTemplateDefaultRecall'),
 
         
         menuSwitchStyle: settings.menu?.switchStyle || 'toggle',
+
         menuDefaultView: settings.menu?.defaultView || 'feed',
         photoDefaultSize: settings.menu?.photoDefaultSize || 'large',
         allowPhotoSizeToggle: settings.menu?.allowCustomerPhotoSizeToggle ?? true,
@@ -722,9 +728,12 @@ function SettingsContent() {
         smsEnabled: formData.smsEnabled,
         recallLimitSeconds: formData.recallLimitSeconds,
         recallMaxCount: formData.recallMaxCount,
+        pushTemplateCalled: formData.pushTemplateCalled,
+        pushTemplateRecall: formData.pushTemplateRecall,
         smsTemplateCalled: formData.smsTemplateCalled,
         smsTemplateRecall: formData.smsTemplateRecall,
       },
+
       menu: {
         switchStyle: formData.menuSwitchStyle,
         defaultView: formData.menuDefaultView,
@@ -1484,9 +1493,33 @@ function SettingsContent() {
                   />
                 </div>
 
+                {formData.pushEnabled && (
+                  <div className="space-y-4 ml-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="pushTemplateCalled">{t('settings.pushTemplateCalled')}</Label>
+                      <Textarea
+                        id="pushTemplateCalled"
+                        value={formData.pushTemplateCalled}
+                        onChange={(e) => updateField('pushTemplateCalled', e.target.value)}
+                        placeholder={t('settings.pushTemplateVariables')}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pushTemplateRecall">{t('settings.pushTemplateRecall')}</Label>
+                      <Textarea
+                        id="pushTemplateRecall"
+                        value={formData.pushTemplateRecall}
+                        onChange={(e) => updateField('pushTemplateRecall', e.target.value)}
+                        placeholder={t('settings.pushTemplateVariables')}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <Separator />
 
                 <div className="space-y-4">
+
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>{t('settings.smsEnabled')}</Label>
