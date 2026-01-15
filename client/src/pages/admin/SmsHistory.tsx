@@ -67,7 +67,7 @@ function SmsHistoryContent() {
   const formatMessage = (key: string, params: Record<string, string | number>) => {
     return Object.entries(params).reduce(
       (message, [param, value]) => message.replace(`{${param}}`, String(value)),
-      t(key)
+      t(key as any)
     );
   };
 
