@@ -81,18 +81,18 @@
 **確認ポイント:** 1枚の画面で迷わず登録でき、失敗時のエラーがi18n済み
 
 #### T2-4. 呼び出し/再呼び出し時にSMS送信を接続
-- [ ] スタッフ操作（CALL/RECALL）にSMS送信をフック
-- [ ] メッセージテンプレ（短く）例: {番号}番です。入口へお願いします {URL}
-- [ ] 送信頻度制限（RECALL連打でスパム化しない）
-- [ ] SMSテンプレ/再通知制限の設定値を反映
+- [x] スタッフ操作（CALL/RECALL）にSMS送信をフック
+- [x] メッセージテンプレ（短く）例: {番号}番です。入口へお願いします {URL}
+- [x] 送信頻度制限（RECALL連打でスパム化しない）
+- [x] SMSテンプレ/再通知制限の設定値を反映
 
 **確認ポイント:** CALL/RECALLのたびに登録済みならSMSが飛ぶ、連打しても一定間隔で抑制
 
 #### T2-5. STOP（配信停止）対応
-- [ ] Twilio の Inbound Webhook を作成（Messaging）
-- [ ] 受信本文が STOP/UNSUBSCRIBE 等なら smsOptOut=true にする
-- [ ] 以後、その番号には送らない
-- [ ] Webhook認証（Twilio署名検証）
+- [x] Twilio の Inbound Webhook を作成（Messaging）
+- [x] 受信本文が STOP/UNSUBSCRIBE 等なら smsOptOut=true にする
+- [x] 以後、その番号には送らない
+- [x] Webhook認証（Twilio署名検証）
 
 **確認ポイント:** STOP後に送られない、webhook認証が通る
 
@@ -109,7 +109,7 @@
 - [x] ページネーション
 - [x] 日付範囲フィルター
 - [x] 設定画面からのリンク追加
-- [ ] CSVエクスポート機能
+- [x] CSVエクスポート機能
 
 
 ---

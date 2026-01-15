@@ -366,6 +366,9 @@ export const translations = {
     'smsHistory.paginationLabel': 'ページ {page} / {totalPages}',
     'smsHistory.prevPage': '前へ',
     'smsHistory.nextPage': '次へ',
+    'smsHistory.exportCsv': 'CSVをエクスポート',
+    'smsHistory.exporting': 'CSVを作成中...',
+    'smsHistory.exportFailed': 'CSVの作成に失敗しました',
     'smsHistory.status.pending': '送信中',
     'smsHistory.status.sent': '送信済み',
     'smsHistory.status.delivered': '配信完了',
@@ -377,10 +380,10 @@ export const translations = {
     
     // SMS Registration
 
-    'sms.title': 'SMS通知',
+    'sms.title': 'SMSでリクエストを受け取る',
     'sms.description': '呼び出し時にSMSでお知らせします',
-    'sms.register': 'SMSを登録',
-    'sms.registerTitle': 'SMS通知を登録',
+    'sms.register': 'SMSでリクエストを受け取る',
+    'sms.registerTitle': 'SMSでリクエストを受け取る',
     'sms.registerDescription': '電話番号を入力して認証コードを受け取ってください',
     'sms.phoneNumber': '電話番号',
     'sms.phoneHint': '国番号を選択し、電話番号を入力してください',
@@ -396,6 +399,15 @@ export const translations = {
     'sms.unsubscribed': 'SMS通知を解除しました',
     'sms.resendCode': 'コードを再送信',
     'sms.error': 'エラーが発生しました',
+    'sms.errorNotEnabled': 'この店舗ではSMS通知が無効です',
+    'sms.errorNotConfigured': 'SMSサービスが設定されていません',
+    'sms.errorAlreadyVerified': 'この電話番号はすでに登録済みです',
+    'sms.errorSendFailed': '認証コードの送信に失敗しました',
+    'sms.errorInvalidPhone': '電話番号の形式が正しくありません',
+    'sms.errorInvalidCodeFormat': '認証コードは6桁で入力してください',
+    'sms.errorInvalidCode': '認証コードが正しくありません',
+    'sms.errorNoPendingVerification': '認証待ちの登録が見つかりません',
+    'sms.errorNoSubscription': 'SMS登録が見つかりません',
   },
   en: {
     // Common
@@ -750,6 +762,9 @@ export const translations = {
     'smsHistory.paginationLabel': 'Page {page} / {totalPages}',
     'smsHistory.prevPage': 'Previous',
     'smsHistory.nextPage': 'Next',
+    'smsHistory.exportCsv': 'Export CSV',
+    'smsHistory.exporting': 'Exporting CSV...',
+    'smsHistory.exportFailed': 'Failed to export CSV',
     'smsHistory.status.pending': 'Pending',
     'smsHistory.status.sent': 'Sent',
     'smsHistory.status.delivered': 'Delivered',
@@ -761,10 +776,10 @@ export const translations = {
     
     // SMS Registration
 
-    'sms.title': 'SMS Notification',
+    'sms.title': 'Receive SMS alerts',
     'sms.description': 'Get notified via SMS when called',
-    'sms.register': 'Register SMS',
-    'sms.registerTitle': 'Register SMS Notification',
+    'sms.register': 'Receive SMS alerts',
+    'sms.registerTitle': 'Receive SMS alerts',
     'sms.registerDescription': 'Enter your phone number to receive a verification code',
     'sms.phoneNumber': 'Phone Number',
     'sms.phoneHint': 'Select country code and enter your phone number',
@@ -780,6 +795,15 @@ export const translations = {
     'sms.unsubscribed': 'SMS notification disabled',
     'sms.resendCode': 'Resend Code',
     'sms.error': 'An error occurred',
+    'sms.errorNotEnabled': 'SMS notifications are disabled for this store',
+    'sms.errorNotConfigured': 'SMS service is not configured',
+    'sms.errorAlreadyVerified': 'This phone number is already verified',
+    'sms.errorSendFailed': 'Failed to send verification code',
+    'sms.errorInvalidPhone': 'Invalid phone number format',
+    'sms.errorInvalidCodeFormat': 'Verification code must be 6 digits',
+    'sms.errorInvalidCode': 'Invalid verification code',
+    'sms.errorNoPendingVerification': 'No pending verification found',
+    'sms.errorNoSubscription': 'SMS subscription not found',
   },
   ko: {
     // Common
@@ -1135,6 +1159,9 @@ export const translations = {
     'smsHistory.paginationLabel': '페이지 {page} / {totalPages}',
     'smsHistory.prevPage': '이전',
     'smsHistory.nextPage': '다음',
+    'smsHistory.exportCsv': 'CSV 내보내기',
+    'smsHistory.exporting': 'CSV 생성 중...',
+    'smsHistory.exportFailed': 'CSV 내보내기에 실패했습니다',
     'smsHistory.status.pending': '전송 중',
     'smsHistory.status.sent': '전송 완료',
     'smsHistory.status.delivered': '전달 완료',
@@ -1146,10 +1173,10 @@ export const translations = {
     
     // SMS Registration
 
-    'sms.title': 'SMS 알림',
+    'sms.title': 'SMS로 호출 알림 받기',
     'sms.description': '호출 시 SMS로 알려드립니다',
-    'sms.register': 'SMS 등록',
-    'sms.registerTitle': 'SMS 알림 등록',
+    'sms.register': 'SMS로 호출 알림 받기',
+    'sms.registerTitle': 'SMS로 호출 알림 받기',
     'sms.registerDescription': '전화번호를 입력하여 인증 코드를 받으세요',
     'sms.phoneNumber': '전화번호',
     'sms.phoneHint': '국가 코드를 선택하고 전화번호를 입력하세요',
@@ -1165,6 +1192,15 @@ export const translations = {
     'sms.unsubscribed': 'SMS 알림이 해제되었습니다',
     'sms.resendCode': '코드 재전송',
     'sms.error': '오류가 발생했습니다',
+    'sms.errorNotEnabled': '이 매장에서는 SMS 알림이 비활성화되어 있습니다',
+    'sms.errorNotConfigured': 'SMS 서비스가 설정되지 않았습니다',
+    'sms.errorAlreadyVerified': '이미 등록된 전화번호입니다',
+    'sms.errorSendFailed': '인증 코드 전송에 실패했습니다',
+    'sms.errorInvalidPhone': '전화번호 형식이 올바르지 않습니다',
+    'sms.errorInvalidCodeFormat': '인증 코드는 6자리로 입력하세요',
+    'sms.errorInvalidCode': '인증 코드가 올바르지 않습니다',
+    'sms.errorNoPendingVerification': '대기 중인 인증이 없습니다',
+    'sms.errorNoSubscription': 'SMS 등록 정보를 찾을 수 없습니다',
   },
   'zh-Hans': {
     // Common
@@ -1520,6 +1556,9 @@ export const translations = {
     'smsHistory.paginationLabel': '第 {page} / {totalPages} 页',
     'smsHistory.prevPage': '上一页',
     'smsHistory.nextPage': '下一页',
+    'smsHistory.exportCsv': '导出CSV',
+    'smsHistory.exporting': '正在生成CSV...',
+    'smsHistory.exportFailed': '导出CSV失败',
     'smsHistory.status.pending': '发送中',
     'smsHistory.status.sent': '已发送',
     'smsHistory.status.delivered': '已送达',
@@ -1531,10 +1570,10 @@ export const translations = {
     
     // SMS Registration
 
-    'sms.title': '短信通知',
+    'sms.title': '接收短信提醒',
     'sms.description': '叫号时通过短信通知您',
-    'sms.register': '注册短信',
-    'sms.registerTitle': '注册短信通知',
+    'sms.register': '接收短信提醒',
+    'sms.registerTitle': '接收短信提醒',
     'sms.registerDescription': '输入您的电话号码以接收验证码',
     'sms.phoneNumber': '电话号码',
     'sms.phoneHint': '选择国家代码并输入电话号码',
@@ -1550,6 +1589,15 @@ export const translations = {
     'sms.unsubscribed': '短信通知已取消',
     'sms.resendCode': '重新发送',
     'sms.error': '发生错误',
+    'sms.errorNotEnabled': '该店铺未启用短信通知',
+    'sms.errorNotConfigured': '短信服务尚未配置',
+    'sms.errorAlreadyVerified': '该电话号码已验证',
+    'sms.errorSendFailed': '发送验证码失败',
+    'sms.errorInvalidPhone': '电话号码格式不正确',
+    'sms.errorInvalidCodeFormat': '验证码必须为6位数字',
+    'sms.errorInvalidCode': '验证码不正确',
+    'sms.errorNoPendingVerification': '未找到待验证的注册信息',
+    'sms.errorNoSubscription': '未找到短信订阅',
   },
   'zh-Hant': {
     // Common
@@ -1905,6 +1953,9 @@ export const translations = {
     'smsHistory.paginationLabel': '第 {page} / {totalPages} 頁',
     'smsHistory.prevPage': '上一頁',
     'smsHistory.nextPage': '下一頁',
+    'smsHistory.exportCsv': '匯出CSV',
+    'smsHistory.exporting': '正在產生CSV...',
+    'smsHistory.exportFailed': '匯出CSV失敗',
     'smsHistory.status.pending': '發送中',
     'smsHistory.status.sent': '已發送',
     'smsHistory.status.delivered': '已送達',
@@ -1916,10 +1967,10 @@ export const translations = {
     
     // SMS Registration
 
-    'sms.title': '簡訊通知',
-    'sms.description': '叫號時通過簡訊通知您',
-    'sms.register': '註冊簡訊',
-    'sms.registerTitle': '註冊簡訊通知',
+    'sms.title': '接收簡訊提醒',
+    'sms.description': '叫號時透過簡訊通知您',
+    'sms.register': '接收簡訊提醒',
+    'sms.registerTitle': '接收簡訊提醒',
     'sms.registerDescription': '輸入您的電話號碼以接收驗證碼',
     'sms.phoneNumber': '電話號碼',
     'sms.phoneHint': '選擇國家代碼並輸入電話號碼',
@@ -1935,6 +1986,15 @@ export const translations = {
     'sms.unsubscribed': '簡訊通知已取消',
     'sms.resendCode': '重新發送',
     'sms.error': '發生錯誤',
+    'sms.errorNotEnabled': '此店家未啟用簡訊通知',
+    'sms.errorNotConfigured': '簡訊服務尚未設定',
+    'sms.errorAlreadyVerified': '此電話號碼已驗證',
+    'sms.errorSendFailed': '驗證碼發送失敗',
+    'sms.errorInvalidPhone': '電話號碼格式不正確',
+    'sms.errorInvalidCodeFormat': '驗證碼需為6位數',
+    'sms.errorInvalidCode': '驗證碼不正確',
+    'sms.errorNoPendingVerification': '找不到待驗證的註冊資料',
+    'sms.errorNoSubscription': '找不到簡訊註冊資料',
   },
 } as const;
 

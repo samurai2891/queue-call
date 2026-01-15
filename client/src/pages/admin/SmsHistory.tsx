@@ -40,7 +40,9 @@ import {
   TrendingUp,
   AlertTriangle,
   Wallet,
+  Download,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { getLoginUrl } from '@/const';
 
@@ -132,6 +134,12 @@ function SmsHistoryContent() {
     { enabled: !!store?.id }
   );
 
+  const exportCsvMutation = trpc.smsLogs.exportCsv.useMutation({
+    onError: () => {
+      toast.error(t('smsHistory.exportFailed'));
+    },
+  });
+
   // Auth check
   if (authLoading || storesLoading) {
     return (
@@ -180,6 +188,29 @@ function SmsHistoryContent() {
     setPage(0);
   };
 
+  const handleExportCsv = async () => {
+    if (!store?.id) return;
+
+    try {
+      const csvResult = await exportCsvMutation.mutateAsync({
+        storeId: store.id,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      });
+
+      const csvBlob = new Blob([csvResult.csv], { type: 'text/csv;charset=utf-8;' });
+      const downloadUrl = window.URL.createObjectURL(csvBlob);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = downloadUrl;
+      downloadLink.download = csvResult.filename;
+      downloadLink.click();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      toast.error(t('smsHistory.exportFailed'));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -196,11 +227,24 @@ function SmsHistoryContent() {
             </h1>
             <p className="text-sm text-muted-foreground">{store.name}</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => refetchLogs()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            {t('smsHistory.refresh')}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCsv}
+              disabled={exportCsvMutation.isPending}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {exportCsvMutation.isPending
+                ? t('smsHistory.exporting')
+                : t('smsHistory.exportCsv')}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => refetchLogs()}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {t('smsHistory.refresh')}
 
-          </Button>
+            </Button>
+          </div>
         </div>
       </header>
 

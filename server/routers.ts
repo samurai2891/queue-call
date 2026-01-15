@@ -32,6 +32,28 @@ function assertTicketTransition(currentStatus: TicketStatus, nextStatus: TicketS
   }
 }
 
+const getAppBaseUrl = () => {
+  const baseUrl = process.env.APP_BASE_URL || process.env.PUBLIC_BASE_URL || 'http://localhost:3000';
+  return baseUrl.replace(/\/+$/, '');
+};
+
+const buildTicketUrl = (storeSlug: string | undefined, ticketToken: string) => {
+  if (!storeSlug) {
+    return undefined;
+  }
+  return `${getAppBaseUrl()}/s/${storeSlug}/ticket/${ticketToken}`;
+};
+
+const getTwilioConfig = () => ({
+  accountSid: process.env.TWILIO_ACCOUNT_SID || '',
+  authToken: process.env.TWILIO_AUTH_TOKEN || '',
+  fromNumber: process.env.TWILIO_FROM_NUMBER || '',
+});
+
+const isTwilioConfigured = (twilioConfig: { accountSid: string; authToken: string; fromNumber: string }) => {
+  return Boolean(twilioConfig.accountSid && twilioConfig.authToken && twilioConfig.fromNumber);
+};
+
 // ==================== Store Router ====================
 const storeRouter = router({
   // Get store by slug (public)
@@ -577,9 +599,27 @@ const staffRouter = router({
       });
 
       const storeName = store?.name ?? 'Queue Call';
-      const pushEnabled = store?.settings?.notifications?.pushEnabled ?? true;
-      if (pushEnabled) {
-        await notifyTicketCalled(nextTicket.id, input.storeId, storeName, nextTicket.number);
+      const notificationSettings = store?.settings?.notifications;
+      const pushEnabled = notificationSettings?.pushEnabled ?? true;
+      const smsEnabled = notificationSettings?.smsEnabled ?? false;
+      const twilioConfig = getTwilioConfig();
+      const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig);
+      const smsTemplate = notificationSettings?.smsTemplateCalled;
+      const ticketUrl = buildTicketUrl(store?.slug, nextTicket.ticketToken);
+      const recallLimitSeconds = notificationSettings?.recallLimitSeconds;
+      const recallMaxCount = notificationSettings?.recallMaxCount;
+      const shouldNotify = pushEnabled || twilioConfigured;
+
+      if (shouldNotify) {
+        await notifyTicketCalled(nextTicket.id, input.storeId, storeName, nextTicket.number, {
+          pushEnabled,
+          twilioConfig: twilioConfigured ? twilioConfig : undefined,
+          smsTemplate,
+          messageType: 'call',
+          ticketUrl,
+          recallLimitSeconds,
+          recallMaxCount,
+        });
       }
 
       return nextTicket;
@@ -638,9 +678,27 @@ const staffRouter = router({
       });
 
       const storeName = store?.name ?? 'Queue Call';
-      const pushEnabled = store?.settings?.notifications?.pushEnabled ?? true;
-      if (pushEnabled) {
-        await notifyTicketCalled(ticket.id, session.storeId, storeName, ticket.number);
+      const notificationSettings = store?.settings?.notifications;
+      const pushEnabled = notificationSettings?.pushEnabled ?? true;
+      const smsEnabled = notificationSettings?.smsEnabled ?? false;
+      const twilioConfig = getTwilioConfig();
+      const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig);
+      const smsTemplate = notificationSettings?.smsTemplateCalled;
+      const ticketUrl = buildTicketUrl(store?.slug, ticket.ticketToken);
+      const recallLimitSeconds = notificationSettings?.recallLimitSeconds;
+      const recallMaxCount = notificationSettings?.recallMaxCount;
+      const shouldNotify = pushEnabled || twilioConfigured;
+
+      if (shouldNotify) {
+        await notifyTicketCalled(ticket.id, session.storeId, storeName, ticket.number, {
+          pushEnabled,
+          twilioConfig: twilioConfigured ? twilioConfig : undefined,
+          smsTemplate,
+          messageType: 'call',
+          ticketUrl,
+          recallLimitSeconds,
+          recallMaxCount,
+        });
       }
 
       return ticket;
@@ -678,9 +736,27 @@ const staffRouter = router({
       }
 
       const storeName = store?.name ?? 'Queue Call';
-      const pushEnabled = store?.settings?.notifications?.pushEnabled ?? true;
-      if (pushEnabled) {
-        await notifyTicketCalled(ticket.id, session.storeId, storeName, ticket.number);
+      const notificationSettings = store?.settings?.notifications;
+      const pushEnabled = notificationSettings?.pushEnabled ?? true;
+      const smsEnabled = notificationSettings?.smsEnabled ?? false;
+      const twilioConfig = getTwilioConfig();
+      const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig);
+      const smsTemplate = notificationSettings?.smsTemplateRecall;
+      const ticketUrl = buildTicketUrl(store?.slug, ticket.ticketToken);
+      const recallLimitSeconds = notificationSettings?.recallLimitSeconds;
+      const recallMaxCount = notificationSettings?.recallMaxCount;
+      const shouldNotify = pushEnabled || twilioConfigured;
+
+      if (shouldNotify) {
+        await notifyTicketCalled(ticket.id, session.storeId, storeName, ticket.number, {
+          pushEnabled,
+          twilioConfig: twilioConfigured ? twilioConfig : undefined,
+          smsTemplate,
+          messageType: 'recall',
+          ticketUrl,
+          recallLimitSeconds,
+          recallMaxCount,
+        });
       }
 
       const waitingCount = await db.getWaitingCount(session.storeId);
@@ -1316,6 +1392,59 @@ const smsLogsRouter = router({
       }
 
       return await db.getSmsLogStats(input.storeId, input.days);
+    }),
+  exportCsv: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      status: z.enum(['pending', 'sent', 'delivered', 'failed']).optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      const options: Parameters<typeof db.getSmsLogsForExport>[1] = {
+        status: input.status,
+      };
+
+      if (input.startDate) {
+        options.startDate = new Date(input.startDate);
+      }
+      if (input.endDate) {
+        options.endDate = new Date(input.endDate);
+      }
+
+      const logs = await db.getSmsLogsForExport(input.storeId, options);
+
+      const formatCsvValue = (value: string | number | null | undefined) => {
+        const textValue = String(value ?? '');
+        return `"${textValue.replace(/"/g, '""')}"`;
+      };
+
+      const headerRow = ['Date', 'Recipient', 'Type', 'Message', 'Status', 'Credits', 'TicketId'];
+      const dataRows = logs.map((log) => [
+        new Date(log.createdAt).toISOString(),
+        log.phoneE164,
+        log.messageType,
+        log.messageContent,
+        log.status,
+        log.creditConsumed,
+        log.ticketId ?? '',
+      ]);
+
+      const csvLines = [headerRow, ...dataRows]
+        .map((row) => row.map((value) => formatCsvValue(value)).join(','))
+        .join('\n');
+
+      const dateStamp = new Date().toISOString().slice(0, 10);
+
+      return {
+        csv: `\uFEFF${csvLines}`,
+        filename: `sms-logs-${store.slug}-${dateStamp}.csv`,
+      };
     }),
 });
 

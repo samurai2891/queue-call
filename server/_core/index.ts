@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
+import { createHmac, timingSafeEqual } from "crypto";
 import net from "net";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -11,6 +12,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleSSE } from "../sse";
 import { startAutoSkipJob } from "../jobs/autoSkip";
+import { startCleanupSmsLogsJob } from "../jobs/cleanupSmsLogs";
 import { constructWebhookEvent, handleCheckoutCompleted } from "../stripe";
 import { storageGet, storagePut } from "../storage";
 import * as db from "../db";
@@ -35,6 +37,46 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   }
   throw new Error(`No available port found starting from ${startPort}`);
 }
+
+const STOP_KEYWORDS = new Set(["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"]);
+
+const buildTwilioSignature = (
+  url: string,
+  params: Record<string, string>,
+  authToken: string
+) => {
+  const sortedKeys = Object.keys(params).sort();
+  const data = sortedKeys.reduce((accumulator, key) => `${accumulator}${key}${params[key]}`, url);
+  return createHmac("sha1", authToken).update(data, "utf8").digest("base64");
+};
+
+const isTwilioSignatureValid = (request: express.Request, authToken: string) => {
+  const signatureHeader = request.headers["x-twilio-signature"];
+  if (typeof signatureHeader !== "string") {
+    return false;
+  }
+
+  const url = `${request.protocol}://${request.get("host")}${request.originalUrl}`;
+  const rawParams = request.body && typeof request.body === "object" ? request.body : {};
+  const params: Record<string, string> = {};
+
+  for (const [entryKey, entryValue] of Object.entries(rawParams)) {
+    const normalizedValue = Array.isArray(entryValue)
+      ? entryValue.join("")
+      : String(entryValue ?? "");
+    params[entryKey] = normalizedValue;
+  }
+
+  const expectedSignature = buildTwilioSignature(url, params, authToken);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  const signatureBuffer = Buffer.from(signatureHeader);
+
+  if (expectedBuffer.length !== signatureBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expectedBuffer, signatureBuffer);
+};
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const UPLOAD_TOKEN_TTL_MS = 10 * 60 * 1000;
@@ -257,6 +299,34 @@ async function startServer() {
       res.status(400).json({ error: `Webhook Error: ${err.message}` });
     }
   });
+
+  app.post('/api/twilio/webhook', async (req, res) => {
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+
+    if (!authToken) {
+      console.error('[Twilio Webhook] Missing TWILIO_AUTH_TOKEN');
+      return res.status(500).json({ error: 'Webhook auth token not configured' });
+    }
+
+    if (!isTwilioSignatureValid(req, authToken)) {
+      return res.status(403).json({ error: 'Invalid signature' });
+    }
+
+    const body = req.body as Record<string, unknown> | undefined;
+    const fromNumber = typeof body?.From === 'string' ? body.From : '';
+    const messageBody = typeof body?.Body === 'string' ? body.Body : '';
+
+    if (!fromNumber) {
+      return res.status(400).json({ error: 'From is required' });
+    }
+
+    const keyword = messageBody.trim().toUpperCase().split(/\s+/)[0];
+    if (STOP_KEYWORDS.has(keyword)) {
+      await db.optOutSmsSubscriptionsByPhone(fromNumber);
+    }
+
+    return res.status(200).send('OK');
+  });
   
   // tRPC API
   app.use(
@@ -285,6 +355,7 @@ async function startServer() {
     
     // Start background jobs
     startAutoSkipJob(60); // Run every 60 seconds
+    startCleanupSmsLogsJob();
   });
 }
 
