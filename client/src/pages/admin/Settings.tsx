@@ -2,6 +2,8 @@ import { useParams, useLocation } from 'wouter';
 import { useState, useEffect, useMemo } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
+import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -74,12 +76,20 @@ const SMS_COST_PER_MESSAGE = 20; // 1通あたり20円
 
 // SMS残高カードコンポーネント
 function SmsBalanceCard({ storeId }: { storeId?: number }) {
+  const { t } = useLocale();
+  const formatMessage = (key: string, params: Record<string, string | number>) => {
+    return Object.entries(params).reduce(
+      (message, [param, value]) => message.replace(`{${param}}`, String(value)),
+      t(key)
+    );
+  };
   const [isCharging, setIsCharging] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [showChargePrompt, setShowChargePrompt] = useState(false);
   const [chargePromptDismissed, setChargePromptDismissed] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
   const [lowBalanceThreshold, setLowBalanceThreshold] = useState(1000);
+
 
   
   // SMS残高取得
@@ -101,7 +111,8 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
       window.location.href = data.url;
     },
     onError: (error) => {
-      toast.error('チャージの開始に失敗しました: ' + error.message);
+      toast.error(`${t('settings.smsChargeStartFailed')}: ${error.message}`);
+
       setIsCharging(false);
     },
   });
@@ -136,7 +147,13 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
   const handleCharge = async (amount: number) => {
     if (!storeId) return;
     if (amount < MIN_SMS_CHARGE_AMOUNT || amount > MAX_SMS_CHARGE_AMOUNT) {
-      toast.error(`チャージ金額は${MIN_SMS_CHARGE_AMOUNT.toLocaleString()}円以上、${MAX_SMS_CHARGE_AMOUNT.toLocaleString()}円以下にしてください。`);
+      toast.error(
+        formatMessage('settings.smsChargeRangeError', {
+          min: MIN_SMS_CHARGE_AMOUNT.toLocaleString(),
+          max: MAX_SMS_CHARGE_AMOUNT.toLocaleString(),
+        })
+      );
+
       return;
     }
     setIsCharging(true);
@@ -155,17 +172,20 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
         <div className="flex items-center justify-center py-4">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      </div>
-    );
-  }
-  
+    </div>
+  );
+}
+
+
+
   return (
     <div className="rounded-lg border bg-card">
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wallet className="h-5 w-5 text-primary" />
-            <span className="font-medium">SMS残高</span>
+            <span className="font-medium">{t('settings.smsBalanceTitle')}</span>
+
           </div>
           <Button
             variant="ghost"
@@ -181,19 +201,25 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
             ¥{balance.toLocaleString()}
           </div>
           <p className="text-sm text-muted-foreground">
-            約{messagesRemaining}通分の送信が可能（1通20円）
+            {formatMessage('settings.smsBalanceAvailable', {
+              count: messagesRemaining,
+              cost: SMS_COST_PER_MESSAGE,
+            })}
           </p>
+
           {isLowBalance && (
             <div className={`mt-2 p-3 rounded-lg ${isCriticalBalance ? 'bg-destructive/10 border border-destructive/30' : 'bg-yellow-50 border border-yellow-200'}`}>
               <p className={`text-sm font-medium ${isCriticalBalance ? 'text-destructive' : 'text-yellow-800'}`}>
-                {isCriticalBalance 
-                  ? '⚠️ SMS残高が非常に少なくなっています！' 
-                  : '📢 残高が少なくなっています'}
+                {isCriticalBalance
+                  ? t('settings.smsBalanceCritical')
+                  : t('settings.smsBalanceLow')}
+
               </p>
               <p className={`text-xs mt-1 ${isCriticalBalance ? 'text-destructive/80' : 'text-yellow-700'}`}>
-                {isCriticalBalance 
-                  ? 'SMS通知が送信できなくなる可能性があります。今すぐチャージしてください。'
-                  : '安定したSMS通知のために、早めのチャージをおすすめします。'}
+                {isCriticalBalance
+                  ? t('settings.smsBalanceCriticalHelp')
+                  : t('settings.smsBalanceLowHelp')}
+
               </p>
               <Button
                 size="sm"
@@ -202,7 +228,8 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
                 onClick={() => setShowChargePrompt(true)}
               >
                 <CreditCard className="h-4 w-4 mr-2" />
-                今すぐチャージ
+                {t('settings.smsChargeNow')}
+
               </Button>
             </div>
           )}
@@ -218,12 +245,17 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
                 <Wallet className={`h-8 w-8 ${isCriticalBalance ? 'text-destructive' : 'text-yellow-600'}`} />
               </div>
               <h3 className="text-lg font-bold">
-                {isCriticalBalance ? 'SMS残高が不足しています' : 'SMS残高をチャージしませんか？'}
+                {isCriticalBalance
+                  ? t('settings.smsBalanceModalCriticalTitle')
+                  : t('settings.smsBalanceModalTitle')}
+
               </h3>
               <p className="text-sm text-muted-foreground mt-2">
-                現在の残高: <span className="font-bold">¥{balance.toLocaleString()}</span>
-                （約{messagesRemaining}通分）
+                {t('settings.smsBalanceCurrentPrefix')}
+                <span className="font-bold">¥{balance.toLocaleString()}</span>
+                {formatMessage('settings.smsBalanceCurrentSuffix', { count: messagesRemaining })}
               </p>
+
             </div>
             
             <div className="grid grid-cols-2 gap-2 mb-4">
@@ -240,9 +272,15 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
                   ) : (
                     <>
                       <span className="font-bold">{option.label}</span>
-                      <span className="text-xs opacity-70">約{option.messages}通</span>
+                      <span className="text-xs opacity-70">
+                        {formatMessage('settings.smsChargeMessageCount', { count: option.messages })}
+                      </span>
+
                       {option.amount === 10000 && (
-                        <span className="text-xs bg-primary/20 px-2 py-0.5 rounded mt-1">おすすめ</span>
+                        <span className="text-xs bg-primary/20 px-2 py-0.5 rounded mt-1">
+                          {t('settings.recommended')}
+                        </span>
+
                       )}
                     </>
                   )}
@@ -251,7 +289,8 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
             </div>
 
             <div className="space-y-2 mb-4">
-              <Label className="text-sm font-medium">カスタム金額</Label>
+              <Label className="text-sm font-medium">{t('settings.smsCustomAmount')}</Label>
+
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -260,7 +299,10 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
                   step={100}
                   value={customAmount}
                   onChange={(e) => setCustomAmount(e.target.value)}
-                  placeholder={`最低${MIN_SMS_CHARGE_AMOUNT.toLocaleString()}円`}
+                  placeholder={formatMessage('settings.smsChargePlaceholder', {
+                    min: MIN_SMS_CHARGE_AMOUNT.toLocaleString(),
+                  })}
+
                 />
                 <Button
                   disabled={isCharging || !isCustomAmountValid}
@@ -269,16 +311,23 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
                   {isCharging && selectedAmount === customAmountValue ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    'チャージ'
+                    t('settings.smsChargeAction')
                   )}
+
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                最低{MIN_SMS_CHARGE_AMOUNT.toLocaleString()}円（上限{MAX_SMS_CHARGE_AMOUNT.toLocaleString()}円）
+                {formatMessage('settings.smsChargeRange', {
+                  min: MIN_SMS_CHARGE_AMOUNT.toLocaleString(),
+                  max: MAX_SMS_CHARGE_AMOUNT.toLocaleString(),
+                })}
                 {isCustomAmountValid && (
-                  <span className="ml-1">約{customMessages}通</span>
+                  <span className="ml-1">
+                    {formatMessage('settings.smsChargeMessageCount', { count: customMessages })}
+                  </span>
                 )}
               </p>
+
             </div>
             
             <Button
@@ -289,7 +338,8 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
                 setChargePromptDismissed(true);
               }}
             >
-              後でチャージする
+              {t('settings.smsChargeLater')}
+
             </Button>
 
 
@@ -299,7 +349,8 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
       
       <div className="p-4 space-y-4">
         <div>
-          <Label className="text-sm font-medium">チャージ金額を選択</Label>
+          <Label className="text-sm font-medium">{t('settings.smsChargeSelect')}</Label>
+
           <div className="grid grid-cols-2 gap-2 mt-2">
             {SMS_CHARGE_OPTIONS.map((option) => (
               <Button
@@ -314,14 +365,18 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
                 ) : (
                   <>
                     <span className="font-bold">{option.label}</span>
-                    <span className="text-xs text-muted-foreground">約{option.messages}通</span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatMessage('settings.smsChargeMessageCount', { count: option.messages })}
+                    </span>
+
                   </>
                 )}
               </Button>
             ))}
           </div>
           <div className="mt-3 space-y-2">
-            <Label className="text-sm font-medium">カスタム金額</Label>
+            <Label className="text-sm font-medium">{t('settings.smsCustomAmount')}</Label>
+
             <div className="flex gap-2">
               <Input
                 type="number"
@@ -330,7 +385,10 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
                 step={100}
                 value={customAmount}
                 onChange={(e) => setCustomAmount(e.target.value)}
-                placeholder={`最低${MIN_SMS_CHARGE_AMOUNT.toLocaleString()}円`}
+                placeholder={formatMessage('settings.smsChargePlaceholder', {
+                  min: MIN_SMS_CHARGE_AMOUNT.toLocaleString(),
+                })}
+
               />
               <Button
                 disabled={isCharging || !isCustomAmountValid}
@@ -339,23 +397,31 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
                 {isCharging && selectedAmount === customAmountValue ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  'チャージ'
+                  t('settings.smsChargeAction')
                 )}
+
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              最低{MIN_SMS_CHARGE_AMOUNT.toLocaleString()}円（上限{MAX_SMS_CHARGE_AMOUNT.toLocaleString()}円）
+              {formatMessage('settings.smsChargeRange', {
+                min: MIN_SMS_CHARGE_AMOUNT.toLocaleString(),
+                max: MAX_SMS_CHARGE_AMOUNT.toLocaleString(),
+              })}
               {isCustomAmountValid && (
-                <span className="ml-1">約{customMessages}通</span>
+                <span className="ml-1">
+                  {formatMessage('settings.smsChargeMessageCount', { count: customMessages })}
+                </span>
               )}
             </p>
+
           </div>
         </div>
 
         
         {transactions && transactions.length > 0 && (
           <div>
-            <Label className="text-sm font-medium">最近の取引</Label>
+            <Label className="text-sm font-medium">{t('settings.smsRecentTransactions')}</Label>
+
             <div className="mt-2 space-y-2">
               {transactions.map((tx) => (
                 <div key={tx.id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
@@ -366,7 +432,10 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
                       <MessageSquare className="h-4 w-4 text-blue-500" />
                     )}
                     <span className="text-muted-foreground">
-                      {tx.type === 'charge' ? 'チャージ' : 'SMS送信'}
+                      {tx.type === 'charge'
+                        ? t('settings.smsTransactionCharge')
+                        : t('settings.smsTransactionSend')}
+
                     </span>
                   </div>
                   <span className={tx.amount > 0 ? 'text-green-600' : 'text-muted-foreground'}>
@@ -398,11 +467,21 @@ type FeedPostDraft = {
 };
 
 
-export default function Settings() {
+function SettingsContent() {
+
   const params = useParams<{ section?: string }>();
   const [, navigate] = useLocation();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
-  
+  const { t } = useLocale();
+
+  const formatMessage = (key: string, params: Record<string, string | number>) => {
+    return Object.entries(params).reduce(
+      (message, [param, value]) => message.replace(`{${param}}`, String(value)),
+      t(key)
+    );
+  };
+
+
   const [activeTab, setActiveTab] = useState(params.section || 'general');
   const [isSaving, setIsSaving] = useState(false);
   const [reorderConfirmOpen, setReorderConfirmOpen] = useState(false);
@@ -432,8 +511,9 @@ export default function Settings() {
     smsEnabled: false,
     recallLimitSeconds: 60,
     recallMaxCount: 3,
-    smsTemplateCalled: '【{storeName}】お客様の番号が呼び出されました。カウンターまでお越しください。',
-    smsTemplateRecall: '【{storeName}】再度のご案内です。お客様の番号が呼び出されています。',
+    smsTemplateCalled: t('settings.smsTemplateDefaultCalled'),
+    smsTemplateRecall: t('settings.smsTemplateDefaultRecall'),
+
     
     // Menu
     menuSwitchStyle: 'toggle',
@@ -548,8 +628,9 @@ export default function Settings() {
         smsEnabled: settings.notifications?.smsEnabled || false,
         recallLimitSeconds: settings.notifications?.recallLimitSeconds || 60,
         recallMaxCount: settings.notifications?.recallMaxCount || 3,
-        smsTemplateCalled: settings.notifications?.smsTemplateCalled || '【{storeName}】お客様の番号が呼び出されました。',
-        smsTemplateRecall: settings.notifications?.smsTemplateRecall || '【{storeName}】再度のご案内です。',
+        smsTemplateCalled: settings.notifications?.smsTemplateCalled || t('settings.smsTemplateDefaultCalled'),
+        smsTemplateRecall: settings.notifications?.smsTemplateRecall || t('settings.smsTemplateDefaultRecall'),
+
         
         menuSwitchStyle: settings.menu?.switchStyle || 'toggle',
         menuDefaultView: settings.menu?.defaultView || 'feed',
@@ -569,7 +650,8 @@ export default function Settings() {
 
   const updateStoreMutation = trpc.store.update.useMutation({
     onSuccess: () => {
-      toast.success('設定を保存しました');
+      toast.success(t('settings.saveSuccess'));
+
       refetchStore();
       setIsSaving(false);
     },
@@ -581,7 +663,8 @@ export default function Settings() {
 
   const createStoreMutation = trpc.store.create.useMutation({
     onSuccess: () => {
-      toast.success('店舗を作成しました');
+      toast.success(t('settings.storeCreated'));
+
       refetchStore();
       setIsSaving(false);
     },
@@ -593,7 +676,8 @@ export default function Settings() {
 
   const regenerateKeyMutation = trpc.store.regenerateKey.useMutation({
     onSuccess: () => {
-      toast.success('キーを再生成しました');
+      toast.success(t('settings.keyRegenerated'));
+
       refetchStore();
       setKeyConfirmOpen(false);
       setPendingKeyType(null);
@@ -615,7 +699,8 @@ export default function Settings() {
     // バリデーション
     if (formData.autoSkipEnabled) {
       if (formData.autoSkipMinutes < 1 || formData.autoSkipMinutes > 60) {
-        toast.error('猶予時間は1～60分の範囲で設定してください');
+        toast.error(t('settings.autoSkipValidation'));
+
         return;
       }
     }
@@ -715,9 +800,11 @@ export default function Settings() {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      toast.success('URLをコピーしました');
+      toast.success(t('settings.copySuccess'));
+
     } catch (error) {
-      toast.error('コピーに失敗しました');
+      toast.error(t('settings.copyFailed'));
+
     }
   };
 
@@ -731,15 +818,18 @@ export default function Settings() {
 
   const uploadImage = async (file: File, kind: 'menu' | 'feed', storeId: number) => {
     if (!file.type) {
-      throw new Error('ファイル形式を判定できません');
+      throw new Error(t('settings.uploadTypeUnknown'));
+
     }
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      throw new Error('JPEG/PNG/WebP形式のみアップロードできます');
+      throw new Error(t('settings.uploadTypeInvalid'));
+
     }
     if (file.size > 5 * 1024 * 1024) {
-      throw new Error('ファイルサイズは5MB以下にしてください');
+      throw new Error(t('settings.uploadSizeExceeded'));
+
     }
 
     const presignResponse = await fetch('/api/media/presign', {
@@ -755,8 +845,11 @@ export default function Settings() {
     });
 
     if (!presignResponse.ok) {
-      const message = await presignResponse.text().catch(() => '画像のアップロード準備に失敗しました');
-      throw new Error(message || '画像のアップロード準備に失敗しました');
+      const message = await presignResponse
+        .text()
+        .catch(() => t('settings.uploadPrepareFailed'));
+      throw new Error(message || t('settings.uploadPrepareFailed'));
+
     }
 
     const { uploadUrl, publicUrl } = await presignResponse.json();
@@ -768,8 +861,11 @@ export default function Settings() {
     });
 
     if (!uploadResponse.ok) {
-      const message = await uploadResponse.text().catch(() => '画像のアップロードに失敗しました');
-      throw new Error(message || '画像のアップロードに失敗しました');
+      const message = await uploadResponse
+        .text()
+        .catch(() => t('settings.uploadFailed'));
+      throw new Error(message || t('settings.uploadFailed'));
+
     }
 
     return publicUrl as string;
@@ -808,7 +904,8 @@ export default function Settings() {
   const handleCreateMenuItem = async () => {
     if (!store) return;
     if (!newMenuItem.nameJa.trim()) {
-      toast.error('商品名を入力してください');
+      toast.error(t('settings.menuNameRequired'));
+
       return;
     }
 
@@ -839,9 +936,11 @@ export default function Settings() {
       });
       setMenuItemFileKey(prev => prev + 1);
       await refetchAdminItems();
-      toast.success('メニューを追加しました');
+      toast.success(t('settings.menuCreateSuccess'));
+
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'メニューの追加に失敗しました';
+      const message = error instanceof Error ? error.message : t('settings.menuCreateFailed');
+
       toast.error(message);
     } finally {
       setIsCreatingMenuItem(false);
@@ -877,9 +976,11 @@ export default function Settings() {
         return next;
       });
       await refetchAdminItems();
-      toast.success('メニューを更新しました');
+      toast.success(t('settings.menuUpdateSuccess'));
+
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'メニューの更新に失敗しました';
+      const message = error instanceof Error ? error.message : t('settings.menuUpdateFailed');
+
       toast.error(message);
     } finally {
       setUpdatingMenuItemId(null);
@@ -892,7 +993,8 @@ export default function Settings() {
       await updateMenuItemMutation.mutateAsync({ storeId: store.id, itemId, isActive });
       await refetchAdminItems();
     } catch (error) {
-      const message = error instanceof Error ? error.message : '状態の更新に失敗しました';
+      const message = error instanceof Error ? error.message : t('settings.statusUpdateFailed');
+
       toast.error(message);
     }
   };
@@ -920,21 +1022,25 @@ export default function Settings() {
       });
       await refetchAdminItems();
     } catch (error) {
-      const message = error instanceof Error ? error.message : '並び替えに失敗しました';
+      const message = error instanceof Error ? error.message : t('settings.sortFailed');
+
       toast.error(message);
     }
   };
 
   const handleDeleteMenuItem = async (itemId: number) => {
     if (!store) return;
-    if (!window.confirm('このメニューを削除しますか？')) return;
+    if (!window.confirm(t('settings.menuDeleteConfirm'))) return;
+
 
     try {
       await deleteMenuItemMutation.mutateAsync({ storeId: store.id, itemId });
       await refetchAdminItems();
-      toast.success('メニューを削除しました');
+      toast.success(t('settings.menuDeleteSuccess'));
+
     } catch (error) {
-      const message = error instanceof Error ? error.message : '削除に失敗しました';
+      const message = error instanceof Error ? error.message : t('settings.deleteFailed');
+
       toast.error(message);
     }
   };
@@ -942,7 +1048,8 @@ export default function Settings() {
   const handleCreateFeedPost = async () => {
     if (!store) return;
     if (!newFeedPost.photoFile) {
-      toast.error('フィード画像を選択してください');
+      toast.error(t('settings.feedImageRequired'));
+
       return;
     }
 
@@ -967,9 +1074,11 @@ export default function Settings() {
       });
       setFeedPostFileKey(prev => prev + 1);
       await refetchAdminFeedPosts();
-      toast.success('フィードを追加しました');
+      toast.success(t('settings.feedCreateSuccess'));
+
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'フィードの追加に失敗しました';
+      const message = error instanceof Error ? error.message : t('settings.feedCreateFailed');
+
       toast.error(message);
     } finally {
       setIsCreatingFeedPost(false);
@@ -1004,9 +1113,11 @@ export default function Settings() {
         return next;
       });
       await refetchAdminFeedPosts();
-      toast.success('フィードを更新しました');
+      toast.success(t('settings.feedUpdateSuccess'));
+
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'フィードの更新に失敗しました';
+      const message = error instanceof Error ? error.message : t('settings.feedUpdateFailed');
+
       toast.error(message);
     } finally {
       setUpdatingFeedPostId(null);
@@ -1019,7 +1130,8 @@ export default function Settings() {
       await updateFeedPostMutation.mutateAsync({ storeId: store.id, feedPostId, isActive });
       await refetchAdminFeedPosts();
     } catch (error) {
-      const message = error instanceof Error ? error.message : '状態の更新に失敗しました';
+      const message = error instanceof Error ? error.message : t('settings.statusUpdateFailed');
+
       toast.error(message);
     }
   };
@@ -1047,21 +1159,25 @@ export default function Settings() {
       });
       await refetchAdminFeedPosts();
     } catch (error) {
-      const message = error instanceof Error ? error.message : '並び替えに失敗しました';
+      const message = error instanceof Error ? error.message : t('settings.sortFailed');
+
       toast.error(message);
     }
   };
 
   const handleDeleteFeedPost = async (feedPostId: number) => {
     if (!store) return;
-    if (!window.confirm('このフィードを削除しますか？')) return;
+    if (!window.confirm(t('settings.feedDeleteConfirm'))) return;
+
 
     try {
       await deleteFeedPostMutation.mutateAsync({ storeId: store.id, feedPostId });
       await refetchAdminFeedPosts();
-      toast.success('フィードを削除しました');
+      toast.success(t('settings.feedDeleteSuccess'));
+
     } catch (error) {
-      const message = error instanceof Error ? error.message : '削除に失敗しました';
+      const message = error instanceof Error ? error.message : t('settings.deleteFailed');
+
       toast.error(message);
     }
   };
@@ -1078,24 +1194,26 @@ export default function Settings() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4">
         <SettingsIcon className="h-16 w-16 text-muted-foreground" />
-        <h1 className="text-2xl font-bold">ログインが必要です</h1>
-        <p className="text-muted-foreground">店舗設定にアクセスするにはログインしてください</p>
+        <h1 className="text-2xl font-bold">{t('settings.loginRequiredTitle')}</h1>
+        <p className="text-muted-foreground">{t('settings.loginRequiredDescription')}</p>
         <Button onClick={() => window.location.href = getLoginUrl()}>
-          ログイン
+          {t('common.login')}
         </Button>
+
       </div>
     );
   }
 
   const tabs = [
-    { id: 'general', label: '基本設定', icon: Store },
-    { id: 'queue', label: '順番待ち設定', icon: Clock },
-    { id: 'notifications', label: '通知設定', icon: Bell },
-    { id: 'menu', label: 'メニュー設定', icon: Menu },
-    { id: 'kiosk', label: 'キオスク設定', icon: Monitor },
-    { id: 'board', label: 'ボード設定', icon: Monitor },
-    { id: 'security', label: 'セキュリティ', icon: Shield },
+    { id: 'general', label: t('settings.general'), icon: Store },
+    { id: 'queue', label: t('settings.queue'), icon: Clock },
+    { id: 'notifications', label: t('settings.notifications'), icon: Bell },
+    { id: 'menu', label: t('settings.menu'), icon: Menu },
+    { id: 'kiosk', label: t('settings.kiosk'), icon: Monitor },
+    { id: 'board', label: t('settings.board'), icon: Monitor },
+    { id: 'security', label: t('settings.security'), icon: Shield },
   ];
+
 
 
   return (
@@ -1107,7 +1225,8 @@ export default function Settings() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-bold">店舗設定</h1>
+            <h1 className="text-xl font-bold">{t('settings.title')}</h1>
+
           </div>
           <Button onClick={handleSave} disabled={isSaving}>
             {isSaving ? (
@@ -1115,8 +1234,9 @@ export default function Settings() {
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            保存
+            {t('common.save')}
           </Button>
+
         </div>
       </header>
 
@@ -1139,22 +1259,26 @@ export default function Settings() {
           <TabsContent value="general">
             <Card>
               <CardHeader>
-                <CardTitle>基本設定</CardTitle>
-                <CardDescription>店舗の基本情報を設定します</CardDescription>
+                <CardTitle>{t('settings.general')}</CardTitle>
+                <CardDescription>{t('settings.generalDescription')}</CardDescription>
+
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="name">店舗名</Label>
+                    <Label htmlFor="name">{t('settings.storeName')}</Label>
+
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => updateField('name', e.target.value)}
-                      placeholder="店舗名を入力"
+                      placeholder={t('settings.storeNamePlaceholder')}
+
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="slug">URL識別子</Label>
+                    <Label htmlFor="slug">{t('settings.slugLabel')}</Label>
+
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">/s/</span>
                       <Input
@@ -1170,10 +1294,12 @@ export default function Settings() {
                 <Separator />
 
                 <div className="space-y-4">
-                  <h3 className="font-medium">言語設定</h3>
+                  <h3 className="font-medium">{t('settings.languageSettings')}</h3>
+
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="defaultLocale">デフォルト言語</Label>
+                      <Label htmlFor="defaultLocale">{t('settings.defaultLocale')}</Label>
+
                       <Select
                         value={formData.defaultLocale}
                         onValueChange={(value) => updateField('defaultLocale', value)}
@@ -1189,7 +1315,8 @@ export default function Settings() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>対応言語</Label>
+                      <Label>{t('settings.supportedLocales')}</Label>
+
                       <div className="flex flex-wrap gap-2">
                         {LOCALE_OPTIONS.map(opt => (
                           <Button
@@ -1218,13 +1345,15 @@ export default function Settings() {
           <TabsContent value="queue">
             <Card>
               <CardHeader>
-                <CardTitle>順番待ち設定</CardTitle>
-                <CardDescription>順番待ちの動作を設定します</CardDescription>
+                <CardTitle>{t('settings.queue')}</CardTitle>
+                <CardDescription>{t('settings.queueDescription')}</CardDescription>
+
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="dailyResetTime">日次リセット時刻</Label>
+                    <Label htmlFor="dailyResetTime">{t('settings.resetTime')}</Label>
+
                     <Input
                       id="dailyResetTime"
                       type="time"
@@ -1233,7 +1362,8 @@ export default function Settings() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="checkinGraceMinutes">チェックイン猶予時間（分）</Label>
+                    <Label htmlFor="checkinGraceMinutes">{t('settings.checkinGraceMinutes')}</Label>
+
                     <Input
                       id="checkinGraceMinutes"
                       type="number"
@@ -1253,8 +1383,9 @@ export default function Settings() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label>自動スキップ</Label>
-                      <p className="text-sm text-muted-foreground">呼び出し後、猶予時間内に到着しない場合に自動でスキップ</p>
+                      <Label>{t('settings.autoSkip')}</Label>
+                      <p className="text-sm text-muted-foreground">{t('settings.autoSkipDescription')}</p>
+
                     </div>
                     <Switch
                       checked={formData.autoSkipEnabled}
@@ -1263,7 +1394,8 @@ export default function Settings() {
                   </div>
                   {formData.autoSkipEnabled && (
                     <div className="space-y-2 ml-4">
-                      <Label htmlFor="autoSkipMinutes">猶予時間（分）</Label>
+                      <Label htmlFor="autoSkipMinutes">{t('settings.autoSkipMinutes')}</Label>
+
                       <Input
                         id="autoSkipMinutes"
                         type="number"
@@ -1276,7 +1408,8 @@ export default function Settings() {
                         }}
                         className="w-32"
                       />
-                      <p className="text-xs text-muted-foreground">呼び出し後、この時間内に到着しない場合は自動的にスキップされます</p>
+                      <p className="text-xs text-muted-foreground">{t('settings.autoSkipHelp')}</p>
+
                     </div>
                   )}
                 </div>
@@ -1286,8 +1419,9 @@ export default function Settings() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label>順番調整を許可</Label>
-                      <p className="text-sm text-muted-foreground">スタッフが順番を入れ替えることを許可</p>
+                      <Label>{t('settings.enableReorder')}</Label>
+                      <p className="text-sm text-muted-foreground">{t('settings.enableReorderDescription')}</p>
+
                     </div>
                     <Switch
                       checked={formData.enableReorder}
@@ -1298,7 +1432,8 @@ export default function Settings() {
                   {formData.enableReorder && (
                     <div className="grid gap-4 md:grid-cols-2 ml-4">
                       <div className="space-y-2">
-                        <Label htmlFor="reorderMaxMove">最大移動数</Label>
+                        <Label htmlFor="reorderMaxMove">{t('settings.reorderMaxMove')}</Label>
+
                         <Input
                           id="reorderMaxMove"
                           type="number"
@@ -1317,7 +1452,8 @@ export default function Settings() {
                           checked={formData.reorderReasonRequired}
                           onCheckedChange={(checked) => updateField('reorderReasonRequired', checked)}
                         />
-                        <Label htmlFor="reorderReasonRequired">理由入力必須</Label>
+                        <Label htmlFor="reorderReasonRequired">{t('settings.reorderReasonRequired')}</Label>
+
                       </div>
                     </div>
                   )}
@@ -1330,14 +1466,16 @@ export default function Settings() {
           <TabsContent value="notifications">
             <Card>
               <CardHeader>
-                <CardTitle>通知設定</CardTitle>
-                <CardDescription>顧客への通知方法を設定します</CardDescription>
+                <CardTitle>{t('settings.notifications')}</CardTitle>
+                <CardDescription>{t('settings.notificationsDescription')}</CardDescription>
+
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label>プッシュ通知</Label>
-                    <p className="text-sm text-muted-foreground">Web Push通知を有効にする</p>
+                      <Label>{t('settings.pushEnabled')}</Label>
+                      <p className="text-sm text-muted-foreground">{t('settings.pushEnabledDescription')}</p>
+
                   </div>
                   <Switch
                     checked={formData.pushEnabled}
@@ -1350,8 +1488,9 @@ export default function Settings() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label>SMS通知</Label>
-                      <p className="text-sm text-muted-foreground">SMS通知を有効にする（プリペイド残高が必要）</p>
+                      <Label>{t('settings.smsEnabled')}</Label>
+                      <p className="text-sm text-muted-foreground">{t('settings.smsEnabledDescription')}</p>
+
                     </div>
                     <Switch
                       checked={formData.smsEnabled}
@@ -1364,22 +1503,26 @@ export default function Settings() {
                       <SmsBalanceCard storeId={store?.id} />
                       
                       <div className="space-y-2">
-                        <Label htmlFor="smsTemplateCalled">呼び出しSMSテンプレート</Label>
+                        <Label htmlFor="smsTemplateCalled">{t('settings.smsTemplateCalled')}</Label>
+
                         <Textarea
                           id="smsTemplateCalled"
                           value={formData.smsTemplateCalled}
                           onChange={(e) => updateField('smsTemplateCalled', e.target.value)}
-                          placeholder="使用可能な変数: {storeName}, {number}"
+                          placeholder={t('settings.smsTemplateVariables')}
                         />
+
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="smsTemplateRecall">再通知SMSテンプレート</Label>
+                        <Label htmlFor="smsTemplateRecall">{t('settings.smsTemplateRecall')}</Label>
+
                         <Textarea
                           id="smsTemplateRecall"
                           value={formData.smsTemplateRecall}
                           onChange={(e) => updateField('smsTemplateRecall', e.target.value)}
-                          placeholder="使用可能な変数: {storeName}, {number}"
+                          placeholder={t('settings.smsTemplateVariables')}
                         />
+
                       </div>
                       
                       {/* SMS送信履歴へのリンク */}
@@ -1390,7 +1533,8 @@ export default function Settings() {
                           onClick={() => navigate('/admin/sms-history')}
                         >
                           <History className="h-4 w-4 mr-2" />
-                          SMS送信履歴を確認
+                          {t('settings.smsHistoryLink')}
+
                           <ExternalLink className="h-4 w-4 ml-auto" />
                         </Button>
                       </div>
@@ -1402,7 +1546,8 @@ export default function Settings() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="recallLimitSeconds">再通知制限（秒）</Label>
+                    <Label htmlFor="recallLimitSeconds">{t('settings.recallLimit')}</Label>
+
                     <Input
                       id="recallLimitSeconds"
                       type="number"
@@ -1416,7 +1561,8 @@ export default function Settings() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="recallMaxCount">再通知最大回数</Label>
+                    <Label htmlFor="recallMaxCount">{t('settings.recallMaxCount')}</Label>
+
                     <Input
                       id="recallMaxCount"
                       type="number"
@@ -1439,13 +1585,15 @@ export default function Settings() {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>メニュー設定</CardTitle>
-                  <CardDescription>メニュー表示の設定を行います</CardDescription>
+                  <CardTitle>{t('settings.menu')}</CardTitle>
+                  <CardDescription>{t('settings.menuDescription')}</CardDescription>
+
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="menuSwitchStyle">切替スタイル</Label>
+                      <Label htmlFor="menuSwitchStyle">{t('settings.menuSwitchStyle')}</Label>
+
                       <Select
                         value={formData.menuSwitchStyle}
                         onValueChange={(value) => updateField('menuSwitchStyle', value)}
@@ -1454,13 +1602,15 @@ export default function Settings() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="toggle">トグル</SelectItem>
-                          <SelectItem value="tabs">タブ</SelectItem>
+                          <SelectItem value="toggle">{t('settings.menuSwitchToggle')}</SelectItem>
+                          <SelectItem value="tabs">{t('settings.menuSwitchTabs')}</SelectItem>
+
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="menuDefaultView">デフォルト表示</Label>
+                      <Label htmlFor="menuDefaultView">{t('settings.defaultView')}</Label>
+
                       <Select
                         value={formData.menuDefaultView}
                         onValueChange={(value) => updateField('menuDefaultView', value)}
@@ -1469,8 +1619,9 @@ export default function Settings() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="feed">フィード</SelectItem>
-                          <SelectItem value="list">一覧</SelectItem>
+                          <SelectItem value="feed">{t('menu.feed')}</SelectItem>
+                          <SelectItem value="list">{t('menu.list')}</SelectItem>
+
                         </SelectContent>
                       </Select>
                     </div>
@@ -1480,7 +1631,8 @@ export default function Settings() {
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="photoDefaultSize">写真デフォルトサイズ</Label>
+                      <Label htmlFor="photoDefaultSize">{t('settings.photoDefaultSize')}</Label>
+
                       <Select
                         value={formData.photoDefaultSize}
                         onValueChange={(value) => updateField('photoDefaultSize', value)}
@@ -1489,8 +1641,9 @@ export default function Settings() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="large">大</SelectItem>
-                          <SelectItem value="small">小</SelectItem>
+                          <SelectItem value="large">{t('menu.large')}</SelectItem>
+                          <SelectItem value="small">{t('menu.small')}</SelectItem>
+
                         </SelectContent>
                       </Select>
                     </div>
@@ -1500,7 +1653,8 @@ export default function Settings() {
                         checked={formData.allowPhotoSizeToggle}
                         onCheckedChange={(checked) => updateField('allowPhotoSizeToggle', checked)}
                       />
-                      <Label htmlFor="allowPhotoSizeToggle">写真サイズ切替を許可</Label>
+                      <Label htmlFor="allowPhotoSizeToggle">{t('settings.allowPhotoSizeToggle')}</Label>
+
                     </div>
                   </div>
                 </CardContent>
@@ -1508,18 +1662,21 @@ export default function Settings() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>メニュー一覧管理</CardTitle>
-                  <CardDescription>一覧表示用のメニューを管理します</CardDescription>
+                  <CardTitle>{t('settings.menuListTitle')}</CardTitle>
+                  <CardDescription>{t('settings.menuListDescription')}</CardDescription>
+
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-sm font-semibold">
                       <ImagePlus className="h-4 w-4" />
-                      新規メニュー追加
+                      {t('settings.menuAddNew')}
+
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="newMenuName">商品名</Label>
+                        <Label htmlFor="newMenuName">{t('settings.menuItemName')}</Label>
+
                         <Input
                           id="newMenuName"
                           value={newMenuItem.nameJa}
@@ -1527,7 +1684,8 @@ export default function Settings() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="newMenuPrice">価格</Label>
+                        <Label htmlFor="newMenuPrice">{t('settings.menuItemPrice')}</Label>
+
                         <Input
                           id="newMenuPrice"
                           type="number"
@@ -1538,7 +1696,8 @@ export default function Settings() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="newMenuDesc">説明</Label>
+                      <Label htmlFor="newMenuDesc">{t('settings.menuItemDescription')}</Label>
+
                       <Textarea
                         id="newMenuDesc"
                         value={newMenuItem.descJa}
@@ -1547,7 +1706,8 @@ export default function Settings() {
                     </div>
                     {menuCategories && menuCategories.length > 0 && (
                       <div className="space-y-2">
-                        <Label htmlFor="newMenuCategory">カテゴリ</Label>
+                        <Label htmlFor="newMenuCategory">{t('settings.menuItemCategory')}</Label>
+
                         <Select
                           value={newMenuItem.categoryId || 'none'}
                           onValueChange={(value) =>
@@ -1555,10 +1715,11 @@ export default function Settings() {
                           }
                         >
                           <SelectTrigger id="newMenuCategory">
-                            <SelectValue placeholder="未選択" />
+                            <SelectValue placeholder={t('settings.menuItemCategoryNone')} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="none">未選択</SelectItem>
+                            <SelectItem value="none">{t('settings.menuItemCategoryNone')}</SelectItem>
+
                             {menuCategories.map(category => (
                               <SelectItem key={category.id} value={String(category.id)}>
                                 {category.nameJa}
@@ -1569,7 +1730,8 @@ export default function Settings() {
                       </div>
                     )}
                     <div className="space-y-2">
-                      <Label htmlFor="newMenuPhoto">画像</Label>
+                      <Label htmlFor="newMenuPhoto">{t('settings.menuItemPhoto')}</Label>
+
                       <Input
                         key={menuItemFileKey}
                         id="newMenuPhoto"
@@ -1582,7 +1744,8 @@ export default function Settings() {
                           }))
                         }
                       />
-                      <p className="text-xs text-muted-foreground">5MBまでのJPEG/PNG/WebP</p>
+                      <p className="text-xs text-muted-foreground">{t('settings.menuItemPhotoHelp')}</p>
+
                     </div>
                     <Button onClick={handleCreateMenuItem} disabled={isCreatingMenuItem || createMenuItemMutation.isPending}>
                       {isCreatingMenuItem ? (
@@ -1590,8 +1753,9 @@ export default function Settings() {
                       ) : (
                         <Plus className="mr-2 h-4 w-4" />
                       )}
-                      追加する
+                      {t('common.add')}
                     </Button>
+
                   </div>
 
                   <Separator />
@@ -1600,10 +1764,12 @@ export default function Settings() {
                     {adminItemsLoading ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        読み込み中...
+                        {t('common.loading')}
                       </div>
+
                     ) : sortedMenuItems.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">登録されたメニューがありません</p>
+                      <p className="text-sm text-muted-foreground">{t('settings.menuNoItems')}</p>
+
                     ) : (
                       sortedMenuItems.map((item, index) => {
                         const draft = menuItemDrafts[item.id] ?? {
@@ -1631,21 +1797,22 @@ export default function Settings() {
                                   />
                                 ) : (
                                   <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-                                    No Image
+                                    {t('common.noImage')}
                                   </div>
                                 )}
+
                               </div>
                               <div className="flex-1 space-y-3">
                                 <div className="grid gap-4 md:grid-cols-2">
                                   <div className="space-y-1">
-                                    <Label>商品名</Label>
+                                    <Label>{t('settings.menuItemName')}</Label>
                                     <Input
                                       value={draft.nameJa}
                                       onChange={(e) => updateMenuItemDraft(item, { nameJa: e.target.value })}
                                     />
                                   </div>
                                   <div className="space-y-1">
-                                    <Label>価格</Label>
+                                    <Label>{t('settings.menuItemPrice')}</Label>
                                     <Input
                                       type="number"
                                       min={0}
@@ -1655,7 +1822,7 @@ export default function Settings() {
                                   </div>
                                 </div>
                                 <div className="space-y-1">
-                                  <Label>説明</Label>
+                                  <Label>{t('settings.menuItemDescription')}</Label>
                                   <Textarea
                                     value={draft.descJa}
                                     onChange={(e) => updateMenuItemDraft(item, { descJa: e.target.value })}
@@ -1664,7 +1831,7 @@ export default function Settings() {
                                 <div className="grid gap-4 md:grid-cols-2">
                                   {menuCategories && menuCategories.length > 0 && (
                                     <div className="space-y-1">
-                                      <Label>カテゴリ</Label>
+                                      <Label>{t('settings.menuItemCategory')}</Label>
                                       <Select
                                         value={draft.categoryId || 'none'}
                                         onValueChange={(value) =>
@@ -1672,10 +1839,10 @@ export default function Settings() {
                                         }
                                       >
                                         <SelectTrigger>
-                                          <SelectValue placeholder="未選択" />
+                                          <SelectValue placeholder={t('settings.menuItemCategoryNone')} />
                                         </SelectTrigger>
                                         <SelectContent>
-                                          <SelectItem value="none">未選択</SelectItem>
+                                          <SelectItem value="none">{t('settings.menuItemCategoryNone')}</SelectItem>
                                           {menuCategories.map(category => (
                                             <SelectItem key={category.id} value={String(category.id)}>
                                               {category.nameJa}
@@ -1686,7 +1853,7 @@ export default function Settings() {
                                     </div>
                                   )}
                                   <div className="space-y-1">
-                                    <Label>画像更新</Label>
+                                    <Label>{t('settings.imageUpdate')}</Label>
                                     <Input
                                       type="file"
                                       accept="image/jpeg,image/png,image/webp"
@@ -1702,7 +1869,7 @@ export default function Settings() {
                                       checked={item.isActive}
                                       onCheckedChange={(checked) => handleToggleMenuItem(item.id, checked)}
                                     />
-                                    <span className="text-sm">公開</span>
+                                    <span className="text-sm">{t('common.published')}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <Button
@@ -1732,12 +1899,14 @@ export default function Settings() {
                                     ) : (
                                       <Save className="mr-2 h-4 w-4" />
                                     )}
-                                    保存
+                                    {t('common.save')}
                                   </Button>
+
                                   <Button variant="destructive" size="sm" onClick={() => handleDeleteMenuItem(item.id)}>
                                     <Trash2 className="mr-2 h-4 w-4" />
-                                    削除
+                                    {t('common.delete')}
                                   </Button>
+
                                 </div>
                               </div>
                             </div>
@@ -1751,18 +1920,21 @@ export default function Settings() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>フィード投稿管理</CardTitle>
-                  <CardDescription>フィード表示用の投稿を管理します</CardDescription>
+                  <CardTitle>{t('settings.feedListTitle')}</CardTitle>
+                  <CardDescription>{t('settings.feedListDescription')}</CardDescription>
+
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-sm font-semibold">
                       <ImagePlus className="h-4 w-4" />
-                      新規フィード投稿
+                      {t('settings.feedAddNew')}
+
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="newFeedTitle">タイトル</Label>
+                        <Label htmlFor="newFeedTitle">{t('settings.feedTitleLabel')}</Label>
+
                         <Input
                           id="newFeedTitle"
                           value={newFeedPost.titleJa}
@@ -1770,7 +1942,8 @@ export default function Settings() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="newFeedPrice">価格</Label>
+                        <Label htmlFor="newFeedPrice">{t('settings.menuItemPrice')}</Label>
+
                         <Input
                           id="newFeedPrice"
                           type="number"
@@ -1781,7 +1954,8 @@ export default function Settings() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="newFeedCaption">キャプション</Label>
+                      <Label htmlFor="newFeedCaption">{t('settings.feedCaptionLabel')}</Label>
+
                       <Textarea
                         id="newFeedCaption"
                         value={newFeedPost.captionJa}
@@ -1789,7 +1963,8 @@ export default function Settings() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="newFeedPhoto">画像</Label>
+                      <Label htmlFor="newFeedPhoto">{t('settings.menuItemPhoto')}</Label>
+
                       <Input
                         key={feedPostFileKey}
                         id="newFeedPhoto"
@@ -1802,7 +1977,8 @@ export default function Settings() {
                           }))
                         }
                       />
-                      <p className="text-xs text-muted-foreground">5MBまでのJPEG/PNG/WebP</p>
+                      <p className="text-xs text-muted-foreground">{t('settings.menuItemPhotoHelp')}</p>
+
                     </div>
                     <Button onClick={handleCreateFeedPost} disabled={isCreatingFeedPost || createFeedPostMutation.isPending}>
                       {isCreatingFeedPost ? (
@@ -1810,8 +1986,9 @@ export default function Settings() {
                       ) : (
                         <Plus className="mr-2 h-4 w-4" />
                       )}
-                      追加する
+                      {t('common.add')}
                     </Button>
+
                   </div>
 
                   <Separator />
@@ -1820,10 +1997,12 @@ export default function Settings() {
                     {adminFeedLoading ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        読み込み中...
+                        {t('common.loading')}
                       </div>
+
                     ) : sortedFeedPosts.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">登録されたフィードがありません</p>
+                      <p className="text-sm text-muted-foreground">{t('settings.feedNoItems')}</p>
+
                     ) : (
                       sortedFeedPosts.map((post, index) => {
                         const draft = feedPostDrafts[post.id] ?? {
@@ -1850,21 +2029,22 @@ export default function Settings() {
                                   />
                                 ) : (
                                   <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-                                    No Image
+                                    {t('common.noImage')}
                                   </div>
                                 )}
+
                               </div>
                               <div className="flex-1 space-y-3">
                                 <div className="grid gap-4 md:grid-cols-2">
                                   <div className="space-y-1">
-                                    <Label>タイトル</Label>
+                                    <Label>{t('settings.feedTitleLabel')}</Label>
                                     <Input
                                       value={draft.titleJa}
                                       onChange={(e) => updateFeedPostDraft(post, { titleJa: e.target.value })}
                                     />
                                   </div>
                                   <div className="space-y-1">
-                                    <Label>価格</Label>
+                                    <Label>{t('settings.menuItemPrice')}</Label>
                                     <Input
                                       type="number"
                                       min={0}
@@ -1874,14 +2054,14 @@ export default function Settings() {
                                   </div>
                                 </div>
                                 <div className="space-y-1">
-                                  <Label>キャプション</Label>
+                                  <Label>{t('settings.feedCaptionLabel')}</Label>
                                   <Textarea
                                     value={draft.captionJa}
                                     onChange={(e) => updateFeedPostDraft(post, { captionJa: e.target.value })}
                                   />
                                 </div>
                                 <div className="space-y-1">
-                                  <Label>画像更新</Label>
+                                  <Label>{t('settings.imageUpdate')}</Label>
                                   <Input
                                     type="file"
                                     accept="image/jpeg,image/png,image/webp"
@@ -1894,7 +2074,7 @@ export default function Settings() {
                                       checked={post.isActive}
                                       onCheckedChange={(checked) => handleToggleFeedPost(post.id, checked)}
                                     />
-                                    <span className="text-sm">公開</span>
+                                    <span className="text-sm">{t('common.published')}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <Button
@@ -1924,12 +2104,14 @@ export default function Settings() {
                                     ) : (
                                       <Save className="mr-2 h-4 w-4" />
                                     )}
-                                    保存
+                                    {t('common.save')}
                                   </Button>
+
                                   <Button variant="destructive" size="sm" onClick={() => handleDeleteFeedPost(post.id)}>
                                     <Trash2 className="mr-2 h-4 w-4" />
-                                    削除
+                                    {t('common.delete')}
                                   </Button>
+
                                 </div>
                               </div>
                             </div>
@@ -1947,13 +2129,15 @@ export default function Settings() {
           <TabsContent value="kiosk">
             <Card>
               <CardHeader>
-                <CardTitle>キオスク設定</CardTitle>
-                <CardDescription>店頭キオスクの動作を設定します</CardDescription>
+                <CardTitle>{t('settings.kiosk')}</CardTitle>
+                <CardDescription>{t('settings.kioskDescription')}</CardDescription>
+
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="kioskAutoResetSeconds">自動リセット（秒）</Label>
+                    <Label htmlFor="kioskAutoResetSeconds">{t('settings.kioskAutoReset')}</Label>
+
                     <Input
                       id="kioskAutoResetSeconds"
                       type="number"
@@ -1965,10 +2149,12 @@ export default function Settings() {
                         updateField('kioskAutoResetSeconds', Number.isNaN(val) ? 15 : val);
                       }}
                     />
-                    <p className="text-xs text-muted-foreground">発券後、次の顧客用に画面をリセットするまでの時間</p>
+                    <p className="text-xs text-muted-foreground">{t('settings.kioskAutoResetHelp')}</p>
+
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="kioskMaxPartySize">最大人数</Label>
+                    <Label htmlFor="kioskMaxPartySize">{t('settings.kioskMaxPartySize')}</Label>
+
                     <Input
                       id="kioskMaxPartySize"
                       type="number"
@@ -1980,7 +2166,8 @@ export default function Settings() {
                         updateField('kioskMaxPartySize', Number.isNaN(val) ? 10 : val);
                       }}
                     />
-                    <p className="text-xs text-muted-foreground">キオスクで選択可能な最大人数</p>
+                    <p className="text-xs text-muted-foreground">{t('settings.kioskMaxPartySizeHelp')}</p>
+
                   </div>
                 </div>
               </CardContent>
@@ -1991,12 +2178,14 @@ export default function Settings() {
           <TabsContent value="board">
             <Card>
               <CardHeader>
-                <CardTitle>ボード設定</CardTitle>
-                <CardDescription>呼び出しボードの表示を設定します</CardDescription>
+                <CardTitle>{t('settings.board')}</CardTitle>
+                <CardDescription>{t('settings.boardDescription')}</CardDescription>
+
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="boardNextCount">次の番号表示件数</Label>
+                  <Label htmlFor="boardNextCount">{t('settings.boardNextCount')}</Label>
+
                   <Input
                     id="boardNextCount"
                     type="number"
@@ -2009,7 +2198,8 @@ export default function Settings() {
                     }}
                     className="w-32"
                   />
-                  <p className="text-xs text-muted-foreground">現在の番号の後に表示する次の番号の件数</p>
+                  <p className="text-xs text-muted-foreground">{t('settings.boardNextCountHelp')}</p>
+
                 </div>
               </CardContent>
             </Card>
@@ -2019,34 +2209,41 @@ export default function Settings() {
           <TabsContent value="security">
             <Card>
               <CardHeader>
-                <CardTitle>セキュリティ</CardTitle>
-                <CardDescription>アクセス制御の設定を行います</CardDescription>
+                <CardTitle>{t('settings.security')}</CardTitle>
+                <CardDescription>{t('settings.securityDescription')}</CardDescription>
+
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="staffPin">スタッフPIN</Label>
+                    <Label htmlFor="staffPin">{t('settings.staffPin')}</Label>
+
                     <Input
                       id="staffPin"
                       type="password"
                       value={formData.staffPin}
                       onChange={(e) => updateField('staffPin', e.target.value)}
-                      placeholder="変更する場合のみ入力"
+                      placeholder={t('settings.pinPlaceholder')}
                       maxLength={8}
                     />
-                    <p className="text-xs text-muted-foreground">スタッフ画面へのアクセスに使用</p>
+
+                    <p className="text-xs text-muted-foreground">{t('settings.staffPinHelp')}</p>
+
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="managerPin">マネージャーPIN</Label>
+                    <Label htmlFor="managerPin">{t('settings.managerPin')}</Label>
+
                     <Input
                       id="managerPin"
                       type="password"
                       value={formData.managerPin}
                       onChange={(e) => updateField('managerPin', e.target.value)}
-                      placeholder="変更する場合のみ入力"
+                      placeholder={t('settings.pinPlaceholder')}
                       maxLength={8}
                     />
-                    <p className="text-xs text-muted-foreground">設定変更などの管理機能に使用</p>
+
+                    <p className="text-xs text-muted-foreground">{t('settings.managerPinHelp')}</p>
+
                   </div>
                 </div>
 
@@ -2055,18 +2252,22 @@ export default function Settings() {
                     <Separator />
                     <div className="space-y-6">
                       <div className="space-y-2">
-                        <h3 className="font-medium">アクセスURL</h3>
+                        <h3 className="font-medium">{t('settings.accessUrlsTitle')}</h3>
+
                         <div className="space-y-2 text-sm">
-                          <p><strong>店舗トップ:</strong> {storeUrls.store}</p>
-                          <p><strong>スタッフ画面:</strong> {storeUrls.staff}</p>
+                          <p><strong>{t('settings.storeUrlLabel')}:</strong> {storeUrls.store}</p>
+                          <p><strong>{t('settings.staffUrlLabel')}:</strong> {storeUrls.staff}</p>
+
                         </div>
                       </div>
                       <div className="space-y-4">
-                        <h3 className="font-medium">キオスク/ボードURL</h3>
+                        <h3 className="font-medium">{t('settings.kioskBoardUrlsTitle')}</h3>
+
                         <div className="space-y-4">
                           <div className="space-y-2">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="text-sm font-medium">キオスクURL</span>
+                              <span className="text-sm font-medium">{t('settings.kioskUrlLabel')}</span>
+
                               <div className="flex flex-wrap gap-2">
                                 <Button
                                   variant="outline"
@@ -2075,25 +2276,27 @@ export default function Settings() {
                                   disabled={!storeUrls.kiosk}
                                 >
                                   <Copy className="mr-2 h-4 w-4" />
-                                  URLをコピー
+                                  {t('settings.copyUrl')}
                                 </Button>
+
                                 <Button
                                   variant="destructive"
                                   size="sm"
                                   onClick={() => requestKeyRegeneration('kiosk')}
                                 >
                                   <RefreshCw className="mr-2 h-4 w-4" />
-                                  キー再生成
+                                  {t('settings.regenerateKey')}
                                 </Button>
                               </div>
                             </div>
                             <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs font-mono break-all">
-                              {storeUrls.kiosk || 'キー未設定'}
+                              {storeUrls.kiosk || t('settings.keyNotSet')}
                             </div>
                           </div>
                           <div className="space-y-2">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="text-sm font-medium">呼び出しボードURL</span>
+                              <span className="text-sm font-medium">{t('settings.boardUrlLabel')}</span>
+
                               <div className="flex flex-wrap gap-2">
                                 <Button
                                   variant="outline"
@@ -2102,20 +2305,21 @@ export default function Settings() {
                                   disabled={!storeUrls.board}
                                 >
                                   <Copy className="mr-2 h-4 w-4" />
-                                  URLをコピー
+                                  {t('settings.copyUrl')}
                                 </Button>
+
                                 <Button
                                   variant="destructive"
                                   size="sm"
                                   onClick={() => requestKeyRegeneration('board')}
                                 >
                                   <RefreshCw className="mr-2 h-4 w-4" />
-                                  キー再生成
+                                  {t('settings.regenerateKey')}
                                 </Button>
                               </div>
                             </div>
                             <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs font-mono break-all">
-                              {storeUrls.board || 'キー未設定'}
+                              {storeUrls.board || t('settings.keyNotSet')}
                             </div>
                           </div>
                         </div>
@@ -2132,15 +2336,18 @@ export default function Settings() {
         <AlertDialog open={reorderConfirmOpen} onOpenChange={setReorderConfirmOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>順番調整を有効にしますか？</AlertDialogTitle>
+              <AlertDialogTitle>{t('settings.enableReorderConfirmTitle')}</AlertDialogTitle>
               <AlertDialogDescription>
-                順番調整を有効にすると、スタッフが並び順を変更できます。例外運用になるため慎重にご利用ください。
+                {t('settings.enableReorderConfirmDescription')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>キャンセル</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmEnableReorder}>有効にする</AlertDialogAction>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmEnableReorder}>
+                {t('settings.enableReorderAction')}
+              </AlertDialogAction>
             </AlertDialogFooter>
+
           </AlertDialogContent>
         </AlertDialog>
 
@@ -2148,25 +2355,41 @@ export default function Settings() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>
-                {pendingKeyType === 'board' ? '呼び出しボード' : 'キオスク'}キーを再生成しますか？
+                {formatMessage('settings.keyRegenerateConfirmTitle', {
+                  target: pendingKeyType === 'board'
+                    ? t('settings.boardKeyLabel')
+                    : t('settings.kioskKeyLabel'),
+                })}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                キーを再生成すると、現在のURLは無効になります。新しいURLを各端末に再配布してください。
+                {t('settings.keyRegenerateConfirmDescription')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>キャンセル</AlertDialogCancel>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmKeyRegeneration}
                 disabled={!pendingKeyType || regenerateKeyMutation.isPending}
               >
-                {regenerateKeyMutation.isPending ? '再生成中...' : '再生成する'}
+                {regenerateKeyMutation.isPending
+                  ? t('settings.regenerateInProgress')
+                  : t('settings.regenerateAction')}
               </AlertDialogAction>
             </AlertDialogFooter>
+
           </AlertDialogContent>
         </AlertDialog>
       </main>
     </div>
   );
 }
+
+export default function Settings() {
+  return (
+    <LocaleProvider defaultLocale="ja" supportedLocales={SUPPORTED_LOCALES}>
+      <SettingsContent />
+    </LocaleProvider>
+  );
+}
+
 

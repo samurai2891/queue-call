@@ -147,7 +147,9 @@ function MenuContent() {
 
       {/* Main Content */}
       <main className="flex-1 container py-4">
+        <p className="text-xs text-muted-foreground mb-4">{t('menu.translationNotice')}</p>
         {viewMode === 'feed' ? (
+
           // Feed View
           <div className="space-y-4">
             {feedPosts && feedPosts.length > 0 ? (

@@ -89,7 +89,8 @@ function BoardContent() {
   }
 
   if (storeError || !store) {
-    const message = accessDenied ? 'アクセスキーが必要です' : t('common.error');
+    const message = accessDenied ? t('common.accessKeyRequired') : t('common.error');
+
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8">
         <AlertCircle className="h-24 w-24 text-destructive" />
@@ -151,8 +152,9 @@ function BoardContent() {
 
       {/* Footer */}
       <footer className="p-4 text-center text-muted-foreground border-t">
-        <p className="text-sm">Powered by Queue Call</p>
+        <p className="text-sm">{t('common.poweredBy')}</p>
       </footer>
+
     </div>
   );
 }

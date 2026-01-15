@@ -12,7 +12,7 @@
 |--------------|--------|------|
 | M0: ローカル実行と環境変数の固定 | 100% | ✅ 完了 |
 | M1: コア順番待ちフロー | 85% | 🟡 ほぼ完了 |
-| M2: 通知（Web Push / SMS） | 60% | 🟡 進行中 |
+| M2: 通知（Web Push / SMS） | 70% | 🟡 進行中 |
 | M3: 店舗設定ページ | 100% | ✅ 完了 |
 | M4: メニュー＋画像アップロード | 100% | ✅ 完了 |
 | M5: スタッフの順番調整 | 100% | ✅ 完了 |
@@ -20,7 +20,7 @@
 | M7: 運用・セキュリティ | 20% | 🔴 未着手多数 |
 | M8: テスト＆リリース | 40% | 🔴 部分実装 |
 
-**全体進捗:** 約 **76%** 完了
+**全体進捗:** 約 **77%** 完了
 
 
 ---
@@ -68,11 +68,11 @@
 - ✅ /s/:storeSlug/checkin で番号入力→ARRIVED
 
 **残タスク:**
-- ❌ CALL時に checkinDeadlineAt を保存（現在は猶予時間経過を計算で判定）
+- 🟡 クライアント側の表示文言・UI分岐を状態で統一
 
 ---
 
-## 🟡 M2: 通知（Web Push / SMS）（60%完了）
+## 🟡 M2: 通知（Web Push / SMS）（70%完了）
 
 ### M2-A Web Push（100%）
 - ✅ チケット単位で PushSubscription を保存
@@ -87,22 +87,27 @@
 - `client/public/sw.js` - Push受信/クリック処理
 
 
-### M2-B SMS（Twilio）（30%）
-- 🟡 チケット画面で「SMSで呼び出しを受け取る」UI（部分実装）
-- 🟡 電話番号入力（国番号含む）
-- 🟡 OTP送信（Twilio Verify）
-- ❌ OTP入力→検証成功→SMS登録完了
-- ❌ 「解除」機能
-- ❌ 呼び出し/再呼び出し時にSMS送信を接続
-- ❌ メッセージテンプレート
+### M2-B SMS（Twilio + プリペイド）（70%）
+- ✅ チケット画面でSMS登録/OTP検証/解除
+- ✅ Twilio VerifyによるOTP送信・検証API
+- ✅ SMS残高管理（Stripe + smsTransactions）
+- ✅ SMS送信ログ/履歴画面
+- ❌ CALL/RECALL時にSMS送信を接続
+- ❌ メッセージテンプレ/再通知制限の反映
 - ❌ 送信頻度制限
-- ❌ STOP（配信停止）対応
+- ❌ STOP（配信停止）対応（Webhook + 署名検証）
+- ❌ SMS履歴CSVエクスポート
+
+**実装済みファイル:**
+- `client/src/components/SmsRegistration.tsx` - SMS登録UI
+- `client/src/pages/admin/SmsHistory.tsx` - SMS送信履歴
+- `server/notifications.ts` - SMS送信/OTP
 
 **残タスク:**
-- Twilio API統合の完全実装
-- OTP検証フロー
-- SMS送信トリガーの接続
-- レート制限
+- CALL/RECALL送信の接続とテンプレ適用
+- 再通知回数/間隔の制限
+- STOP Webhook（署名検証含む）
+- SMS履歴CSVエクスポート
 
 ---
 
@@ -262,17 +267,19 @@ client/src/pages/
 │   ├── Board.tsx              ✅ 呼び出しボード
 │   └── Staff.tsx              ✅ スタッフ管理
 └── admin/
-    └── Settings.tsx            ✅ 店舗設定（全タブ実装済み）
+    ├── Settings.tsx            ✅ 店舗設定（全タブ実装済み）
+    └── SmsHistory.tsx          ✅ SMS送信履歴
 
 client/src/contexts/
 └── LocaleContext.tsx           ✅ 多言語対応コンテキスト
 
 client/src/hooks/
 ├── useSSE.ts                   ✅ SSEリアルタイム更新
-└── usePushNotification.ts      🟡 Web Push通知（部分実装）
+└── usePushNotification.ts      ✅ Web Push通知
 
 client/src/components/
-└── LanguageSwitcher.tsx        ✅ 言語切替UI
+├── LanguageSwitcher.tsx        ✅ 言語切替UI
+└── SmsRegistration.tsx         ✅ SMS登録UI
 ```
 
 ### サーバー側（Node.js + tRPC）
@@ -281,7 +288,7 @@ server/
 ├── routers.ts                  ✅ tRPCルーター（全API実装）
 ├── db.ts                       ✅ DBヘルパー関数
 ├── sse.ts                      ✅ SSEストリーム
-├── notifications.ts            🟡 通知システム（部分実装）
+├── notifications.ts            🟡 通知システム（SMS残件あり）
 ├── storage.ts                  ✅ S3ストレージヘルパー
 ├── queue.test.ts               ✅ テスト（15件）
 ├── auth.logout.test.ts         ✅ テスト（1件）
@@ -311,35 +318,30 @@ client/public/
 ## 🎯 次に優先すべきタスク（重要度順）
 
 ### 🔴 最優先（M2完成に必要）
-1. **T2-1: Web Push送信の完全実装**
-   - CALL/RECALL時のPush送信トリガー接続
-   - 送信失敗時の購読削除処理
-
-2. **T2-3~T2-5: SMS通知の完全実装**
-   - OTP検証フロー完成
-   - CALL/RECALL時のSMS送信接続
-   - STOP対応（Twilio Webhook）
+1. **T2-4: CALL/RECALLのSMS送信接続**
+   - メッセージテンプレ適用
+   - 再通知制限/送信間隔の反映
+2. **T2-5: STOP（配信停止）対応**
+   - Twilio Inbound Webhook
+   - 署名検証 + opt-out反映
+3. **T2-7: SMS履歴CSVエクスポート**
 
 ### 🟡 重要（運用開始前に必要）
-3. **T7-1: レート制限**
+4. **T7-1: レート制限**
    - チケット発券の連打対策
    - SMS OTP爆撃対策
    - スタッフPINブルートフォース対策
 
-4. **T7-2: 日跨ぎ処理**
+5. **T7-2: 日跨ぎ処理**
    - dayKeyによる番号リセット
    - 前日チケットのEXPIRED化
 
-5. **T8-1: 手動E2Eチェックリスト**
+6. **T8-1: 手動E2Eチェックリスト**
    - 全フローの動作確認
    - 多言語表示確認
    - PWA動作確認
 
 ### 🟢 推奨（UX向上）
-6. **T3-3: キー再生成機能**
-   - キオスク/ボードURLのコピーボタン
-   - key再生成時の旧key無効化
-
 7. **T6-1: i18n完全化**
    - 全キーの翻訳漏れチェック
    - 設定画面の翻訳完成
@@ -369,8 +371,8 @@ client/public/
 
 ### インフラ
 - ✅ S3互換ストレージ（Manus Storage）
-- 🟡 Twilio（SMS/OTP）- 部分実装
-- 🟡 Web Push（VAPID）- 部分実装
+- 🟡 Twilio（SMS/OTP）- 送信連携残件あり
+- ✅ Web Push（VAPID）- 実装済み
 
 ---
 
@@ -378,11 +380,11 @@ client/public/
 
 | カテゴリ | 残タスク数 | 推定工数 |
 |---------|-----------|---------|
-| M2: 通知完成 | 8タスク | 2-3日 |
+| M2: 通知完成 | 4タスク | 1-2日 |
 | M7: セキュリティ | 4タスク | 1-2日 |
 | M8: テスト | 2タスク | 1日 |
 | その他調整 | - | 1日 |
-| **合計** | **14タスク** | **5-7日** |
+| **合計** | **10タスク** | **4-6日** |
 
 ---
 
@@ -436,9 +438,9 @@ client/public/
 ## 📝 まとめ
 
 **現在の状態:**
-- プロジェクトの基本骨格は完成（約70%）
+- プロジェクトの基本骨格は完成（約77%）
 - コア順番待ちフローは動作可能
-- 通知機能とセキュリティ対策が主な残タスク
+- SMS通知のCALL/RECALL接続とセキュリティ対策が主な残タスク
 
 **強み:**
 - 堅牢なDBスキーマ設計
@@ -449,16 +451,17 @@ client/public/
 - 充実したテストカバレッジ
 
 **課題:**
-- Web Push/SMS通知の完全実装
+- SMS通知のCALL/RECALL接続・再通知制限
+- STOP Webhook対応とCSVエクスポート
 - レート制限
 - 日跨ぎ処理
 - E2Eテスト
 
 **推奨アクション:**
-1. M2（通知）を最優先で完成させる
+1. M2（SMS送信連携・STOP対応・CSV）を完了させる
 2. M7（セキュリティ）を強化する
-3. E2Eテストを実施する
-4. 本番リリース
+3. M8（手動E2E）を実施する
+4. M6（i18n漏れチェック）を仕上げる
 
 ---
 

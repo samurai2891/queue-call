@@ -350,7 +350,8 @@ function StaffContent() {
             <CardContent>
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="pin">PIN</Label>
+                    <Label htmlFor="pin">{t('staff.pinLabel')}</Label>
+
                   <Input
                     id="pin"
                     type="password"
@@ -397,8 +398,9 @@ function StaffContent() {
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{store.name}</h1>
             <Badge variant={role === 'manager' ? 'default' : 'secondary'}>
-              {role === 'manager' ? 'Manager' : 'Staff'}
+              {role === 'manager' ? t('staff.roleManager') : t('staff.roleStaff')}
             </Badge>
+
           </div>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />

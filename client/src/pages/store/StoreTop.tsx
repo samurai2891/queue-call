@@ -68,7 +68,8 @@ function StoreTopContent() {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4">
         <AlertCircle className="h-16 w-16 text-destructive" />
         <h1 className="text-2xl font-bold">{t('common.error')}</h1>
-        <p className="text-muted-foreground">Store not found</p>
+        <p className="text-muted-foreground">{t('store.notFound')}</p>
+
         <Link href="/">
           <Button variant="outline">{t('common.back')}</Button>
         </Link>
@@ -151,8 +152,9 @@ function StoreTopContent() {
 
       {/* Footer */}
       <footer className="p-4 text-center text-sm text-muted-foreground">
-        Powered by Queue Call
+        {t('common.poweredBy')}
       </footer>
+
     </div>
   );
 }

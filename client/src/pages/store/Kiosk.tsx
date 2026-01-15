@@ -86,13 +86,15 @@ function KioskContent() {
   if (storeLoading) {
     return (
       <div className="kiosk-mode flex items-center justify-center">
-        <div className="animate-pulse text-4xl">Loading...</div>
+        <div className="animate-pulse text-4xl">{t('common.loading')}</div>
+
       </div>
     );
   }
 
   if (storeError || !store) {
-    const message = accessDenied ? 'アクセスキーが必要です' : t('common.error');
+    const message = accessDenied ? t('common.accessKeyRequired') : t('common.error');
+
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8">
         <AlertCircle className="h-24 w-24 text-destructive" />

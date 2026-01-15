@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { useParams, useLocation } from 'wouter';
+import { useLocation } from 'wouter';
+
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
+import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { Button } from '@/components/ui/button';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,26 +41,12 @@ import {
   AlertTriangle,
   Wallet,
 } from 'lucide-react';
-import { toast } from 'sonner';
+
 import { getLoginUrl } from '@/const';
 
 const PAGE_SIZE = 20;
 
 type SmsStatus = 'pending' | 'sent' | 'delivered' | 'failed';
-
-const STATUS_CONFIG: Record<SmsStatus, { label: string; color: string; icon: typeof CheckCircle }> = {
-  pending: { label: '送信中', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-  sent: { label: '送信済み', color: 'bg-blue-100 text-blue-800', icon: Send },
-  delivered: { label: '配信完了', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-  failed: { label: '失敗', color: 'bg-red-100 text-red-800', icon: XCircle },
-};
-
-const MESSAGE_TYPE_LABELS: Record<string, string> = {
-  call: '呼び出し',
-  recall: '再通知',
-  reminder: 'リマインダー',
-  custom: 'カスタム',
-};
 
 function formatPhoneNumber(phone: string): string {
   // Mask middle digits for privacy
@@ -67,22 +56,46 @@ function formatPhoneNumber(phone: string): string {
   return phone;
 }
 
-function formatDate(date: string | Date): string {
-  const d = new Date(date);
-  return d.toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+function SmsHistoryContent() {
 
-export default function SmsHistory() {
   const [, navigate] = useLocation();
-  const { user, loading: authLoading, isAuthenticated } = useAuth();
-  
+  const { loading: authLoading, isAuthenticated } = useAuth();
+  const { t, locale } = useLocale();
+
+  const formatMessage = (key: string, params: Record<string, string | number>) => {
+    return Object.entries(params).reduce(
+      (message, [param, value]) => message.replace(`{${param}}`, String(value)),
+      t(key)
+    );
+  };
+
+  const statusConfig: Record<SmsStatus, { label: string; color: string; icon: typeof CheckCircle }> = {
+    pending: { label: t('smsHistory.status.pending'), color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+    sent: { label: t('smsHistory.status.sent'), color: 'bg-blue-100 text-blue-800', icon: Send },
+    delivered: { label: t('smsHistory.status.delivered'), color: 'bg-green-100 text-green-800', icon: CheckCircle },
+    failed: { label: t('smsHistory.status.failed'), color: 'bg-red-100 text-red-800', icon: XCircle },
+  };
+
+  const messageTypeLabels: Record<string, string> = {
+    call: t('smsHistory.type.call'),
+    recall: t('smsHistory.type.recall'),
+    reminder: t('smsHistory.type.reminder'),
+    custom: t('smsHistory.type.custom'),
+  };
+
+  const formatDate = (date: string | Date): string => {
+    const d = new Date(date);
+    return d.toLocaleString(locale, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   // Filters
+
   const [statusFilter, setStatusFilter] = useState<SmsStatus | 'all'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -138,17 +151,22 @@ export default function SmsHistory() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground">店舗が見つかりません</p>
+            <p className="text-muted-foreground">{t('smsHistory.storeNotFound')}</p>
             <Button className="mt-4" onClick={() => navigate('/admin')}>
-              ダッシュボードに戻る
+              {t('smsHistory.backToDashboard')}
             </Button>
+
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  const totalPages = Math.ceil((logsData?.total || 0) / PAGE_SIZE);
+  const totalLogs = logsData?.total || 0;
+  const rangeStart = totalLogs === 0 ? 0 : page * PAGE_SIZE + 1;
+  const rangeEnd = Math.min((page + 1) * PAGE_SIZE, totalLogs);
+  const totalPages = Math.ceil(totalLogs / PAGE_SIZE);
+
 
   const handleFilter = () => {
     setPage(0);
@@ -173,13 +191,15 @@ export default function SmsHistory() {
           <div className="flex-1">
             <h1 className="text-xl font-bold flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
-              SMS送信履歴
+              {t('smsHistory.title')}
+
             </h1>
             <p className="text-sm text-muted-foreground">{store.name}</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => refetchLogs()}>
             <RefreshCw className="h-4 w-4 mr-2" />
-            更新
+            {t('smsHistory.refresh')}
+
           </Button>
         </div>
       </header>
@@ -191,12 +211,16 @@ export default function SmsHistory() {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <TrendingUp className="h-4 w-4" />
-                <span className="text-sm">送信成功（30日）</span>
+                <span className="text-sm">{t('smsHistory.statsSent')}</span>
+
               </div>
               {statsLoading ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
-                <p className="text-2xl font-bold text-green-600">{stats?.totalSent || 0}通</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {formatMessage('smsHistory.messageCount', { count: stats?.totalSent || 0 })}
+                </p>
+
               )}
             </CardContent>
           </Card>
@@ -205,12 +229,16 @@ export default function SmsHistory() {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <AlertTriangle className="h-4 w-4" />
-                <span className="text-sm">送信失敗（30日）</span>
+                <span className="text-sm">{t('smsHistory.statsFailed')}</span>
+
               </div>
               {statsLoading ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
-                <p className="text-2xl font-bold text-red-600">{stats?.totalFailed || 0}通</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {formatMessage('smsHistory.messageCount', { count: stats?.totalFailed || 0 })}
+                </p>
+
               )}
             </CardContent>
           </Card>
@@ -219,7 +247,8 @@ export default function SmsHistory() {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <Wallet className="h-4 w-4" />
-                <span className="text-sm">消費クレジット（30日）</span>
+                <span className="text-sm">{t('smsHistory.statsCreditsUsed')}</span>
+
               </div>
               {statsLoading ? (
                 <Skeleton className="h-8 w-20" />
@@ -233,7 +262,8 @@ export default function SmsHistory() {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <Wallet className="h-4 w-4" />
-                <span className="text-sm">現在の残高</span>
+                <span className="text-sm">{t('smsHistory.statsCurrentBalance')}</span>
+
               </div>
               <p className="text-2xl font-bold text-primary">
                 ¥{(balanceData?.balance || 0).toLocaleString()}
@@ -247,29 +277,33 @@ export default function SmsHistory() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Filter className="h-4 w-4" />
-              フィルター
+              {t('smsHistory.filtersTitle')}
+
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label>ステータス</Label>
+                <Label>{t('smsHistory.filterStatus')}</Label>
+
                 <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as SmsStatus | 'all')}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">すべて</SelectItem>
-                    <SelectItem value="pending">送信中</SelectItem>
-                    <SelectItem value="sent">送信済み</SelectItem>
-                    <SelectItem value="delivered">配信完了</SelectItem>
-                    <SelectItem value="failed">失敗</SelectItem>
+                    <SelectItem value="all">{t('smsHistory.filterAll')}</SelectItem>
+                    <SelectItem value="pending">{t('smsHistory.status.pending')}</SelectItem>
+                    <SelectItem value="sent">{t('smsHistory.status.sent')}</SelectItem>
+                    <SelectItem value="delivered">{t('smsHistory.status.delivered')}</SelectItem>
+                    <SelectItem value="failed">{t('smsHistory.status.failed')}</SelectItem>
+
                   </SelectContent>
                 </Select>
               </div>
               
               <div className="space-y-2">
-                <Label>開始日</Label>
+                <Label>{t('smsHistory.filterStartDate')}</Label>
+
                 <Input
                   type="date"
                   value={startDate}
@@ -278,7 +312,8 @@ export default function SmsHistory() {
               </div>
               
               <div className="space-y-2">
-                <Label>終了日</Label>
+                <Label>{t('smsHistory.filterEndDate')}</Label>
+
                 <Input
                   type="date"
                   value={endDate}
@@ -288,11 +323,12 @@ export default function SmsHistory() {
               
               <div className="flex items-end gap-2">
                 <Button onClick={handleFilter} className="flex-1">
-                  検索
+                  {t('smsHistory.filterSearch')}
                 </Button>
                 <Button variant="outline" onClick={handleClearFilters}>
-                  クリア
+                  {t('smsHistory.filterClear')}
                 </Button>
+
               </div>
             </div>
           </CardContent>
@@ -301,10 +337,15 @@ export default function SmsHistory() {
         {/* Logs Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">送信履歴</CardTitle>
+            <CardTitle className="text-base">{t('smsHistory.logsTitle')}</CardTitle>
             <CardDescription>
-              {logsData?.total || 0}件中 {page * PAGE_SIZE + 1} - {Math.min((page + 1) * PAGE_SIZE, logsData?.total || 0)}件を表示
+              {formatMessage('smsHistory.logsDescription', {
+                total: totalLogs,
+                start: rangeStart,
+                end: rangeEnd,
+              })}
             </CardDescription>
+
           </CardHeader>
           <CardContent>
             {logsLoading ? (
@@ -316,7 +357,8 @@ export default function SmsHistory() {
             ) : logsData?.logs.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>送信履歴がありません</p>
+                <p>{t('smsHistory.logsEmpty')}</p>
+
               </div>
             ) : (
               <>
@@ -324,18 +366,20 @@ export default function SmsHistory() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>日時</TableHead>
-                        <TableHead>宛先</TableHead>
-                        <TableHead>タイプ</TableHead>
-                        <TableHead>内容</TableHead>
-                        <TableHead>ステータス</TableHead>
-                        <TableHead className="text-right">クレジット</TableHead>
+                        <TableHead>{t('smsHistory.tableDate')}</TableHead>
+                        <TableHead>{t('smsHistory.tableRecipient')}</TableHead>
+                        <TableHead>{t('smsHistory.tableType')}</TableHead>
+                        <TableHead>{t('smsHistory.tableMessage')}</TableHead>
+                        <TableHead>{t('smsHistory.tableStatus')}</TableHead>
+                        <TableHead className="text-right">{t('smsHistory.tableCredits')}</TableHead>
+
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {logsData?.logs.map((log) => {
-                        const statusConfig = STATUS_CONFIG[log.status as SmsStatus];
-                        const StatusIcon = statusConfig?.icon || Clock;
+                        const currentStatus = statusConfig[log.status as SmsStatus];
+                        const StatusIcon = currentStatus?.icon || Clock;
+
                         
                         return (
                           <TableRow key={log.id}>
@@ -347,17 +391,19 @@ export default function SmsHistory() {
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline">
-                                {MESSAGE_TYPE_LABELS[log.messageType] || log.messageType}
+                                {messageTypeLabels[log.messageType] || log.messageType}
+
                               </Badge>
                             </TableCell>
                             <TableCell className="max-w-xs truncate">
                               {log.messageContent}
                             </TableCell>
                             <TableCell>
-                              <Badge className={statusConfig?.color || ''}>
+                              <Badge className={currentStatus?.color || ''}>
                                 <StatusIcon className="h-3 w-3 mr-1" />
-                                {statusConfig?.label || log.status}
+                                {currentStatus?.label || log.status}
                               </Badge>
+
                             </TableCell>
                             <TableCell className="text-right">
                               ¥{log.creditConsumed}
@@ -373,7 +419,11 @@ export default function SmsHistory() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between mt-4">
                     <p className="text-sm text-muted-foreground">
-                      ページ {page + 1} / {totalPages}
+                      {formatMessage('smsHistory.paginationLabel', {
+                        page: page + 1,
+                        totalPages,
+                      })}
+
                     </p>
                     <div className="flex gap-2">
                       <Button
@@ -383,7 +433,8 @@ export default function SmsHistory() {
                         disabled={page === 0}
                       >
                         <ChevronLeft className="h-4 w-4" />
-                        前へ
+                        {t('smsHistory.prevPage')}
+
                       </Button>
                       <Button
                         variant="outline"
@@ -391,8 +442,9 @@ export default function SmsHistory() {
                         onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                         disabled={page >= totalPages - 1}
                       >
-                        次へ
+                        {t('smsHistory.nextPage')}
                         <ChevronRight className="h-4 w-4" />
+
                       </Button>
                     </div>
                   </div>
@@ -405,3 +457,12 @@ export default function SmsHistory() {
     </div>
   );
 }
+
+export default function SmsHistory() {
+  return (
+    <LocaleProvider defaultLocale="ja" supportedLocales={SUPPORTED_LOCALES}>
+      <SmsHistoryContent />
+    </LocaleProvider>
+  );
+}
+
