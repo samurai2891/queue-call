@@ -125,12 +125,16 @@ export default function Home() {
                     <Button size="sm" variant="outline" onClick={() => navigate(`/s/${store.slug}/staff`)}>
                       スタッフ
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/s/${store.slug}/kiosk`)}>
-                      キオスク
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/s/${store.slug}/board`)}>
-                      ボード
-                    </Button>
+                    {store.kioskKey && (
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/s/${store.slug}/kiosk?key=${store.kioskKey}`)}>
+                        キオスク
+                      </Button>
+                    )}
+                    {store.boardKey && (
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/s/${store.slug}/board?key=${store.boardKey}`)}>
+                        ボード
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
