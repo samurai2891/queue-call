@@ -1019,58 +1019,6 @@ const ticketRouter = router({
       return { success: true };
     }),
 
-  // Login with PIN
-  login: publicProcedure
-    .input(z.object({
-      storeId: z.number(),
-      pin: z.string(),
-    }))
-    .mutation(async ({ input }) => {
-      const store = await db.getStoreById(input.storeId);
-      if (!store) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
-      }
-
-      // Check manager PIN first
-      if (store.managerPinHash) {
-        const isManager = await bcrypt.compare(input.pin, store.managerPinHash);
-        if (isManager) {
-          const sessionToken = await db.createStaffSession({ storeId: input.storeId, role: 'manager' });
-          return { sessionToken, role: 'manager' as const };
-        }
-      }
-
-      // Check staff PIN
-      if (store.staffPinHash) {
-        const isStaff = await bcrypt.compare(input.pin, store.staffPinHash);
-        if (isStaff) {
-          const sessionToken = await db.createStaffSession({ storeId: input.storeId, role: 'staff' });
-          return { sessionToken, role: 'staff' as const };
-        }
-      }
-
-      throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid PIN' });
-    }),
-
-  // Logout
-  logout: publicProcedure
-    .input(z.object({ sessionToken: z.string() }))
-    .mutation(async ({ input }) => {
-      await db.deleteStaffSession(input.sessionToken);
-      return { success: true };
-    }),
-
-  // Get session
-  getSession: publicProcedure
-    .input(z.object({ sessionToken: z.string() }))
-    .query(async ({ input }) => {
-      const session = await db.getStaffSession(input.sessionToken);
-      if (!session) {
-        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
-      }
-      return session;
-    }),
-
   // Checkin (public)
   checkin: publicProcedure
     .input(z.object({ 

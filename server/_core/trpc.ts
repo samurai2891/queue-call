@@ -39,7 +39,7 @@ const logErrors = t.middleware(async opts => {
   try {
     return await opts.next();
   } catch (error) {
-    const context = buildErrorContext(opts.rawInput);
+    const context = buildErrorContext(opts.input);
     console.error(
       "[API] Request failed",
       {

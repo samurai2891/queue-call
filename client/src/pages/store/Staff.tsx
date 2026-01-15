@@ -159,7 +159,7 @@ function StaffContent() {
   const loginMutation = trpc.staff.login.useMutation({
     onSuccess: (data) => {
       setSessionToken(data.sessionToken);
-      setRole(data.role);
+      setRole(data.role as 'staff' | 'manager');
       sessionStorage.setItem(SESSION_STORAGE_KEY, data.sessionToken);
       setPin('');
       setIsLoggingIn(false);
