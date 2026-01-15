@@ -1,8 +1,8 @@
 import { getDb, createSmsLog, updateSmsLog } from './db';
 import { pushSubscriptions, smsSubscriptions, tickets, smsLogs } from '../drizzle/schema';
-import { eq, and, isNull, isNotNull } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, sql } from 'drizzle-orm';
 import webPush from 'web-push';
-import { consumeSmsBalance } from './stripe';
+import { consumeSmsBalance, SMS_COST_PER_MESSAGE } from './stripe';
 
 
 // Web Push notification payload
@@ -105,6 +105,11 @@ export async function sendSmsNotification(
     accountSid: string;
     authToken: string;
     fromNumber: string;
+  },
+  options?: {
+    messageType?: 'call' | 'recall' | 'reminder' | 'custom';
+    recallLimitSeconds?: number;
+    recallMaxCount?: number;
   }
 ): Promise<{ success: boolean; reason?: string }> {
   const db = await getDb();
@@ -129,6 +134,68 @@ export async function sendSmsNotification(
     }
 
     const subscription = subscriptions[0];
+    const messageType = options?.messageType ?? 'call';
+    const recallLimitSeconds = options?.recallLimitSeconds ?? 0;
+    const recallMaxCount = options?.recallMaxCount ?? 0;
+
+    if (messageType === 'recall') {
+      const now = new Date();
+
+      if (recallLimitSeconds > 0 && subscription.lastSentAt) {
+        const secondsSinceLast = (now.getTime() - subscription.lastSentAt.getTime()) / 1000;
+
+        if (secondsSinceLast < recallLimitSeconds) {
+          await createSmsLog({
+            storeId,
+            ticketId,
+            phoneE164: subscription.phoneE164,
+            messageContent: message,
+            status: 'failed',
+            creditConsumed: 0,
+            messageType,
+            errorMessage: 'Recall throttled',
+          });
+          return { success: false, reason: 'Recall throttled' };
+        }
+      }
+
+      if (recallMaxCount > 0) {
+        const [ticket] = await db
+          .select({ calledAt: tickets.calledAt, createdAt: tickets.createdAt })
+          .from(tickets)
+          .where(eq(tickets.id, ticketId))
+          .limit(1);
+
+        const baseline = ticket?.calledAt ?? ticket?.createdAt;
+        if (baseline) {
+          const countResult = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(smsLogs)
+            .where(
+              and(
+                eq(smsLogs.ticketId, ticketId),
+                eq(smsLogs.messageType, 'recall'),
+                sql`${smsLogs.createdAt} >= ${baseline}`
+              )
+            );
+
+          const recallCount = countResult[0]?.count || 0;
+          if (recallCount >= recallMaxCount) {
+            await createSmsLog({
+              storeId,
+              ticketId,
+              phoneE164: subscription.phoneE164,
+              messageContent: message,
+              status: 'failed',
+              creditConsumed: 0,
+              messageType,
+              errorMessage: 'Recall limit reached',
+            });
+            return { success: false, reason: 'Recall limit reached' };
+          }
+        }
+      }
+    }
 
     // Create SMS log entry first
     const smsLogId = await createSmsLog({
@@ -137,8 +204,8 @@ export async function sendSmsNotification(
       phoneE164: subscription.phoneE164,
       messageContent: message,
       status: 'pending',
-      creditConsumed: 20,
-      messageType: 'call',
+      creditConsumed: SMS_COST_PER_MESSAGE,
+      messageType,
     });
 
     // Check and consume SMS balance BEFORE sending
@@ -285,39 +352,58 @@ export async function notifyTicketCalled(
   storeId: number,
   storeName: string,
   ticketNumber: number,
-  twilioConfig?: {
-    accountSid: string;
-    authToken: string;
-    fromNumber: string;
-  },
-  smsTemplate?: string
+  options?: {
+    pushEnabled?: boolean;
+    twilioConfig?: {
+      accountSid: string;
+      authToken: string;
+      fromNumber: string;
+    };
+    smsTemplate?: string;
+    messageType?: 'call' | 'recall' | 'reminder' | 'custom';
+    ticketUrl?: string;
+    recallLimitSeconds?: number;
+    recallMaxCount?: number;
+  }
 ): Promise<{ push: boolean; sms: boolean; smsReason?: string }> {
   const results: { push: boolean; sms: boolean; smsReason?: string } = { push: false, sms: false };
+  const pushEnabled = options?.pushEnabled ?? true;
 
-  // Send push notification
-  results.push = await sendPushNotification(ticketId, {
-    title: `${storeName}`,
-    body: `お客様の番号 ${ticketNumber} が呼び出されました。カウンターまでお越しください。`,
-    tag: `ticket-${ticketId}`,
-    data: {
-      type: 'called',
-      ticketId,
-      ticketNumber,
-    },
-  });
+  if (pushEnabled) {
+    results.push = await sendPushNotification(ticketId, {
+      title: `${storeName}`,
+      body: `お客様の番号 ${ticketNumber} が呼び出されました。カウンターまでお越しください。`,
+      tag: `ticket-${ticketId}`,
+      data: {
+        type: 'called',
+        ticketId,
+        ticketNumber,
+      },
+    });
+  }
 
-  // Send SMS if configured
+  const twilioConfig = options?.twilioConfig;
   if (twilioConfig) {
-    const message = smsTemplate
-      ? smsTemplate
-          .replace('{storeName}', storeName)
-          .replace('{number}', String(ticketNumber))
+    const messageType = options?.messageType ?? 'call';
+    const fallbackMessage = messageType === 'recall'
+      ? `【${storeName}】再度のご案内です。お客様の番号 ${ticketNumber} が呼び出されています。`
       : `【${storeName}】お客様の番号 ${ticketNumber} が呼び出されました。カウンターまでお越しください。`;
+    const ticketUrl = options?.ticketUrl ?? '';
+    const message = (options?.smsTemplate ?? fallbackMessage)
+      .replace('{storeName}', storeName)
+      .replace('{number}', String(ticketNumber))
+      .replace('{url}', ticketUrl)
+      .trim();
 
-    const smsResult = await sendSmsNotification(ticketId, storeId, message, twilioConfig);
+    const smsResult = await sendSmsNotification(ticketId, storeId, message, twilioConfig, {
+      messageType,
+      recallLimitSeconds: options?.recallLimitSeconds,
+      recallMaxCount: options?.recallMaxCount,
+    });
     results.sms = smsResult.success;
     results.smsReason = smsResult.reason;
   }
 
   return results;
 }
+

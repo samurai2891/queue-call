@@ -12,7 +12,7 @@
 |--------------|--------|------|
 | M0: ローカル実行と環境変数の固定 | 100% | ✅ 完了 |
 | M1: コア順番待ちフロー | 85% | 🟡 ほぼ完了 |
-| M2: 通知（Web Push / SMS） | 70% | 🟡 進行中 |
+| M2: 通知（Web Push / SMS） | 100% | ✅ 完了 |
 | M3: 店舗設定ページ | 100% | ✅ 完了 |
 | M4: メニュー＋画像アップロード | 100% | ✅ 完了 |
 | M5: スタッフの順番調整 | 100% | ✅ 完了 |
@@ -20,7 +20,7 @@
 | M7: 運用・セキュリティ | 20% | 🔴 未着手多数 |
 | M8: テスト＆リリース | 40% | 🔴 部分実装 |
 
-**全体進捗:** 約 **77%** 完了
+**全体進捗:** 約 **81%** 完了
 
 
 ---
@@ -72,7 +72,7 @@
 
 ---
 
-## 🟡 M2: 通知（Web Push / SMS）（70%完了）
+## ✅ M2: 通知（Web Push / SMS）（100%完了）
 
 ### M2-A Web Push（100%）
 - ✅ チケット単位で PushSubscription を保存
@@ -87,27 +87,21 @@
 - `client/public/sw.js` - Push受信/クリック処理
 
 
-### M2-B SMS（Twilio + プリペイド）（70%）
+### M2-B SMS（Twilio + プリペイド）（100%）
 - ✅ チケット画面でSMS登録/OTP検証/解除
-- ✅ Twilio VerifyによるOTP送信・検証API
+- ✅ CALL/RECALL時のSMS送信接続＋テンプレ適用
+- ✅ 再通知制限（回数/間隔）
+- ✅ STOP Webhook（署名検証 + opt-out）
 - ✅ SMS残高管理（Stripe + smsTransactions）
-- ✅ SMS送信ログ/履歴画面
-- ❌ CALL/RECALL時にSMS送信を接続
-- ❌ メッセージテンプレ/再通知制限の反映
-- ❌ 送信頻度制限
-- ❌ STOP（配信停止）対応（Webhook + 署名検証）
-- ❌ SMS履歴CSVエクスポート
+- ✅ SMS送信ログ/履歴＋CSVエクスポート
+- ✅ SMSログの6か月保持 + 自動削除ジョブ
 
 **実装済みファイル:**
 - `client/src/components/SmsRegistration.tsx` - SMS登録UI
-- `client/src/pages/admin/SmsHistory.tsx` - SMS送信履歴
-- `server/notifications.ts` - SMS送信/OTP
-
-**残タスク:**
-- CALL/RECALL送信の接続とテンプレ適用
-- 再通知回数/間隔の制限
-- STOP Webhook（署名検証含む）
-- SMS履歴CSVエクスポート
+- `client/src/pages/admin/SmsHistory.tsx` - SMS送信履歴 + CSV
+- `server/notifications.ts` - SMS送信/OTP/再通知制限
+- `server/jobs/cleanupSmsLogs.ts` - SMSログ自動削除
+- `server/_core/index.ts` - Twilio webhook
 
 ---
 
@@ -317,32 +311,23 @@ client/public/
 
 ## 🎯 次に優先すべきタスク（重要度順）
 
-### 🔴 最優先（M2完成に必要）
-1. **T2-4: CALL/RECALLのSMS送信接続**
-   - メッセージテンプレ適用
-   - 再通知制限/送信間隔の反映
-2. **T2-5: STOP（配信停止）対応**
-   - Twilio Inbound Webhook
-   - 署名検証 + opt-out反映
-3. **T2-7: SMS履歴CSVエクスポート**
-
-### 🟡 重要（運用開始前に必要）
-4. **T7-1: レート制限**
+### 🔴 最優先（運用開始前に必要）
+1. **T7-1: レート制限**
    - チケット発券の連打対策
    - SMS OTP爆撃対策
    - スタッフPINブルートフォース対策
 
-5. **T7-2: 日跨ぎ処理**
+2. **T7-2: 日跨ぎ処理**
    - dayKeyによる番号リセット
    - 前日チケットのEXPIRED化
 
-6. **T8-1: 手動E2Eチェックリスト**
+3. **T8-1: 手動E2Eチェックリスト**
    - 全フローの動作確認
    - 多言語表示確認
    - PWA動作確認
 
 ### 🟢 推奨（UX向上）
-7. **T6-1: i18n完全化**
+4. **T6-1: i18n完全化**
    - 全キーの翻訳漏れチェック
    - 設定画面の翻訳完成
 

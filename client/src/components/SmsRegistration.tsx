@@ -48,6 +48,33 @@ export function SmsRegistration({ ticketId }: SmsRegistrationProps) {
     { enabled: !!ticketId }
   );
 
+  const getErrorMessage = (error: unknown) => {
+    const message = error instanceof Error ? error.message : '';
+
+    switch (message) {
+      case 'SMS notifications are not enabled for this store':
+        return t('sms.errorNotEnabled');
+      case 'SMS service is not configured':
+        return t('sms.errorNotConfigured');
+      case 'Phone number already verified':
+        return t('sms.errorAlreadyVerified');
+      case 'Failed to send verification code':
+        return t('sms.errorSendFailed');
+      case 'Invalid phone number format':
+        return t('sms.errorInvalidPhone');
+      case 'Verification code must be 6 digits':
+        return t('sms.errorInvalidCodeFormat');
+      case 'No pending verification found':
+        return t('sms.errorNoPendingVerification');
+      case 'Invalid verification code':
+        return t('sms.errorInvalidCode');
+      case 'No subscription found':
+        return t('sms.errorNoSubscription');
+      default:
+        return t('sms.error');
+    }
+  };
+
   // Register SMS mutation
   const registerMutation = trpc.notification.registerSms.useMutation({
     onSuccess: () => {
@@ -55,9 +82,10 @@ export function SmsRegistration({ ticketId }: SmsRegistrationProps) {
       toast.success(t('sms.codeSent'));
     },
     onError: (error) => {
-      setErrorMessage(error.message);
+      const message = getErrorMessage(error);
+      setErrorMessage(message);
       setStep('error');
-      toast.error(error.message);
+      toast.error(message);
     },
   });
 
@@ -69,7 +97,7 @@ export function SmsRegistration({ ticketId }: SmsRegistrationProps) {
       toast.success(t('sms.verified'));
     },
     onError: (error) => {
-      toast.error(error.message);
+      toast.error(getErrorMessage(error));
     },
   });
 
@@ -81,7 +109,7 @@ export function SmsRegistration({ ticketId }: SmsRegistrationProps) {
       toast.success(t('sms.unsubscribed'));
     },
     onError: (error) => {
-      toast.error(error.message);
+      toast.error(getErrorMessage(error));
     },
   });
 

@@ -70,6 +70,8 @@
 - `TWILIO_AUTH_TOKEN`: Twilio 認証トークン（SMS通知用）
 - `TWILIO_VERIFY_SERVICE_SID`: Twilio Verify サービスSID（OTP用）
 - `TWILIO_FROM_NUMBER`: SMS送信元電話番号
+- `APP_BASE_URL`: SMS内リンク生成用のベースURL（例: `https://example.com`）
+- `PUBLIC_BASE_URL`: `APP_BASE_URL` 未設定時の代替URL
 
 VAPIDキーは `npx web-push generate-vapid-keys` で生成できます。
 

@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { 
   InsertUser, users, 
@@ -437,6 +437,16 @@ export async function updateSmsSubscription(id: number, data: Partial<InsertSmsS
   await db.update(smsSubscriptions).set(data).where(eq(smsSubscriptions.id, id));
 }
 
+export async function optOutSmsSubscriptionsByPhone(phoneE164: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(smsSubscriptions)
+    .set({ optedOutAt: new Date() })
+    .where(eq(smsSubscriptions.phoneE164, phoneE164));
+}
+
 // ==================== Menu Functions ====================
 
 export async function getMenuCategories(storeId: number) {
@@ -728,6 +738,48 @@ export async function getSmsLogs(storeId: number, options?: {
   const logs = await query;
 
   return { logs, total };
+}
+
+export async function getSmsLogsForExport(storeId: number, options?: {
+  status?: 'pending' | 'sent' | 'delivered' | 'failed';
+  startDate?: Date;
+  endDate?: Date;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const cutoffDate = new Date();
+  cutoffDate.setMonth(cutoffDate.getMonth() - 6);
+
+  const startDate = options?.startDate && options.startDate > cutoffDate
+    ? options.startDate
+    : cutoffDate;
+
+  const conditions = [
+    eq(smsLogs.storeId, storeId),
+    sql`${smsLogs.createdAt} >= ${startDate}`,
+  ];
+
+  if (options?.endDate) {
+    conditions.push(sql`${smsLogs.createdAt} <= ${options.endDate}`);
+  }
+
+  if (options?.status) {
+    conditions.push(eq(smsLogs.status, options.status));
+  }
+
+  return await db
+    .select()
+    .from(smsLogs)
+    .where(and(...conditions))
+    .orderBy(desc(smsLogs.createdAt));
+}
+
+export async function deleteSmsLogsBefore(cutoffDate: Date): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(smsLogs).where(lt(smsLogs.createdAt, cutoffDate));
 }
 
 export async function getSmsLogStats(storeId: number, days: number = 30) {
