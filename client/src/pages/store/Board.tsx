@@ -40,8 +40,10 @@ function BoardContent() {
   useSSE({
     scope: 'board',
     storeId: store?.id || 0,
+    storeSlug: params.storeSlug,
     enabled: !!store?.id,
     onQueueUpdate: (data) => {
+
       const newNumber = data.currentNumber;
       
       // Play sound when number changes

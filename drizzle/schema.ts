@@ -67,6 +67,7 @@ export type InsertStore = typeof stores.$inferInsert;
 
 export interface StoreSettings {
   queue?: {
+    dailyResetTime?: string;
     checkinGraceMinutes?: number;
     autoSkip?: boolean;
     enableReorder?: boolean;
@@ -74,6 +75,7 @@ export interface StoreSettings {
     reorderReasonRequired?: boolean;
     auditLog?: boolean;
   };
+
   notifications?: {
     pushEnabled?: boolean;
     smsEnabled?: boolean;

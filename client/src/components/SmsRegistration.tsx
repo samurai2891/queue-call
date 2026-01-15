@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/select';
 import { MessageSquare, Phone, CheckCircle, Loader2, XCircle, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { RATE_LIMITED_ERR_MSG } from '@shared/const';
+
 
 interface SmsRegistrationProps {
   ticketId: number;
@@ -51,9 +53,12 @@ export function SmsRegistration({ ticketId }: SmsRegistrationProps) {
   const getErrorMessage = (error: unknown) => {
     const message = error instanceof Error ? error.message : '';
 
-    switch (message) {
-      case 'SMS notifications are not enabled for this store':
-        return t('sms.errorNotEnabled');
+      switch (message) {
+        case RATE_LIMITED_ERR_MSG:
+          return t('common.rateLimited');
+        case 'SMS notifications are not enabled for this store':
+          return t('sms.errorNotEnabled');
+
       case 'SMS service is not configured':
         return t('sms.errorNotConfigured');
       case 'Phone number already verified':

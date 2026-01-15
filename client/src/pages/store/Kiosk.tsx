@@ -5,7 +5,9 @@ import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleC
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Minus, Plus, Printer, CheckCircle, RotateCcw, AlertCircle, Globe } from 'lucide-react';
+import { RATE_LIMITED_ERR_MSG } from '@shared/const';
 import type { Locale } from '@/contexts/LocaleContext';
+
 
 type KioskState = 'language' | 'input' | 'success' | 'error';
 
@@ -34,9 +36,13 @@ function KioskContent() {
       setState('success');
     },
     onError: (error) => {
-      setErrorMessage(error.message);
+      const message = error.message === RATE_LIMITED_ERR_MSG
+        ? t('common.rateLimited')
+        : error.message;
+      setErrorMessage(message);
       setState('error');
     },
+
   });
 
   const kioskSettings = store?.settings?.kiosk;

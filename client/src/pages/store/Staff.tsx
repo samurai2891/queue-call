@@ -41,7 +41,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSSE } from '@/hooks/useSSE';
+import { RATE_LIMITED_ERR_MSG } from '@shared/const';
 import type { Locale } from '@/contexts/LocaleContext';
+
 
 type TicketStatus = 'WAITING' | 'CALLED' | 'ARRIVED' | 'SKIPPED' | 'DONE' | 'CANCELED' | 'EXPIRED';
 
@@ -92,12 +94,21 @@ function StaffContent() {
   const reorderReasonRequired = store?.settings?.queue?.reorderReasonRequired ?? false;
 
   // Verify session
-  const { data: session, isLoading: sessionLoading } = trpc.staff.getSession.useQuery(
+  const { data: session, isLoading: sessionLoading, error: sessionError } = trpc.staff.getSession.useQuery(
     { sessionToken: sessionToken || '' },
     { enabled: !!sessionToken, retry: false }
   );
 
+  useEffect(() => {
+    if (sessionError) {
+      setSessionToken(null);
+      setRole(null);
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+  }, [sessionError]);
+
   // Get waiting list
+
   const { data: waitingList, refetch: refetchWaitingList } = trpc.staff.getWaitingList.useQuery(
     { sessionToken: sessionToken || '', storeId: store?.id || 0 },
     { enabled: !!sessionToken && !!session && !!store?.id, refetchInterval: 30000 }
@@ -125,8 +136,10 @@ function StaffContent() {
   useSSE({
     scope: 'staff',
     storeId: store?.id || 0,
+    storeSlug: params.storeSlug,
     enabled: !!store?.id && !!sessionToken && !!session,
     onQueueUpdate: () => {
+
       refetchWaitingList();
     },
     onIntakeStatus: (data) => {
@@ -144,10 +157,15 @@ function StaffContent() {
       setIsLoggingIn(false);
     },
     onError: (error) => {
-      toast.error(t('staff.wrongPin'));
+      if (error.message === RATE_LIMITED_ERR_MSG) {
+        toast.error(t('common.rateLimited'));
+      } else {
+        toast.error(t('staff.wrongPin'));
+      }
       setIsLoggingIn(false);
     },
   });
+
 
   const logoutMutation = trpc.staff.logout.useMutation({
     onSuccess: () => {

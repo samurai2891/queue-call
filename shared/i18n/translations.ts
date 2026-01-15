@@ -37,8 +37,10 @@ export const translations = {
     'common.noImage': '画像なし',
     'common.poweredBy': 'Powered by Queue Call',
     'common.accessKeyRequired': 'アクセスキーが必要です',
+    'common.rateLimited': 'アクセスが集中しています。しばらくしてからもう一度お試しください。',
     
     // Store Top
+
 
     'store.welcome': 'いらっしゃいませ',
     'store.currentNumber': '現在の呼び出し番号',
@@ -433,8 +435,10 @@ export const translations = {
     'common.noImage': 'No image',
     'common.poweredBy': 'Powered by Queue Call',
     'common.accessKeyRequired': 'Access key required',
+    'common.rateLimited': 'Too many requests. Please try again later.',
     
     // Store Top
+
 
     'store.welcome': 'Welcome',
     'store.currentNumber': 'Now Calling',
@@ -829,8 +833,10 @@ export const translations = {
     'common.noImage': '이미지 없음',
     'common.poweredBy': 'Powered by Queue Call',
     'common.accessKeyRequired': '액세스 키가 필요합니다',
+    'common.rateLimited': '요청이 너무 많습니다. 잠시 후 다시 시도하세요.',
     
     // Store Top
+
 
     'store.welcome': '어서오세요',
     'store.currentNumber': '현재 호출 번호',
@@ -1226,8 +1232,10 @@ export const translations = {
     'common.noImage': '无图片',
     'common.poweredBy': 'Powered by Queue Call',
     'common.accessKeyRequired': '需要访问密钥',
+    'common.rateLimited': '请求过于频繁，请稍后再试。',
     
     // Store Top
+
 
     'store.welcome': '欢迎光临',
     'store.currentNumber': '当前叫号',
@@ -1623,8 +1631,10 @@ export const translations = {
     'common.noImage': '無圖片',
     'common.poweredBy': 'Powered by Queue Call',
     'common.accessKeyRequired': '需要存取金鑰',
+    'common.rateLimited': '請求過於頻繁，請稍後再試。',
     
     // Store Top
+
 
     'store.welcome': '歡迎光臨',
     'store.currentNumber': '目前叫號',

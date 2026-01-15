@@ -9,10 +9,13 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { requestContextMiddleware } from "./requestContext";
 import { serveStatic, setupVite } from "./vite";
 import { handleSSE } from "../sse";
 import { startAutoSkipJob } from "../jobs/autoSkip";
 import { startCleanupSmsLogsJob } from "../jobs/cleanupSmsLogs";
+import { startDailyResetJob } from "../jobs/dailyReset";
+
 import { constructWebhookEvent, handleCheckoutCompleted } from "../stripe";
 import { storageGet, storagePut } from "../storage";
 import * as db from "../db";
@@ -255,7 +258,9 @@ function registerMediaRoutes(app: express.Express) {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  app.use(requestContextMiddleware);
   // Configure body parser with larger size limit for file uploads
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
@@ -356,6 +361,8 @@ async function startServer() {
     // Start background jobs
     startAutoSkipJob(60); // Run every 60 seconds
     startCleanupSmsLogsJob();
+    startDailyResetJob(300);
+
   });
 }
 

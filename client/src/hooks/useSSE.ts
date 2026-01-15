@@ -5,6 +5,7 @@ type SSEScope = 'board' | 'staff' | 'ticket';
 interface UseSSEOptions {
   scope: SSEScope;
   storeId: number;
+  storeSlug?: string;
   ticketToken?: string;
   onMessage?: (event: string, data: any) => void;
   onQueueUpdate?: (data: { currentNumber: number; waitingCount: number; nextNumbers?: number[] }) => void;
@@ -14,9 +15,11 @@ interface UseSSEOptions {
   enabled?: boolean;
 }
 
+
 export function useSSE({
   scope,
   storeId,
+  storeSlug,
   ticketToken,
   onMessage,
   onQueueUpdate,
@@ -25,6 +28,7 @@ export function useSSE({
   onIntakeStatus,
   enabled = true,
 }: UseSSEOptions) {
+
   const eventSourceRef = useRef<EventSource | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,9 +44,13 @@ export function useSSE({
       scope,
       storeId: storeId.toString(),
     });
+    if (storeSlug) {
+      params.set('storeSlug', storeSlug);
+    }
     if (ticketToken) {
       params.set('ticketToken', ticketToken);
     }
+
 
     const url = `/api/sse?${params.toString()}`;
     
@@ -109,7 +117,8 @@ export function useSSE({
     eventSource.addEventListener('ping', () => {
       // Keep-alive, no action needed
     });
-  }, [enabled, storeId, scope, ticketToken, onMessage, onQueueUpdate, onTicketUpdate, onCalled, onIntakeStatus]);
+  }, [enabled, storeId, scope, storeSlug, ticketToken, onMessage, onQueueUpdate, onTicketUpdate, onCalled, onIntakeStatus]);
+
 
   useEffect(() => {
     connect();
