@@ -24,6 +24,8 @@ vi.mock('./db', () => ({
   getWaitingTickets: vi.fn(),
   getTicketById: vi.fn(),
   createAuditLog: vi.fn(),
+  createStaffSession: vi.fn(),
+  deleteStaffSession: vi.fn(),
 }));
 
 // Mock SSE functions

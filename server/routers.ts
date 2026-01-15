@@ -468,6 +468,71 @@ const ticketRouter = router({
       return { success: true };
     }),
 
+  // Staff login
+  login: publicProcedure
+    .input(z.object({
+      storeId: z.number(),
+      pin: z.string().min(4).max(8),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      const ipAddress = getRequestIp(ctx.req);
+      enforceRateLimits({
+        scope: 'staff-login',
+        key: `${store.id}:${ipAddress}`,
+        windows: RATE_LIMITS.staffLogin,
+        requestId: ctx.requestId,
+        storeSlug: store.slug,
+      });
+
+      const managerValid = store.managerPinHash
+        ? await bcrypt.compare(input.pin, store.managerPinHash)
+        : false;
+      const staffValid = !managerValid && store.staffPinHash
+        ? await bcrypt.compare(input.pin, store.staffPinHash)
+        : false;
+
+      if (!managerValid && !staffValid) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid PIN' });
+      }
+
+      const role = managerValid ? 'manager' : 'staff';
+      const sessionToken = await db.createStaffSession({
+        storeId: store.id,
+        role,
+      });
+
+      return { sessionToken, role };
+    }),
+
+  // Get staff session
+  getSession: publicProcedure
+    .input(z.object({ sessionToken: z.string() }))
+    .query(async ({ input }) => {
+      const session = await db.getStaffSession(input.sessionToken);
+      if (!session) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
+      }
+
+      return {
+        storeId: session.storeId,
+        role: session.role,
+        expiresAt: session.expiresAt,
+      };
+    }),
+
+  // Staff logout
+  logout: publicProcedure
+    .input(z.object({ sessionToken: z.string() }))
+    .mutation(async ({ input }) => {
+      await db.deleteStaffSession(input.sessionToken);
+      return { success: true };
+    }),
+
   // Get waiting list
   getWaitingList: publicProcedure
     .input(z.object({ 

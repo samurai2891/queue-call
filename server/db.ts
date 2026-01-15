@@ -187,7 +187,10 @@ export async function createStore(data: {
 
 export async function getStoreBySlug(slug: string): Promise<Store | undefined> {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeSlug: slug });
+    return undefined;
+  }
 
   const result = await db.select().from(stores).where(eq(stores.slug, slug)).limit(1);
   return result[0];
@@ -195,7 +198,10 @@ export async function getStoreBySlug(slug: string): Promise<Store | undefined> {
 
 export async function getStoreById(id: number): Promise<Store | undefined> {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId: id });
+    return undefined;
+  }
 
   const result = await db.select().from(stores).where(eq(stores.id, id)).limit(1);
   return result[0];
@@ -203,7 +209,10 @@ export async function getStoreById(id: number): Promise<Store | undefined> {
 
 export async function getStoresByOwner(ownerId: number): Promise<Store[]> {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { ownerId });
+    return [];
+  }
 
   return await db.select().from(stores).where(eq(stores.ownerId, ownerId));
 }
@@ -392,7 +401,10 @@ export async function createTicket(data: {
 
 export async function getTicketByToken(token: string): Promise<Ticket | undefined> {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { ticketToken: token });
+    return undefined;
+  }
 
   const result = await db.select().from(tickets).where(eq(tickets.ticketToken, token)).limit(1);
   return result[0];
@@ -400,7 +412,10 @@ export async function getTicketByToken(token: string): Promise<Ticket | undefine
 
 export async function getTicketById(id: number): Promise<Ticket | undefined> {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { ticketId: id });
+    return undefined;
+  }
 
   const result = await db.select().from(tickets).where(eq(tickets.id, id)).limit(1);
   return result[0];
@@ -408,7 +423,10 @@ export async function getTicketById(id: number): Promise<Ticket | undefined> {
 
 export async function getWaitingTickets(storeId: number): Promise<Ticket[]> {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
 
   const store = await getStoreById(storeId);
   if (!store) return [];
@@ -427,7 +445,10 @@ export async function getWaitingTickets(storeId: number): Promise<Ticket[]> {
 
 export async function getCalledTicket(storeId: number): Promise<Ticket | undefined> {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return undefined;
+  }
 
   const store = await getStoreById(storeId);
   if (!store) return undefined;
@@ -492,7 +513,13 @@ export async function updateTicketQueueRank(id: number, queueRank: string): Prom
 
 export async function getGroupsAhead(ticket: Ticket): Promise<number> {
   const db = await getDb();
-  if (!db) return 0;
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), {
+      storeId: ticket.storeId,
+      ticketId: ticket.id,
+    });
+    return 0;
+  }
 
   const result = await db.select({ count: sql<number>`count(*)` })
     .from(tickets)
@@ -508,7 +535,10 @@ export async function getGroupsAhead(ticket: Ticket): Promise<number> {
 
 export async function getWaitingCount(storeId: number): Promise<number> {
   const db = await getDb();
-  if (!db) return 0;
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return 0;
+  }
 
   const store = await getStoreById(storeId);
   if (!store) return 0;
@@ -537,7 +567,10 @@ export async function createPushSubscription(data: InsertPushSubscription): Prom
 
 export async function getPushSubscriptionsByTicket(ticketId: number) {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { ticketId });
+    return [];
+  }
 
   return await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.ticketId, ticketId));
 }
@@ -553,7 +586,10 @@ export async function createSmsSubscription(data: InsertSmsSubscription): Promis
 
 export async function getSmsSubscriptionByTicket(ticketId: number) {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { ticketId });
+    return undefined;
+  }
 
   const result = await db.select().from(smsSubscriptions).where(eq(smsSubscriptions.ticketId, ticketId)).limit(1);
   return result[0];
@@ -580,7 +616,10 @@ export async function optOutSmsSubscriptionsByPhone(phoneE164: string): Promise<
 
 export async function getMenuCategories(storeId: number) {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
 
   return await db.select()
     .from(menuCategories)
@@ -598,7 +637,10 @@ export async function getMenuItemsForStore(
   includeInactive: boolean = false
 ) {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId, categoryId });
+    return [];
+  }
 
   const conditions = [eq(menuItems.storeId, storeId)];
   if (!includeInactive) {
@@ -616,7 +658,10 @@ export async function getMenuItemsForStore(
 
 export async function getMenuItemById(id: number) {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { menuItemId: id });
+    return undefined;
+  }
 
   const result = await db.select().from(menuItems).where(eq(menuItems.id, id)).limit(1);
   return result[0];
@@ -679,7 +724,10 @@ export async function getFeedPosts(storeId: number) {
 
 export async function getFeedPostsForStore(storeId: number, includeInactive: boolean = false) {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId, includeInactive });
+    return [];
+  }
 
   const conditions = [eq(feedPosts.storeId, storeId)];
   if (!includeInactive) {
@@ -694,7 +742,10 @@ export async function getFeedPostsForStore(storeId: number, includeInactive: boo
 
 export async function getFeedPostById(id: number) {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { feedPostId: id });
+    return undefined;
+  }
 
   const result = await db.select().from(feedPosts).where(eq(feedPosts.id, id)).limit(1);
   return result[0];
@@ -772,7 +823,10 @@ export async function createStaffSession(data: {
 
 export async function getStaffSession(sessionToken: string) {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { sessionToken });
+    return undefined;
+  }
 
   const result = await db.select()
     .from(staffSessions)
@@ -780,6 +834,7 @@ export async function getStaffSession(sessionToken: string) {
     .limit(1);
 
   if (!result[0]) return undefined;
+
 
   const now = new Date();
 
@@ -839,7 +894,10 @@ export async function getSmsLogs(storeId: number, options?: {
   endDate?: Date;
 }) {
   const db = await getDb();
-  if (!db) return { logs: [], total: 0 };
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return { logs: [], total: 0 };
+  }
 
   const conditions = [eq(smsLogs.storeId, storeId)];
   
@@ -887,7 +945,10 @@ export async function getSmsLogsForExport(storeId: number, options?: {
   endDate?: Date;
 }) {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
 
   const cutoffDate = new Date();
   cutoffDate.setMonth(cutoffDate.getMonth() - 6);
@@ -925,7 +986,10 @@ export async function deleteSmsLogsBefore(cutoffDate: Date): Promise<void> {
 
 export async function getSmsLogStats(storeId: number, days: number = 30) {
   const db = await getDb();
-  if (!db) return { totalSent: 0, totalFailed: 0, totalCredits: 0 };
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return { totalSent: 0, totalFailed: 0, totalCredits: 0 };
+  }
 
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
