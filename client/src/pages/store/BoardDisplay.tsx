@@ -37,7 +37,7 @@ function BoardDisplayContent() {
   }, [queueStatus]);
 
   // SSE for real-time updates
-  useSSE({
+  const { isConnected, error: sseError, usePolling } = useSSE({
     scope: 'board',
     storeId: store?.id || 0,
     storeSlug: params.storeSlug,
@@ -57,6 +57,12 @@ function BoardDisplayContent() {
       setCurrentNumber(newNumber);
       if (data.nextNumbers) {
         setNextNumbers(data.nextNumbers);
+      }
+    },
+    onMessage: (event, data) => {
+      // Handle polling-active event to trigger manual refetch
+      if (event === 'polling-active') {
+        refetchQueue();
       }
     },
   });
@@ -168,7 +174,28 @@ function BoardDisplayContent() {
 
       {/* Footer */}
       <footer className="p-4 text-center text-muted-foreground border-t">
-        <p className="text-sm">{t('common.poweredBy')}</p>
+        <div className="flex items-center justify-center gap-4">
+          <p className="text-sm">{t('common.poweredBy')}</p>
+          {/* Connection Status Indicator */}
+          {usePolling && (
+            <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-500">
+              <div className="h-2 w-2 rounded-full bg-yellow-600 dark:bg-yellow-500 animate-pulse" />
+              {t('connection.pollingMode')}
+            </div>
+          )}
+          {!isConnected && !usePolling && sseError && (
+            <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-500">
+              <div className="h-2 w-2 rounded-full bg-red-600 dark:bg-red-500" />
+              {t('connection.disconnected')}
+            </div>
+          )}
+          {isConnected && (
+            <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-500">
+              <div className="h-2 w-2 rounded-full bg-green-600 dark:bg-green-500" />
+              {t('connection.connected')}
+            </div>
+          )}
+        </div>
       </footer>
 
     </div>

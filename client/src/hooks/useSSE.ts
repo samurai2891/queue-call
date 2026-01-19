@@ -33,8 +33,34 @@ export function useSSE({
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
+  const [usePolling, setUsePolling] = useState(false);
+
+  // Polling fallback function
+  const startPolling = useCallback(() => {
+    if (!enabled || !storeId || scope !== 'board') return;
+
+    // Clear existing polling interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+
+    setUsePolling(true);
+    setError(null);
+
+    // Poll every 10 seconds
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        // Trigger queue refetch via onQueueUpdate callback
+        // This assumes the parent component will handle the refetch
+        onMessage?.('polling-active', { timestamp: Date.now() });
+      } catch (e) {
+        console.error('Polling error:', e);
+      }
+    }, 10000);
+  }, [enabled, storeId, scope, onMessage]);
 
   const connect = useCallback(() => {
     if (!enabled || !storeId) return;
@@ -80,7 +106,13 @@ export function useSSE({
           connect();
         }, delay);
       } else {
-        setError('Connection lost. Please refresh the page.');
+        // After max attempts, fall back to polling for board scope
+        if (scope === 'board') {
+          setError('Using polling mode');
+          startPolling();
+        } else {
+          setError('Connection lost. Please refresh the page.');
+        }
       }
     };
 
@@ -130,6 +162,9 @@ export function useSSE({
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
     };
   }, [connect]);
 
@@ -154,5 +189,6 @@ export function useSSE({
     error,
     disconnect,
     reconnect,
+    usePolling,
   };
 }

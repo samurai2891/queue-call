@@ -39,6 +39,9 @@ export const translations = {
     'common.accessKeyRequired': 'アクセスキーが必要です',
     'common.rateLimited': 'アクセスが集中しています。しばらくしてからもう一度お試しください。',
     'connection.offline': 'オフラインです。インターネット接続を確認してください。',
+    'connection.connected': '接続中',
+    'connection.disconnected': '切断',
+    'connection.pollingMode': 'ポーリングモード',
     
     // Store Top
 
@@ -513,6 +516,9 @@ export const translations = {
     'common.accessKeyRequired': 'Access key required',
     'common.rateLimited': 'Too many requests. Please try again later.',
     'connection.offline': 'You are offline. Please check your internet connection.',
+    'connection.connected': 'Connected',
+    'connection.disconnected': 'Disconnected',
+    'connection.pollingMode': 'Polling Mode',
     
     // Store Top
 
@@ -987,6 +993,9 @@ export const translations = {
     'common.accessKeyRequired': '액세스 키가 필요합니다',
     'common.rateLimited': '요청이 너무 많습니다. 잠시 후 다시 시도하세요.',
     'connection.offline': '오프라인입니다. 인터넷 연결을 확인해 주세요.',
+    'connection.connected': '연결됨',
+    'connection.disconnected': '연결 끊김',
+    'connection.pollingMode': '폴링 모드',
     
     // Store Top
 
@@ -1462,6 +1471,9 @@ export const translations = {
     'common.accessKeyRequired': '需要访问密钥',
     'common.rateLimited': '请求过于频繁，请稍后再试。',
     'connection.offline': '您已离线。请检查网络连接。',
+    'connection.connected': '已连接',
+    'connection.disconnected': '已断开',
+    'connection.pollingMode': '轮询模式',
     
     // Store Top
 
@@ -1937,6 +1949,9 @@ export const translations = {
     'common.accessKeyRequired': '需要存取金鑰',
     'common.rateLimited': '請求過於頻繁，請稍後再試。',
     'connection.offline': '您已離線。請檢查網路連接。',
+    'connection.connected': '已連接',
+    'connection.disconnected': '已斷開',
+    'connection.pollingMode': '輪詢模式',
     
     // Store Top
 
