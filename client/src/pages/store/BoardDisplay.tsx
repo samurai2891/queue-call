@@ -12,22 +12,17 @@ function BoardDisplayContent() {
   const params = useParams<{ storeSlug: string }>();
   const [location] = useLocation();
   const { t } = useLocale();
-  const searchParams = new URLSearchParams(location.split('?')[1] ?? '');
-  const accessKey = searchParams.get('key') ?? undefined;
   
   const [currentNumber, setCurrentNumber] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [nextNumbers, setNextNumbers] = useState<number[]>([]);
   const [lastCalledNumber, setLastCalledNumber] = useState<number>(0);
 
-  const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlugWithKey.useQuery(
-    { slug: params.storeSlug || '', key: accessKey, keyType: 'board' },
-    { enabled: !!params.storeSlug && !!accessKey }
+  // ボードはアクセスキー不要
+  const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlugForBoard.useQuery(
+    { slug: params.storeSlug || '' },
+    { enabled: !!params.storeSlug }
   );
-  
-  // Show error if no access key provided
-  const noAccessKey = !accessKey && !!params.storeSlug;
-  const accessDenied = storeError?.data?.code === 'FORBIDDEN';
 
 
   const { data: queueStatus, refetch: refetchQueue } = trpc.store.getQueueStatus.useQuery(
@@ -97,13 +92,11 @@ function BoardDisplayContent() {
     );
   }
 
-  if (noAccessKey || storeError || !store) {
-    const message = (noAccessKey || accessDenied) ? t('common.accessKeyRequired') : t('common.error');
-
+  if (storeError || !store) {
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8">
         <AlertCircle className="h-24 w-24 text-destructive" />
-        <h1 className="text-4xl font-bold">{message}</h1>
+        <h1 className="text-4xl font-bold">{t('common.error')}</h1>
       </div>
     );
   }

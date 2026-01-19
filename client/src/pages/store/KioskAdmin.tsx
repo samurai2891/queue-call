@@ -20,7 +20,8 @@ import {
   CheckCircle,
   AlertCircle,
   Eye,
-  Settings
+  Settings,
+  AlertTriangle
 } from 'lucide-react';
 import {
   Dialog,
@@ -29,7 +30,19 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import type { Locale } from '@/contexts/LocaleContext';
 
 function KioskAdminContent() {
@@ -40,17 +53,39 @@ function KioskAdminContent() {
   
   const [copied, setCopied] = useState(false);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
 
-  const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
+  const utils = trpc.useUtils();
+
+  // getWithKeysを使用してkioskTokenを取得（オーナーのみ）
+  const { data: storePublic, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
     { slug: params.storeSlug || '' },
     { enabled: !!params.storeSlug }
   );
 
+  const { data: storeWithKeys, isLoading: keysLoading } = trpc.store.getWithKeys.useQuery(
+    { storeId: storePublic?.id || 0 },
+    { enabled: !!storePublic?.id && !!user }
+  );
+
+  const regenerateTokenMutation = trpc.store.regenerateKioskToken.useMutation({
+    onSuccess: () => {
+      toast.success(t('admin.tokenRegenerated'));
+      utils.store.getWithKeys.invalidate();
+      setRegenerateDialogOpen(false);
+    },
+    onError: () => {
+      toast.error(t('common.error'));
+    },
+  });
+
+  const kioskToken = storeWithKeys?.kioskToken;
+
   const kioskUrl = useMemo(() => {
-    if (!store) return '';
+    if (!storePublic || !kioskToken) return '';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${baseUrl}/s/${params.storeSlug}/kiosk/display?key=${store.kioskKey || ''}`;
-  }, [store, params.storeSlug]);
+    return `${baseUrl}/s/${params.storeSlug}/kiosk/display?token=${kioskToken}`;
+  }, [storePublic, params.storeSlug, kioskToken]);
 
   const qrCodeUrl = useMemo(() => {
     if (!kioskUrl) return '';
@@ -76,6 +111,12 @@ function KioskAdminContent() {
     navigate('/admin/settings/kiosk');
   };
 
+  const handleRegenerateToken = () => {
+    if (storePublic?.id) {
+      regenerateTokenMutation.mutate({ storeId: storePublic.id });
+    }
+  };
+
   // Loading state
   if (storeLoading || authLoading) {
     return (
@@ -89,7 +130,7 @@ function KioskAdminContent() {
   }
 
   // Error state
-  if (storeError || !store) {
+  if (storeError || !storePublic) {
     return (
       <StoreLayout storeSlug={params.storeSlug || ''}>
         <div className="container py-8 flex flex-col items-center justify-center gap-4">
@@ -104,7 +145,7 @@ function KioskAdminContent() {
   // Auth check
   if (!user) {
     return (
-      <StoreLayout storeSlug={params.storeSlug || ''} storeName={store.name}>
+      <StoreLayout storeSlug={params.storeSlug || ''} storeName={storePublic.name}>
         <div className="container py-8 flex flex-col items-center justify-center gap-4">
           <AlertCircle className="h-16 w-16 text-warning" />
           <h1 className="text-2xl font-bold">{t('settings.loginRequiredTitle')}</h1>
@@ -116,10 +157,11 @@ function KioskAdminContent() {
     );
   }
 
-  const isPaused = store.intakeStatus === 'paused';
+  const isPaused = storePublic.intakeStatus === 'paused';
+  const hasToken = !!kioskToken;
 
   return (
-    <StoreLayout storeSlug={params.storeSlug || ''} storeName={store.name}>
+    <StoreLayout storeSlug={params.storeSlug || ''} storeName={storePublic.name}>
       <div className="container py-8 max-w-4xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -127,7 +169,7 @@ function KioskAdminContent() {
             <Tablet className="h-8 w-8 text-primary" />
             <div>
               <h1 className="text-2xl font-bold">{t('admin.kioskManagement')}</h1>
-              <p className="text-muted-foreground">{store.name}</p>
+              <p className="text-muted-foreground">{storePublic.name}</p>
             </div>
           </div>
           <Badge variant={isPaused ? 'secondary' : 'default'}>
@@ -147,83 +189,128 @@ function KioskAdminContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* URL Display */}
-            <div className="space-y-2">
-              <Label htmlFor="kiosk-url">{t('admin.displayUrl')}</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="kiosk-url"
-                  value={kioskUrl}
-                  readOnly
-                  className="font-mono text-sm"
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleCopyUrl}
-                  aria-label={t('admin.copyUrl')}
-                >
-                  {copied ? (
-                    <CheckCircle className="h-4 w-4 text-success" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Access Key */}
-            <div className="space-y-2">
-              <Label>{t('admin.accessKey')}</Label>
-              <div className="flex items-center gap-2">
-                <code className="px-3 py-2 bg-muted rounded-md font-mono text-sm flex-1">
-                  {store.kioskKey || '-'}
-                </code>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t('admin.accessKeyDesc')}
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3 pt-4 border-t">
-              <Button onClick={handleOpenPreview}>
-                <Eye className="mr-2 h-4 w-4" />
-                {t('admin.preview')}
-              </Button>
-
-              <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <QrCode className="mr-2 h-4 w-4" />
-                    {t('admin.showQrCode')}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>{t('admin.kioskQrCode')}</DialogTitle>
-                    <DialogDescription>
-                      {t('admin.kioskQrCodeDesc')}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="flex flex-col items-center gap-4 py-4">
-                    <img 
-                      src={qrCodeUrl} 
-                      alt="Kiosk QR Code" 
-                      className="w-64 h-64 border rounded-lg"
-                    />
-                    <p className="text-sm text-muted-foreground text-center">
-                      {t('admin.scanToAccess')}
+            {/* Token Status */}
+            {!hasToken ? (
+              <div className="p-4 bg-warning/10 border border-warning/30 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-warning mt-0.5" />
+                  <div>
+                    <p className="font-medium text-warning">{t('admin.noTokenTitle')}</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {t('admin.noTokenDesc')}
                     </p>
+                    <Button 
+                      className="mt-3" 
+                      onClick={handleRegenerateToken}
+                      disabled={regenerateTokenMutation.isPending}
+                    >
+                      {regenerateTokenMutation.isPending ? (
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                      )}
+                      {t('admin.generateToken')}
+                    </Button>
                   </div>
-                </DialogContent>
-              </Dialog>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* URL Display */}
+                <div className="space-y-2">
+                  <Label htmlFor="kiosk-url">{t('admin.displayUrl')}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="kiosk-url"
+                      value={kioskUrl}
+                      readOnly
+                      className="font-mono text-sm"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleCopyUrl}
+                      aria-label={t('admin.copyUrl')}
+                    >
+                      {copied ? (
+                        <CheckCircle className="h-4 w-4 text-success" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
 
-              <Button variant="outline" onClick={handleGoToSettings}>
-                <Settings className="mr-2 h-4 w-4" />
-                {t('admin.kioskSettings')}
-              </Button>
-            </div>
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-3 pt-4 border-t">
+                  <Button onClick={handleOpenPreview}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    {t('admin.preview')}
+                  </Button>
+
+                  <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <QrCode className="mr-2 h-4 w-4" />
+                        {t('admin.showQrCode')}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>{t('admin.kioskQrCode')}</DialogTitle>
+                        <DialogDescription>
+                          {t('admin.kioskQrCodeDesc')}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="flex flex-col items-center gap-4 py-4">
+                        <img 
+                          src={qrCodeUrl} 
+                          alt="Kiosk QR Code" 
+                          className="w-64 h-64 border rounded-lg"
+                        />
+                        <p className="text-sm text-muted-foreground text-center">
+                          {t('admin.scanToAccess')}
+                        </p>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
+                  <AlertDialog open={regenerateDialogOpen} onOpenChange={setRegenerateDialogOpen}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline">
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        {t('admin.regenerateToken')}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t('admin.regenerateTokenTitle')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t('admin.regenerateTokenWarning')}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={handleRegenerateToken}
+                          disabled={regenerateTokenMutation.isPending}
+                        >
+                          {regenerateTokenMutation.isPending ? (
+                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                          ) : null}
+                          {t('admin.regenerateToken')}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  <Button variant="outline" onClick={handleGoToSettings}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    {t('admin.kioskSettings')}
+                  </Button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -245,6 +332,10 @@ function KioskAdminContent() {
               <li className="flex items-start gap-2">
                 <CheckCircle className="h-4 w-4 mt-0.5 text-success shrink-0" />
                 {t('admin.kioskTip3')}
+              </li>
+              <li className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 text-warning shrink-0" />
+                {t('admin.kioskTip4')}
               </li>
             </ul>
           </CardContent>

@@ -15,7 +15,7 @@ function KioskDisplayContent() {
   const params = useParams<{ storeSlug: string }>();
   const [location, navigate] = useLocation();
   const { t, locale, setLocale } = useLocale();
-  const accessKey = new URLSearchParams(location.split('?')[1] ?? '').get('key') ?? undefined;
+  const kioskToken = new URLSearchParams(location.split('?')[1] ?? '').get('token') ?? undefined;
   
   const [state, setState] = useState<KioskState>('language');
 
@@ -23,13 +23,13 @@ function KioskDisplayContent() {
   const [issuedTicket, setIssuedTicket] = useState<{ number: number; token: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlugWithKey.useQuery(
-    { slug: params.storeSlug || '', key: accessKey, keyType: 'kiosk' },
-    { enabled: !!params.storeSlug && !!accessKey }
+  const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlugWithKioskToken.useQuery(
+    { slug: params.storeSlug || '', token: kioskToken || '' },
+    { enabled: !!params.storeSlug && !!kioskToken }
   );
   
-  // Show error if no access key provided
-  const noAccessKey = !accessKey && !!params.storeSlug;
+  // Show error if no token provided
+  const noToken = !kioskToken && !!params.storeSlug;
   const accessDenied = storeError?.data?.code === 'FORBIDDEN';
 
   const createTicketMutation = trpc.ticket.create.useMutation({
@@ -101,8 +101,8 @@ function KioskDisplayContent() {
     );
   }
 
-  if (noAccessKey || storeError || !store) {
-    const message = (noAccessKey || accessDenied) ? t('common.accessKeyRequired') : t('common.error');
+  if (noToken || storeError || !store) {
+    const message = (noToken || accessDenied) ? t('common.accessKeyRequired') : t('common.error');
 
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8">

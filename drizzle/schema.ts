@@ -45,8 +45,10 @@ export const stores = mysqlTable("stores", {
   currentNumber: int("currentNumber").default(0).notNull(),
   dayKey: varchar("dayKey", { length: 10 }), // YYYY-MM-DD形式
   
-  // キオスク・ボード用キー
+  // キオスク用トークン（QR URL用、再生成可能）
   kioskKey: varchar("kioskKey", { length: 64 }),
+  kioskToken: varchar("kioskToken", { length: 64 }),
+  // boardKeyは廃止（ボードはアクセスキー不要）
   boardKey: varchar("boardKey", { length: 64 }),
   
   // 設定JSON

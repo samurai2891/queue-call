@@ -29,6 +29,13 @@
       "when": 1768336817612,
       "tag": "0003_tidy_gertrude_yorkes",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1768834429099,
+      "tag": "0004_rapid_wilson_fisk",
+      "breakpoints": true
     }
   ]
 }

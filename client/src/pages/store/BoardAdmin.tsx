@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { 
@@ -45,10 +44,11 @@ function BoardAdminContent() {
     { enabled: !!params.storeSlug }
   );
 
+  // ボードはアクセスキー不要のシンプルなURL
   const boardUrl = useMemo(() => {
     if (!store) return '';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${baseUrl}/s/${params.storeSlug}/board/display?key=${store.boardKey || ''}`;
+    return `${baseUrl}/s/${params.storeSlug}/board/display`;
   }, [store, params.storeSlug]);
 
   const qrCodeUrl = useMemo(() => {
@@ -164,19 +164,6 @@ function BoardAdminContent() {
                   )}
                 </Button>
               </div>
-            </div>
-
-            {/* Access Key */}
-            <div className="space-y-2">
-              <Label>{t('admin.accessKey')}</Label>
-              <div className="flex items-center gap-2">
-                <code className="px-3 py-2 bg-muted rounded-md font-mono text-sm flex-1">
-                  {store.boardKey || '-'}
-                </code>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t('admin.accessKeyDesc')}
-              </p>
             </div>
 
             {/* Action Buttons */}

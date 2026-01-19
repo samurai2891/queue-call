@@ -172,11 +172,11 @@ const storeRouter = router({
       };
     }),
 
-  getBySlugWithKey: publicProcedure
+  // キオスク表示画面用（トークン必須）
+  getBySlugWithKioskToken: publicProcedure
     .input(z.object({
       slug: z.string(),
-      key: z.string().optional(),
-      keyType: z.enum(['kiosk', 'board']),
+      token: z.string(),
     }))
     .query(async ({ input }) => {
       const store = await db.getStoreBySlug(input.slug);
@@ -184,9 +184,35 @@ const storeRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
       }
 
-      const expectedKey = input.keyType === 'kiosk' ? store.kioskKey : store.boardKey;
-      if (!input.key || !expectedKey || input.key !== expectedKey) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Access key required' });
+      // トークン検証（kioskTokenが設定されている場合のみ）
+      if (!store.kioskToken || input.token !== store.kioskToken) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Invalid or expired kiosk token' });
+      }
+
+      return {
+        id: store.id,
+        slug: store.slug,
+        name: store.name,
+        intakeStatus: store.intakeStatus,
+        defaultLocale: store.defaultLocale,
+        supportedLocales: store.supportedLocales,
+        settings: {
+          menu: store.settings?.menu,
+          kiosk: store.settings?.kiosk,
+          board: store.settings?.board,
+        },
+      };
+    }),
+
+  // ボード表示画面用（アクセスキー不要）
+  getBySlugForBoard: publicProcedure
+    .input(z.object({
+      slug: z.string(),
+    }))
+    .query(async ({ input }) => {
+      const store = await db.getStoreBySlug(input.slug);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
       }
 
       return {
@@ -345,11 +371,10 @@ const storeRouter = router({
       return { success: true };
     }),
 
-  // Regenerate key (protected)
-  regenerateKey: protectedProcedure
+  // キオスクトークン再生成（過去URL無効化）
+  regenerateKioskToken: protectedProcedure
     .input(z.object({
       storeId: z.number(),
-      keyType: z.enum(['kiosk', 'board']),
     }))
     .mutation(async ({ ctx, input }) => {
       const store = await db.getStoreById(input.storeId);
@@ -357,8 +382,8 @@ const storeRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
 
-      const newKey = await db.regenerateStoreKey(input.storeId, input.keyType);
-      return { key: newKey };
+      const newToken = await db.regenerateStoreKey(input.storeId, 'kiosk');
+      return { token: newToken };
     }),
 
   // Get store with keys (protected - owner only)

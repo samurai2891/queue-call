@@ -251,7 +251,9 @@ export async function regenerateStoreKey(id: number, keyType: 'kiosk' | 'board')
   if (!db) throw new Error("Database not available");
 
   const newKey = nanoid(32);
-  const updateData = keyType === 'kiosk' ? { kioskKey: newKey } : { boardKey: newKey };
+  // kioskTokenはキオスクQR URL用のトークン（再生成で過去URL無効化）
+  // boardKeyは廃止（ボードはアクセスキー不要）
+  const updateData = keyType === 'kiosk' ? { kioskToken: newKey } : { boardKey: newKey };
   
   await db.update(stores).set(updateData).where(eq(stores.id, id));
   return newKey;

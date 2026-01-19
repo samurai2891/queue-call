@@ -603,8 +603,10 @@ function SettingsContent() {
     const slug = store.slug;
     return {
       store: `${baseUrl}/s/${slug}`,
-      kiosk: store.kioskKey ? `${baseUrl}/s/${slug}/kiosk?key=${store.kioskKey}` : '',
-      board: store.boardKey ? `${baseUrl}/s/${slug}/board?key=${store.boardKey}` : '',
+      // キオスクはkioskTokenを使用
+      kiosk: store.kioskToken ? `${baseUrl}/s/${slug}/kiosk/display?token=${store.kioskToken}` : '',
+      // ボードはアクセスキー不要
+      board: `${baseUrl}/s/${slug}/board/display`,
       staff: `${baseUrl}/s/${slug}/staff`,
     };
   }, [store]);
@@ -681,7 +683,8 @@ function SettingsContent() {
     },
   });
 
-  const regenerateKeyMutation = trpc.store.regenerateKey.useMutation({
+  // キオスクトークン再生成（ボードはアクセスキー不要のため削除）
+  const regenerateKioskTokenMutation = trpc.store.regenerateKioskToken.useMutation({
     onSuccess: () => {
       toast.success(t('settings.keyRegenerated'));
 
@@ -790,14 +793,15 @@ function SettingsContent() {
     setReorderConfirmOpen(false);
   };
 
-  const requestKeyRegeneration = (keyType: 'kiosk' | 'board') => {
-    setPendingKeyType(keyType);
+  // キオスクトークン再生成のみ（ボードはアクセスキー不要）
+  const requestKioskTokenRegeneration = () => {
+    setPendingKeyType('kiosk');
     setKeyConfirmOpen(true);
   };
 
-  const confirmKeyRegeneration = () => {
-    if (!store || !pendingKeyType) return;
-    regenerateKeyMutation.mutate({ storeId: store.id, keyType: pendingKeyType });
+  const confirmKioskTokenRegeneration = () => {
+    if (!store) return;
+    regenerateKioskTokenMutation.mutate({ storeId: store.id });
   };
 
   const handleKeyDialogChange = (open: boolean) => {
@@ -2298,6 +2302,7 @@ function SettingsContent() {
                         <h3 className="font-medium">{t('settings.kioskBoardUrlsTitle')}</h3>
 
                         <div className="space-y-4">
+                          {/* キオスクURL（トークン再生成可能） */}
                           <div className="space-y-2">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <span className="text-sm font-medium">{t('settings.kioskUrlLabel')}</span>
@@ -2316,7 +2321,7 @@ function SettingsContent() {
                                 <Button
                                   variant="destructive"
                                   size="sm"
-                                  onClick={() => requestKeyRegeneration('kiosk')}
+                                  onClick={requestKioskTokenRegeneration}
                                 >
                                   <RefreshCw className="mr-2 h-4 w-4" />
                                   {t('settings.regenerateKey')}
@@ -2327,6 +2332,7 @@ function SettingsContent() {
                               {storeUrls.kiosk || t('settings.keyNotSet')}
                             </div>
                           </div>
+                          {/* ボードURL（アクセスキー不要のため再生成ボタンなし） */}
                           <div className="space-y-2">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <span className="text-sm font-medium">{t('settings.boardUrlLabel')}</span>
@@ -2336,24 +2342,14 @@ function SettingsContent() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => copyToClipboard(storeUrls.board)}
-                                  disabled={!storeUrls.board}
                                 >
                                   <Copy className="mr-2 h-4 w-4" />
                                   {t('settings.copyUrl')}
                                 </Button>
-
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => requestKeyRegeneration('board')}
-                                >
-                                  <RefreshCw className="mr-2 h-4 w-4" />
-                                  {t('settings.regenerateKey')}
-                                </Button>
                               </div>
                             </div>
                             <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs font-mono break-all">
-                              {storeUrls.board || t('settings.keyNotSet')}
+                              {storeUrls.board}
                             </div>
                           </div>
                         </div>
@@ -2385,14 +2381,13 @@ function SettingsContent() {
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* キオスクトークン再生成確認ダイアログ */}
         <AlertDialog open={keyConfirmOpen} onOpenChange={handleKeyDialogChange}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>
                 {formatMessage('settings.keyRegenerateConfirmTitle', {
-                  target: pendingKeyType === 'board'
-                    ? t('settings.boardKeyLabel')
-                    : t('settings.kioskKeyLabel'),
+                  target: t('settings.kioskKeyLabel'),
                 })}
               </AlertDialogTitle>
               <AlertDialogDescription>
@@ -2402,15 +2397,14 @@ function SettingsContent() {
             <AlertDialogFooter>
               <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
               <AlertDialogAction
-                onClick={confirmKeyRegeneration}
-                disabled={!pendingKeyType || regenerateKeyMutation.isPending}
+                onClick={confirmKioskTokenRegeneration}
+                disabled={regenerateKioskTokenMutation.isPending}
               >
-                {regenerateKeyMutation.isPending
+                {regenerateKioskTokenMutation.isPending
                   ? t('settings.regenerateInProgress')
                   : t('settings.regenerateAction')}
               </AlertDialogAction>
             </AlertDialogFooter>
-
           </AlertDialogContent>
         </AlertDialog>
       </main>
