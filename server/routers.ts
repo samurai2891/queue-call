@@ -153,7 +153,7 @@ const storeRouter = router({
       if (!store) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
       }
-      // Return public info only
+      // Return public info only (kioskKey/boardKey included for admin pages)
       return {
         id: store.id,
         slug: store.slug,
@@ -161,6 +161,8 @@ const storeRouter = router({
         intakeStatus: store.intakeStatus,
         defaultLocale: store.defaultLocale,
         supportedLocales: store.supportedLocales,
+        kioskKey: store.kioskKey,
+        boardKey: store.boardKey,
         settings: {
           queue: store.settings?.queue,
           menu: store.settings?.menu,

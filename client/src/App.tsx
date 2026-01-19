@@ -18,8 +18,15 @@ const Notifications = lazy(() => import("./pages/store/Notifications"));
 const Checkin = lazy(() => import("./pages/store/Checkin"));
 
 const Menu = lazy(() => import("./pages/store/Menu"));
-const Kiosk = lazy(() => import("./pages/store/Kiosk"));
-const Board = lazy(() => import("./pages/store/Board"));
+
+// Kiosk: Admin (management) and Display (customer-facing)
+const KioskAdmin = lazy(() => import("./pages/store/KioskAdmin"));
+const KioskDisplay = lazy(() => import("./pages/store/KioskDisplay"));
+
+// Board: Admin (management) and Display (customer-facing)
+const BoardAdmin = lazy(() => import("./pages/store/BoardAdmin"));
+const BoardDisplay = lazy(() => import("./pages/store/BoardDisplay"));
+
 const Staff = lazy(() => import("./pages/store/Staff"));
 const Settings = lazy(() => import("./pages/admin/Settings"));
 const SmsHistory = lazy(() => import("./pages/admin/SmsHistory"));
@@ -48,9 +55,13 @@ function Router() {
 
         <Route path="/s/:storeSlug/menu" component={Menu} />
         
-        {/* Store Kiosk & Board */}
-        <Route path="/s/:storeSlug/kiosk" component={Kiosk} />
-        <Route path="/s/:storeSlug/board" component={Board} />
+        {/* Kiosk: Admin (management) and Display (customer-facing with access key) */}
+        <Route path="/s/:storeSlug/kiosk" component={KioskAdmin} />
+        <Route path="/s/:storeSlug/kiosk/display" component={KioskDisplay} />
+        
+        {/* Board: Admin (management) and Display (customer-facing with access key) */}
+        <Route path="/s/:storeSlug/board" component={BoardAdmin} />
+        <Route path="/s/:storeSlug/board/display" component={BoardDisplay} />
         
         {/* Store Staff */}
         <Route path="/s/:storeSlug/staff" component={Staff} />

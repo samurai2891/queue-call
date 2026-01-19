@@ -1,4 +1,5 @@
 import { useParams, useLocation } from 'wouter';
+import { StoreLayout } from '@/components/StoreLayout';
 import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
@@ -455,13 +456,14 @@ function StaffContent() {
   const canReorder = reorderEnabled && reorderModeEnabled && reorderMaxMove > 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-background border-b">
-        <div className="container py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold">{store.name}</h1>
-            <Badge variant={role === 'manager' ? 'default' : 'secondary'}>
+    <StoreLayout storeSlug={params.storeSlug || ''} storeName={store.name}>
+      <div className="min-h-screen flex flex-col bg-background">
+        {/* Header */}
+        <header className="sticky top-0 z-10 bg-background border-b">
+          <div className="container py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-semibold">{store.name}</h1>
+              <Badge variant={role === 'manager' ? 'default' : 'secondary'}>
               {role === 'manager' ? t('staff.roleManager') : t('staff.roleStaff')}
             </Badge>
 
@@ -776,7 +778,8 @@ function StaffContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </div>
+    </StoreLayout>
   );
 }
 

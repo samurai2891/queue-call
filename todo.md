@@ -477,3 +477,44 @@
 - `board.mute`, `board.unmute`
 - `connection.offline`
 - `notification.installDesc`
+
+
+---
+
+## M10: ナビゲーション改善（案D + 専用画面分離）
+
+### Phase 1: 共通ナビゲーション基盤の構築
+- [x] 1-1: `StoreNavigation.tsx` 作成（PC用サイドバー + モバイル用ボトムナビ統合）
+- [x] 1-2: サイドバー折り畳み機能（localStorage状態保持、アニメーション）
+- [x] 1-3: ボトムナビ実装（768px以下表示、アイコン+ラベル、現在地ハイライト）
+- [x] 1-4: `StoreLayout.tsx` 作成（ナビ+コンテンツのレイアウトラッパー）
+
+### Phase 2: 既存画面へのナビゲーション適用
+- [x] 2-1: 店舗トップ (`StoreTop.tsx`) - 顧客向け公開ページのためナビなし（荒らし対策）
+- [x] 2-2: スタッフ (`Staff.tsx`) にStoreLayout適用
+- [x] 2-3: キオスク管理画面 (`KioskAdmin.tsx`) 新規作成
+- [x] 2-4: ボード管理画面 (`BoardAdmin.tsx`) 新規作成
+
+### Phase 3: 専用画面分離（キオスク/ボード）
+- [x] 3-1: キオスク表示画面 (`KioskDisplay.tsx`) - 既存をリネーム、ナビなしフルスクリーン
+- [x] 3-2: ボード表示画面 (`BoardDisplay.tsx`) - 既存をリネーム、ナビなしフルスクリーン
+- [x] 3-3: ルーティング更新 (`App.tsx`) - 新URL構造対応
+- [x] 3-4: アクセスキー検証強化 - display画面はキー必須
+
+### Phase 4: 管理者向け機能追加
+- [x] 4-1: URLコピーボタン（来店客用URLをワンクリックコピー）
+- [x] 4-2: QRコード表示（来店客用URLのQRコードモーダル）
+- [x] 4-3: プレビューモード（管理画面内で来店客画面プレビュー）
+
+### Phase 5: 多言語対応・テスト
+- [x] 5-1: 翻訳キー追加（ナビラベル、管理画面テキスト 5言語）
+- [x] 5-2: 動作確認・調整（PC/モバイル全画面遷移テスト）
+
+### 新しいURL構造
+- `/s/:storeSlug` - 店舗トップ（顧客向け）
+- `/s/:storeSlug/staff` - スタッフ画面（ナビ付き）
+- `/s/:storeSlug/kiosk` - キオスク管理画面（ナビ付き）
+- `/s/:storeSlug/kiosk/display?key=xxx` - キオスク表示画面（ナビなし）
+- `/s/:storeSlug/board` - ボード管理画面（ナビ付き）
+- `/s/:storeSlug/board/display?key=xxx` - ボード表示画面（ナビなし）
+
