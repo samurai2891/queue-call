@@ -433,7 +433,7 @@
 |--------|------|------|------|
 | High | 7 | 7 | 0 |
 | Medium | 9 | 9 | 0 |
-| Low | 8 | 1 | 7 |
+| Low | 8 | 8 | 0 |
 
 ### High項目（完了）
 - [x] H-001: viewport pinch-zoom有効化 (`client/index.html`)
@@ -455,15 +455,15 @@
 - [x] M-008: ボードのミュートボタン追加 (`Board.tsx`)
 - [x] M-009: サイドバーのキーボード操作（shadcn/ui標準で対応済み）
 
-### Low項目（未着手）
-- [ ] L-001: フォーカス可視性の強化 (`client/src/index.css`)
-- [ ] L-002: 淡色コントラストの調整 (`client/src/index.css`)
-- [ ] L-003: 基本タイポグラフィの調整
-- [ ] L-004: PWAインストールプロンプトの改善
-- [ ] L-005: オフライン状態の表示改善
-- [ ] L-006: LanguageSwitcherのaria-label追加（対応済み）
+### Low項目（完了）
+- [x] L-001: フォーカス可視性の強化 (`client/src/index.css`) - focus-visibleリングを強化
+- [x] L-002: 淡色コントラストの調整 (`client/src/index.css`) - muted-foregroundのコントラスト改善
+- [x] L-003: 基本タイポグラフィの調整 (`client/src/index.css`) - 行高・文字間隔の最適化
+- [x] L-004: PWAインストールプロンプトの改善 (`Notifications.tsx`) - 説明文追加
+- [x] L-005: オフライン状態の表示改善 (`OfflineIndicator.tsx`, `App.tsx`) - グローバルオフラインバナー追加
+- [x] L-006: LanguageSwitcherのaria-label追加 (`LanguageSwitcher.tsx`) - 全バリアントにaria属性追加
 - [x] L-007: theme-colorメタタグの追加 (`client/index.html`)
-- [ ] L-008: スケルトンローディングの一貫性
+- [x] L-008: スケルトンローディングの一貫性 (`PageSkeleton.tsx`) - 共通コンポーネント作成
 
 ### 追加した翻訳キー
 - `join.decreasePartySize`, `join.increasePartySize`
@@ -475,3 +475,5 @@
 - `smsHistory.loadError`
 - `ticket.completedMessage`, `ticket.canceledMessage`, `ticket.expiredMessage`, `ticket.skippedMessage`, `ticket.backToStore`
 - `board.mute`, `board.unmute`
+- `connection.offline`
+- `notification.installDesc`

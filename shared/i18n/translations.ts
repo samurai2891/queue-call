@@ -38,6 +38,7 @@ export const translations = {
     'common.poweredBy': 'Powered by Queue Call',
     'common.accessKeyRequired': 'アクセスキーが必要です',
     'common.rateLimited': 'アクセスが集中しています。しばらくしてからもう一度お試しください。',
+    'connection.offline': 'オフラインです。インターネット接続を確認してください。',
     
     // Store Top
 
@@ -104,6 +105,7 @@ export const translations = {
     'notification.installTitle': 'ホーム画面に追加してください',
     'notification.installBody': 'iOSではホーム画面に追加した状態でのみ通知を有効にできます。共有メニューから「ホーム画面に追加」を実行してください。',
     'notification.installButton': 'ホーム画面に追加',
+    'notification.installDesc': 'アプリをインストールすると、より快適にご利用いただけます。',
     'notification.called': '順番が来ました！',
 
     'notification.calledBody': 'お客様の番号が呼び出されました。カウンターまでお越しください。',
@@ -460,6 +462,7 @@ export const translations = {
     'common.poweredBy': 'Powered by Queue Call',
     'common.accessKeyRequired': 'Access key required',
     'common.rateLimited': 'Too many requests. Please try again later.',
+    'connection.offline': 'You are offline. Please check your internet connection.',
     
     // Store Top
 
@@ -526,6 +529,7 @@ export const translations = {
     'notification.installTitle': 'Add to Home Screen',
     'notification.installBody': 'On iOS, push notifications work only after adding this site to your home screen. Use the Share menu and tap "Add to Home Screen".',
     'notification.installButton': 'Add to Home Screen',
+    'notification.installDesc': 'Install the app for a better experience.',
     'notification.called': 'Your turn!',
 
     'notification.calledBody': 'Your number has been called. Please come to the counter.',
@@ -882,6 +886,7 @@ export const translations = {
     'common.poweredBy': 'Powered by Queue Call',
     'common.accessKeyRequired': '액세스 키가 필요합니다',
     'common.rateLimited': '요청이 너무 많습니다. 잠시 후 다시 시도하세요.',
+    'connection.offline': '오프라인입니다. 인터넷 연결을 확인해 주세요.',
     
     // Store Top
 
@@ -948,6 +953,7 @@ export const translations = {
     'notification.installTitle': '홈 화면에 추가',
     'notification.installBody': 'iOS에서는 홈 화면에 추가한 뒤에만 알림을 사용할 수 있습니다. 공유 메뉴에서 "홈 화면에 추가"를 선택하세요.',
     'notification.installButton': '홈 화면에 추가',
+    'notification.installDesc': '앱을 설치하면 더 편리하게 이용할 수 있습니다.',
     'notification.called': '차례가 되었습니다!',
 
     'notification.calledBody': '고객님 번호가 호출되었습니다. 카운터로 와주세요.',
@@ -1305,6 +1311,7 @@ export const translations = {
     'common.poweredBy': 'Powered by Queue Call',
     'common.accessKeyRequired': '需要访问密钥',
     'common.rateLimited': '请求过于频繁，请稍后再试。',
+    'connection.offline': '您已离线。请检查网络连接。',
     
     // Store Top
 
@@ -1371,6 +1378,7 @@ export const translations = {
     'notification.installTitle': '添加到主屏幕',
     'notification.installBody': '在 iOS 上，只有添加到主屏幕后才能使用通知。请在共享菜单中选择“添加到主屏幕”。',
     'notification.installButton': '添加到主屏幕',
+    'notification.installDesc': '安装应用程序可以获得更好的体验。',
     'notification.called': '轮到您了！',
 
     'notification.calledBody': '您的号码已被叫到，请到柜台。',
@@ -1728,6 +1736,7 @@ export const translations = {
     'common.poweredBy': 'Powered by Queue Call',
     'common.accessKeyRequired': '需要存取金鑰',
     'common.rateLimited': '請求過於頻繁，請稍後再試。',
+    'connection.offline': '您已離線。請檢查網路連接。',
     
     // Store Top
 
@@ -1794,6 +1803,7 @@ export const translations = {
     'notification.installTitle': '加入主畫面',
     'notification.installBody': '在 iOS 上，必須加入主畫面後才能使用通知。請在分享選單選擇「加入主畫面」。',
     'notification.installButton': '加入主畫面',
+    'notification.installDesc': '安裝應用程式可以獲得更好的體驗。',
     'notification.called': '輪到您了！',
 
     'notification.calledBody': '您的號碼已被叫到，請到櫃檯。',

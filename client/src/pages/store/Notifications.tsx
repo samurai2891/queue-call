@@ -179,11 +179,23 @@ function NotificationsContent() {
               </Button>
             )}
 
+            {/* L-004: PWAインストールプロンプトの改善 */}
             {showInstallButton && (
-              <Button variant="outline" className="w-full" onClick={handleInstall}>
-                <Download className="mr-2 h-4 w-4" />
-                {t('notification.installButton')}
-              </Button>
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-primary/10 p-2">
+                    <Download className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-sm">{t('notification.installTitle')}</h4>
+                    <p className="text-xs text-muted-foreground mt-1">{t('notification.installDesc')}</p>
+                  </div>
+                </div>
+                <Button variant="outline" className="w-full mt-3" onClick={handleInstall}>
+                  <Download className="mr-2 h-4 w-4" />
+                  {t('notification.installButton')}
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>

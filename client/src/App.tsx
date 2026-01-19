@@ -3,7 +3,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { OfflineIndicator } from "./components/OfflineIndicator";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { LocaleProvider } from "./contexts/LocaleContext";
 import Home from "./pages/Home";
 import { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
@@ -72,6 +74,9 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
+          <LocaleProvider>
+            <OfflineIndicator />
+          </LocaleProvider>
           <Router />
         </TooltipProvider>
       </ThemeProvider>

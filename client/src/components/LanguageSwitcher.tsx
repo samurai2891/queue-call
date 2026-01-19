@@ -23,13 +23,15 @@ export function LanguageSwitcher({
 
   if (variant === 'buttons') {
     return (
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap" role="group" aria-label="Language selection">
         {supportedLocales.map((loc) => (
           <Button
             key={loc}
             variant={locale === loc ? 'default' : 'outline'}
             size={size}
             onClick={() => setLocale(loc)}
+            aria-pressed={locale === loc}
+            aria-label={`Switch to ${LOCALE_NAMES[loc]}`}
           >
             {LOCALE_NAMES[loc]}
           </Button>
@@ -40,7 +42,7 @@ export function LanguageSwitcher({
 
   if (variant === 'grid') {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" role="group" aria-label="Language selection">
         {supportedLocales.map((loc) => (
           <Button
             key={loc}
@@ -48,6 +50,8 @@ export function LanguageSwitcher({
             size="lg"
             className="h-16 text-lg"
             onClick={() => setLocale(loc)}
+            aria-pressed={locale === loc}
+            aria-label={`Switch to ${LOCALE_NAMES[loc]}`}
           >
             {LOCALE_NAMES[loc]}
           </Button>
@@ -59,8 +63,12 @@ export function LanguageSwitcher({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size={size}>
-          <Globe className="h-4 w-4" />
+        <Button 
+          variant="ghost" 
+          size={size}
+          aria-label={`Change language. Current: ${LOCALE_NAMES[locale]}`}
+        >
+          <Globe className="h-4 w-4" aria-hidden="true" />
           {showLabel && <span className="ml-2">{LOCALE_NAMES[locale]}</span>}
         </Button>
       </DropdownMenuTrigger>
