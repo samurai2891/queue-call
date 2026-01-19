@@ -1252,7 +1252,7 @@ function SettingsContent() {
 
       <main className="container py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-4 lg:grid-cols-7 gap-2 h-auto p-2">
+          <TabsList className="flex flex-wrap justify-start gap-2 h-auto p-2">
             {tabs.map(tab => (
               <TabsTrigger
                 key={tab.id}
@@ -1314,7 +1314,7 @@ function SettingsContent() {
                         value={formData.defaultLocale}
                         onValueChange={(value) => updateField('defaultLocale', value)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger id="defaultLocale">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

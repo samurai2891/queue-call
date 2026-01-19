@@ -108,6 +108,8 @@ function MenuContent() {
               variant="outline"
               size="sm"
               onClick={() => setPhotoSize(photoSize === 'large' ? 'small' : 'large')}
+              aria-pressed={photoSize === 'large'}
+              aria-label={photoSize === 'large' ? t('menu.photoSizeSmall') : t('menu.photoSizeLarge')}
             >
               {photoSize === 'large' ? (
                 <Minimize2 className="h-4 w-4" />
@@ -121,11 +123,13 @@ function MenuContent() {
         {/* Category Tabs (for list view) */}
         {viewMode === 'list' && categories && categories.length > 0 && (
           <ScrollArea className="w-full">
-            <div className="px-4 pb-3 flex gap-2">
+            <div className="px-4 pb-3 flex gap-2" role="tablist" aria-label={t('menu.categoryFilter')}>
               <Button
                 variant={selectedCategory === null ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setSelectedCategory(null)}
+                role="tab"
+                aria-selected={selectedCategory === null}
               >
                 {t('menu.category.all')}
               </Button>
@@ -135,6 +139,8 @@ function MenuContent() {
                   variant={selectedCategory === category.id ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedCategory(category.id)}
+                  role="tab"
+                  aria-selected={selectedCategory === category.id}
                 >
                   {getField(category, 'name')}
                 </Button>

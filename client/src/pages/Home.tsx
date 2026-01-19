@@ -104,42 +104,58 @@ export default function Home() {
       </section>
 
       {/* My Stores Section (if logged in) */}
-      {isAuthenticated && myStores && myStores.length > 0 && (
+      {isAuthenticated && (
         <section className="container py-8">
           <h2 className="text-2xl font-bold mb-6">あなたの店舗</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {myStores.map((store) => (
-              <Card key={store.id} className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Store className="h-5 w-5" />
-                    {store.name}
-                  </CardTitle>
-                  <CardDescription>/s/{store.slug}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => navigate(`/s/${store.slug}`)}>
-                      店舗トップ
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/s/${store.slug}/staff`)}>
-                      スタッフ
-                    </Button>
-                    {store.kioskKey && (
-                      <Button size="sm" variant="outline" onClick={() => navigate(`/s/${store.slug}/kiosk?key=${store.kioskKey}`)}>
-                        キオスク
+          {storesLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : !myStores || myStores.length === 0 ? (
+            <Card className="bg-muted/30">
+              <CardContent className="py-8 text-center">
+                <Store className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground mb-4">まだ店舗がありません</p>
+                <Button onClick={() => navigate('/admin/settings')}>
+                  店舗を作成する
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {myStores.map((store) => (
+                <Card key={store.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Store className="h-5 w-5" />
+                      {store.name}
+                    </CardTitle>
+                    <CardDescription>/s/{store.slug}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => navigate(`/s/${store.slug}`)}>
+                        店舗トップ
                       </Button>
-                    )}
-                    {store.boardKey && (
-                      <Button size="sm" variant="outline" onClick={() => navigate(`/s/${store.slug}/board?key=${store.boardKey}`)}>
-                        ボード
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/s/${store.slug}/staff`)}>
+                        スタッフ
                       </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                      {store.kioskKey && (
+                        <Button size="sm" variant="outline" onClick={() => navigate(`/s/${store.slug}/kiosk?key=${store.kioskKey}`)}>
+                          キオスク
+                        </Button>
+                      )}
+                      {store.boardKey && (
+                        <Button size="sm" variant="outline" onClick={() => navigate(`/s/${store.slug}/board?key=${store.boardKey}`)}>
+                          ボード
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </section>
       )}
 

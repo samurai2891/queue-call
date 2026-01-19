@@ -422,3 +422,56 @@
 - [x] 設定画面に表示されるURLが実際の店舗スラッグを含んでいる
 - [x] ユーザーがURLを手動で入力する必要がない
 - [x] すべてのナビゲーションリンクが正しく動作する
+
+
+---
+
+## M9: UI/UX品質改善（アクセシビリティ・多言語・レスポンシブ）
+
+### 進捗サマリー
+| 重大度 | 総数 | 完了 | 残り |
+|--------|------|------|------|
+| High | 7 | 7 | 0 |
+| Medium | 9 | 9 | 0 |
+| Low | 8 | 1 | 7 |
+
+### High項目（完了）
+- [x] H-001: viewport pinch-zoom有効化 (`client/index.html`)
+- [x] H-002: SMSチャージモーダルのdialog化 (`Settings.tsx`)
+- [x] H-003: アイコンボタンへのaria-label追加（複数ファイル）
+- [x] H-004: SSE接続状態バナーの追加（4画面）
+- [x] H-005: ホーム画面の多言語対応 (`Home.tsx`)
+- [x] H-006: 404ページの多言語対応 (`NotFound.tsx`)
+- [x] H-007: HTML lang属性の動的設定 (`client/index.html`)
+
+### Medium項目（完了）
+- [x] M-001: 入力フィールドのラベル関連付け (`SmsRegistration.tsx`, `Settings.tsx`)
+- [x] M-002: フォームのインラインエラー表示（既存実装で対応済み）
+- [x] M-003: メニュー画面の選択状態aria属性 (`Menu.tsx`)
+- [x] M-004: 設定画面タブのモバイル対応 (`Settings.tsx`)
+- [x] M-005: SMS履歴のエラー状態UI (`SmsHistory.tsx`)
+- [x] M-006: ホーム画面の店舗セクションにローディング/空状態追加 (`Home.tsx`)
+- [x] M-007: チケット完了/失効時の次アクション追加 (`Ticket.tsx`)
+- [x] M-008: ボードのミュートボタン追加 (`Board.tsx`)
+- [x] M-009: サイドバーのキーボード操作（shadcn/ui標準で対応済み）
+
+### Low項目（未着手）
+- [ ] L-001: フォーカス可視性の強化 (`client/src/index.css`)
+- [ ] L-002: 淡色コントラストの調整 (`client/src/index.css`)
+- [ ] L-003: 基本タイポグラフィの調整
+- [ ] L-004: PWAインストールプロンプトの改善
+- [ ] L-005: オフライン状態の表示改善
+- [ ] L-006: LanguageSwitcherのaria-label追加（対応済み）
+- [x] L-007: theme-colorメタタグの追加 (`client/index.html`)
+- [ ] L-008: スケルトンローディングの一貫性
+
+### 追加した翻訳キー
+- `join.decreasePartySize`, `join.increasePartySize`
+- `menu.photoSizeSmall`, `menu.photoSizeLarge`, `menu.categoryFilter`
+- `settings.menu.moveUp`, `settings.menu.moveDown`
+- `connection.disconnected`, `connection.reconnecting`, `connection.reconnect`, `connection.realtimeUpdatesStopped`, `connection.connectionFailed`
+- `home.*` (30キー以上)
+- `notFound.title`, `notFound.description`, `notFound.goHome`
+- `smsHistory.loadError`
+- `ticket.completedMessage`, `ticket.canceledMessage`, `ticket.expiredMessage`, `ticket.skippedMessage`, `ticket.backToStore`
+- `board.mute`, `board.unmute`

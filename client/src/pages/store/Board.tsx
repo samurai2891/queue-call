@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { useSSE } from '@/hooks/useSSE';
-import { AlertCircle, Volume2 } from 'lucide-react';
+import { AlertCircle, Volume2, VolumeX } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { Locale } from '@/contexts/LocaleContext';
 
 
@@ -15,7 +16,7 @@ function BoardContent() {
   const accessKey = searchParams.get('key') ?? undefined;
   
   const [currentNumber, setCurrentNumber] = useState<number>(0);
-
+  const [isMuted, setIsMuted] = useState<boolean>(false);
   const [nextNumbers, setNextNumbers] = useState<number[]>([]);
   const [lastCalledNumber, setLastCalledNumber] = useState<number>(0);
 
@@ -52,7 +53,9 @@ function BoardContent() {
       
       // Play sound when number changes
       if (newNumber !== lastCalledNumber && newNumber > 0) {
-        playCallSound();
+        if (!isMuted) {
+          playCallSound();
+        }
         setLastCalledNumber(newNumber);
       }
       
@@ -112,8 +115,22 @@ function BoardContent() {
   return (
     <div className="kiosk-mode flex flex-col bg-gradient-to-b from-primary/5 to-background">
       {/* Header */}
-      <header className="p-6 text-center border-b">
+      <header className="p-6 border-b flex items-center justify-between">
+        <div className="w-16" /> {/* Spacer for centering */}
         <h1 className="text-4xl font-bold">{store.name}</h1>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-12 w-12"
+          onClick={() => setIsMuted(!isMuted)}
+          aria-label={isMuted ? t('board.unmute') : t('board.mute')}
+        >
+          {isMuted ? (
+            <VolumeX className="h-6 w-6 text-muted-foreground" />
+          ) : (
+            <Volume2 className="h-6 w-6" />
+          )}
+        </Button>
       </header>
 
       {/* Main Content */}

@@ -79,6 +79,11 @@ export const translations = {
     'ticket.cancelButton': 'キャンセルする',
     'ticket.checkinButton': '到着を報告',
     'ticket.checkinDeadline': 'までにお越しください',
+    'ticket.completedMessage': 'ご来店ありがとうございました',
+    'ticket.canceledMessage': 'この整理券はキャンセルされました',
+    'ticket.expiredMessage': 'この整理券は有効期限が切れました',
+    'ticket.skippedMessage': 'この整理券はスキップされました',
+    'ticket.backToStore': '店舗トップに戻る',
     
     // Notifications
     'notification.title': '通知設定',
@@ -122,6 +127,9 @@ export const translations = {
 'menu.price': '円',
     'menu.noItems': 'メニューがありません',
     'menu.translationNotice': '翻訳が必要な場合はブラウザ翻訳をご利用ください。',
+    'menu.photoSizeSmall': '小さい写真表示',
+    'menu.photoSizeLarge': '大きい写真表示',
+    'menu.categoryFilter': 'カテゴリフィルター',
     
     // Kiosk
 
@@ -147,6 +155,8 @@ export const translations = {
     'board.nowCalling': '現在呼び出し中',
     'board.next': '次の番号',
     'board.noQueue': '現在待ちはありません',
+    'board.mute': '音をミュート',
+    'board.unmute': '音をオン',
     
     // Staff
     'staff.title': 'スタッフ画面',
@@ -372,6 +382,7 @@ export const translations = {
     'smsHistory.logsTitle': '送信履歴',
     'smsHistory.logsDescription': '{total}件中 {start} - {end}件を表示',
     'smsHistory.logsEmpty': '送信履歴がありません',
+    'smsHistory.loadError': '履歴の読み込みに失敗しました',
     'smsHistory.tableDate': '日時',
     'smsHistory.tableRecipient': '宛先',
     'smsHistory.tableType': 'タイプ',
@@ -490,6 +501,11 @@ export const translations = {
     'ticket.cancelButton': 'Cancel Queue',
     'ticket.checkinButton': 'Check In',
     'ticket.checkinDeadline': 'Please arrive by',
+    'ticket.completedMessage': 'Thank you for visiting',
+    'ticket.canceledMessage': 'This ticket has been canceled',
+    'ticket.expiredMessage': 'This ticket has expired',
+    'ticket.skippedMessage': 'This ticket has been skipped',
+    'ticket.backToStore': 'Back to Store',
     
     // Notifications
     'notification.title': 'Notifications',
@@ -533,6 +549,9 @@ export const translations = {
     'menu.price': '',
     'menu.noItems': 'No menu items',
     'menu.translationNotice': 'Use browser translation if you need a translated menu.',
+    'menu.photoSizeSmall': 'Small photo view',
+    'menu.photoSizeLarge': 'Large photo view',
+    'menu.categoryFilter': 'Category filter',
     
     // Kiosk
 
@@ -558,6 +577,8 @@ export const translations = {
     'board.nowCalling': 'Now Calling',
     'board.next': 'Next',
     'board.noQueue': 'No one waiting',
+    'board.mute': 'Mute sound',
+    'board.unmute': 'Unmute sound',
     
     // Staff
     'staff.title': 'Staff Panel',
@@ -783,6 +804,7 @@ export const translations = {
     'smsHistory.logsTitle': 'Send logs',
     'smsHistory.logsDescription': 'Showing {start} - {end} of {total}',
     'smsHistory.logsEmpty': 'No SMS logs',
+    'smsHistory.loadError': 'Failed to load history',
     'smsHistory.tableDate': 'Date',
     'smsHistory.tableRecipient': 'Recipient',
     'smsHistory.tableType': 'Type',
@@ -901,6 +923,11 @@ export const translations = {
     'ticket.cancelButton': '취소하기',
     'ticket.checkinButton': '도착 알림',
     'ticket.checkinDeadline': '까지 도착해 주세요',
+    'ticket.completedMessage': '방문해 주셔서 감사합니다',
+    'ticket.canceledMessage': '이 번호표는 취소되었습니다',
+    'ticket.expiredMessage': '이 번호표는 만료되었습니다',
+    'ticket.skippedMessage': '이 번호표는 건너뛰어졌습니다',
+    'ticket.backToStore': '매장으로 돌아가기',
     
     // Notifications
     'notification.title': '알림 설정',
@@ -944,6 +971,9 @@ export const translations = {
     'menu.price': '원',
     'menu.noItems': '메뉴가 없습니다',
     'menu.translationNotice': '번역이 필요하면 브라우저 번역을 이용하세요.',
+    'menu.photoSizeSmall': '작은 사진 보기',
+    'menu.photoSizeLarge': '큰 사진 보기',
+    'menu.categoryFilter': '카테고리 필터',
     
     // Kiosk
 
@@ -970,6 +1000,8 @@ export const translations = {
     'board.nowCalling': '현재 호출 중',
     'board.next': '다음 번호',
     'board.noQueue': '대기 중인 분이 없습니다',
+    'board.mute': '소리 끄기',
+    'board.unmute': '소리 켜기',
     
     // Staff
     'staff.title': '직원 화면',
@@ -1195,6 +1227,7 @@ export const translations = {
     'smsHistory.logsTitle': '발송 내역',
     'smsHistory.logsDescription': '{total}건 중 {start} - {end}건 표시',
     'smsHistory.logsEmpty': '발송 내역이 없습니다',
+    'smsHistory.loadError': '내역 로드에 실패했습니다',
     'smsHistory.tableDate': '일시',
     'smsHistory.tableRecipient': '수신처',
     'smsHistory.tableType': '유형',
@@ -1313,6 +1346,11 @@ export const translations = {
     'ticket.cancelButton': '取消排队',
     'ticket.checkinButton': '报到',
     'ticket.checkinDeadline': '请在此之前到达',
+    'ticket.completedMessage': '感谢您的光临',
+    'ticket.canceledMessage': '此号码已取消',
+    'ticket.expiredMessage': '此号码已过期',
+    'ticket.skippedMessage': '此号码已跳过',
+    'ticket.backToStore': '返回店铺',
     
     // Notifications
     'notification.title': '通知设置',
@@ -1356,6 +1394,9 @@ export const translations = {
     'menu.price': '元',
     'menu.noItems': '暂无菜单',
     'menu.translationNotice': '需要翻译时请使用浏览器翻译。',
+    'menu.photoSizeSmall': '小图模式',
+    'menu.photoSizeLarge': '大图模式',
+    'menu.categoryFilter': '分类筛选',
     
     // Kiosk
 
@@ -1382,6 +1423,8 @@ export const translations = {
     'board.nowCalling': '当前叫号',
     'board.next': '下一位',
     'board.noQueue': '暂无等待',
+    'board.mute': '静音',
+    'board.unmute': '取消静音',
     
     // Staff
     'staff.title': '员工界面',
@@ -1607,6 +1650,7 @@ export const translations = {
     'smsHistory.logsTitle': '发送记录',
     'smsHistory.logsDescription': '显示 {start} - {end} / 共 {total} 条',
     'smsHistory.logsEmpty': '没有发送记录',
+    'smsHistory.loadError': '加载记录失败',
     'smsHistory.tableDate': '时间',
     'smsHistory.tableRecipient': '收件人',
     'smsHistory.tableType': '类型',
@@ -1725,6 +1769,11 @@ export const translations = {
     'ticket.cancelButton': '取消排隊',
     'ticket.checkinButton': '報到',
     'ticket.checkinDeadline': '請在此之前到達',
+    'ticket.completedMessage': '感謝您的光臨',
+    'ticket.canceledMessage': '此號碼已取消',
+    'ticket.expiredMessage': '此號碼已過期',
+    'ticket.skippedMessage': '此號碼已跳過',
+    'ticket.backToStore': '返回店鋪',
     
     // Notifications
     'notification.title': '通知設定',
@@ -1768,6 +1817,9 @@ export const translations = {
     'menu.price': '元',
     'menu.noItems': '暫無菜單',
     'menu.translationNotice': '需要翻譯時請使用瀏覽器翻譯。',
+    'menu.photoSizeSmall': '小圖模式',
+    'menu.photoSizeLarge': '大圖模式',
+    'menu.categoryFilter': '分類篩選',
     
     // Kiosk
 
@@ -1794,6 +1846,8 @@ export const translations = {
     'board.nowCalling': '目前叫號',
     'board.next': '下一位',
     'board.noQueue': '暫無等待',
+    'board.mute': '靜音',
+    'board.unmute': '取消靜音',
     
     // Staff
     'staff.title': '員工介面',
@@ -2019,6 +2073,7 @@ export const translations = {
     'smsHistory.logsTitle': '發送記錄',
     'smsHistory.logsDescription': '顯示 {start} - {end} / 共 {total} 則',
     'smsHistory.logsEmpty': '沒有發送記錄',
+    'smsHistory.loadError': '讀取記錄失敗',
     'smsHistory.tableDate': '時間',
     'smsHistory.tableRecipient': '收件人',
     'smsHistory.tableType': '類型',

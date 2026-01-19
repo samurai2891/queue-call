@@ -110,7 +110,7 @@ function SmsHistoryContent() {
   );
 
   // Get SMS logs
-  const { data: logsData, isLoading: logsLoading, refetch: refetchLogs } = trpc.smsLogs.getLogs.useQuery(
+  const { data: logsData, isLoading: logsLoading, error: logsError, refetch: refetchLogs } = trpc.smsLogs.getLogs.useQuery(
     {
       storeId: store?.id!,
       limit: PAGE_SIZE,
@@ -397,6 +397,16 @@ function SmsHistoryContent() {
                 {[...Array(5)].map((_, i) => (
                   <Skeleton key={i} className="h-16 w-full" />
                 ))}
+              </div>
+            ) : logsError ? (
+              <div className="text-center py-12">
+                <XCircle className="h-12 w-12 mx-auto mb-4 text-destructive opacity-70" />
+                <p className="text-destructive font-medium mb-2">{t('smsHistory.loadError')}</p>
+                <p className="text-sm text-muted-foreground mb-4">{logsError.message}</p>
+                <Button variant="outline" onClick={() => refetchLogs()}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {t('common.retry')}
+                </Button>
               </div>
             ) : logsData?.logs.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">

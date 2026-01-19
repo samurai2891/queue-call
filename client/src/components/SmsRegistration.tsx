@@ -269,10 +269,10 @@ export function SmsRegistration({ ticketId }: SmsRegistrationProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>{t('sms.phoneNumber')}</Label>
+            <Label htmlFor="phone-number">{t('sms.phoneNumber')}</Label>
             <div className="flex gap-2">
               <Select value={countryCode} onValueChange={setCountryCode}>
-                <SelectTrigger className="w-[120px]">
+                <SelectTrigger className="w-[120px]" aria-label={t('sms.phoneNumber')}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -284,6 +284,7 @@ export function SmsRegistration({ ticketId }: SmsRegistrationProps) {
                 </SelectContent>
               </Select>
               <Input
+                id="phone-number"
                 type="tel"
                 inputMode="numeric"
                 placeholder={countryCode === '+81' ? '090-1234-5678' : '123-456-7890'}

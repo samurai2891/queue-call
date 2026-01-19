@@ -218,6 +218,21 @@ function TicketContent() {
               {ticket.note && <p className="italic">"{ticket.note}"</p>}
             </div>
 
+            {/* Completed/Expired Message */}
+            {!isActive && (
+              <div className="text-center space-y-4">
+                <p className="text-muted-foreground">
+                  {status === 'DONE' ? t('ticket.completedMessage') : 
+                   status === 'CANCELED' ? t('ticket.canceledMessage') :
+                   status === 'EXPIRED' ? t('ticket.expiredMessage') :
+                   status === 'SKIPPED' ? t('ticket.skippedMessage') : ''}
+                </p>
+                <Button onClick={() => navigate(`/s/${params.storeSlug}`)}>
+                  {t('ticket.backToStore')}
+                </Button>
+              </div>
+            )}
+
             {/* Actions */}
             {isActive && (
               <div className="space-y-3">
