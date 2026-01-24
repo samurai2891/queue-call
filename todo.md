@@ -37,3 +37,35 @@
 - **フォールバックポーリング**: SSE接続失敗後に10秒間隔で自動ポーリング
 - **接続状態インジケーター**: フッターに表示（緑=接続中、赤=切断、黄=ポーリングモード）
 - **対応画面**: Board.tsx, BoardDisplay.tsx
+
+
+---
+
+## M13: キオスクアクセスキー完全削除
+
+### 背景・目的
+- キオスクのアクセスキー（トークン）がエラーの原因になるため完全削除
+- ボードと同様にシンプルなURL `/s/:storeSlug/kiosk/display` でアクセス可能に
+
+### Phase 1: サーバー側API更新
+- [x] 1-1: getBySlugWithKioskTokenをgetBySlugForKioskに変更（トークン検証削除）
+- [x] 1-2: regenerateKioskToken APIを削除
+- [x] 1-3: getWithKeysからkioskToken関連を削除
+
+### Phase 2: キオスク表示画面更新
+- [x] 2-1: Kiosk.tsxからトークン関連コードを削除
+- [x] 2-2: KioskDisplay.tsxからトークン関連コードを削除
+- [x] 2-3: URLパラメータ不要に変更
+
+### Phase 3: キオスク管理画面更新
+- [x] 3-1: KioskAdmin.tsxからトークン再生成UI削除
+- [x] 3-2: シンプルなURL表示に変更
+- [x] 3-3: Settings.tsxのキオスク関連を更新
+
+### Phase 4: テスト・完了
+- [x] 4-1: 動作確認（59件のテスト全パス）
+- [x] 4-2: チェックポイント保存
+
+### 新しいURL構造
+- キオスク: `/s/:storeSlug/kiosk/display`（アクセスキー不要）
+- ボード: `/s/:storeSlug/board/display`（アクセスキー不要）

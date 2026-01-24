@@ -16,12 +16,10 @@ import {
   Copy, 
   ExternalLink, 
   QrCode, 
-  RefreshCw,
   CheckCircle,
   AlertCircle,
   Eye,
-  Settings,
-  AlertTriangle
+  Settings
 } from 'lucide-react';
 import {
   Dialog,
@@ -30,19 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import type { Locale } from '@/contexts/LocaleContext';
 
 function KioskAdminContent() {
@@ -53,39 +39,18 @@ function KioskAdminContent() {
   
   const [copied, setCopied] = useState(false);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
-  const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
 
-  const utils = trpc.useUtils();
-
-  // getWithKeysを使用してkioskTokenを取得（オーナーのみ）
   const { data: storePublic, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
     { slug: params.storeSlug || '' },
     { enabled: !!params.storeSlug }
   );
 
-  const { data: storeWithKeys, isLoading: keysLoading } = trpc.store.getWithKeys.useQuery(
-    { storeId: storePublic?.id || 0 },
-    { enabled: !!storePublic?.id && !!user }
-  );
-
-  const regenerateTokenMutation = trpc.store.regenerateKioskToken.useMutation({
-    onSuccess: () => {
-      toast.success(t('admin.tokenRegenerated'));
-      utils.store.getWithKeys.invalidate();
-      setRegenerateDialogOpen(false);
-    },
-    onError: () => {
-      toast.error(t('common.error'));
-    },
-  });
-
-  const kioskToken = storeWithKeys?.kioskToken;
-
+  // シンプルなURL（トークン不要）
   const kioskUrl = useMemo(() => {
-    if (!storePublic || !kioskToken) return '';
+    if (!storePublic) return '';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${baseUrl}/s/${params.storeSlug}/kiosk/display?token=${kioskToken}`;
-  }, [storePublic, params.storeSlug, kioskToken]);
+    return `${baseUrl}/s/${params.storeSlug}/kiosk/display`;
+  }, [storePublic, params.storeSlug]);
 
   const qrCodeUrl = useMemo(() => {
     if (!kioskUrl) return '';
@@ -109,12 +74,6 @@ function KioskAdminContent() {
 
   const handleGoToSettings = () => {
     navigate('/admin/settings/kiosk');
-  };
-
-  const handleRegenerateToken = () => {
-    if (storePublic?.id) {
-      regenerateTokenMutation.mutate({ storeId: storePublic.id });
-    }
   };
 
   // Loading state
@@ -158,7 +117,6 @@ function KioskAdminContent() {
   }
 
   const isPaused = storePublic.intakeStatus === 'paused';
-  const hasToken = !!kioskToken;
 
   return (
     <StoreLayout storeSlug={params.storeSlug || ''} storeName={storePublic.name}>
@@ -189,128 +147,70 @@ function KioskAdminContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Token Status */}
-            {!hasToken ? (
-              <div className="p-4 bg-warning/10 border border-warning/30 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-warning mt-0.5" />
-                  <div>
-                    <p className="font-medium text-warning">{t('admin.noTokenTitle')}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {t('admin.noTokenDesc')}
-                    </p>
-                    <Button 
-                      className="mt-3" 
-                      onClick={handleRegenerateToken}
-                      disabled={regenerateTokenMutation.isPending}
-                    >
-                      {regenerateTokenMutation.isPending ? (
-                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                      )}
-                      {t('admin.generateToken')}
-                    </Button>
-                  </div>
-                </div>
+            {/* URL Display */}
+            <div className="space-y-2">
+              <Label htmlFor="kiosk-url">{t('admin.displayUrl')}</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="kiosk-url"
+                  value={kioskUrl}
+                  readOnly
+                  className="font-mono text-sm"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleCopyUrl}
+                  aria-label={t('admin.copyUrl')}
+                >
+                  {copied ? (
+                    <CheckCircle className="h-4 w-4 text-success" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
-            ) : (
-              <>
-                {/* URL Display */}
-                <div className="space-y-2">
-                  <Label htmlFor="kiosk-url">{t('admin.displayUrl')}</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="kiosk-url"
-                      value={kioskUrl}
-                      readOnly
-                      className="font-mono text-sm"
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-3 pt-4 border-t">
+              <Button onClick={handleOpenPreview}>
+                <Eye className="mr-2 h-4 w-4" />
+                {t('admin.preview')}
+              </Button>
+
+              <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <QrCode className="mr-2 h-4 w-4" />
+                    {t('admin.showQrCode')}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>{t('admin.kioskQrCode')}</DialogTitle>
+                    <DialogDescription>
+                      {t('admin.kioskQrCodeDesc')}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex flex-col items-center gap-4 py-4">
+                    <img 
+                      src={qrCodeUrl} 
+                      alt="Kiosk QR Code" 
+                      className="w-64 h-64 border rounded-lg"
                     />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleCopyUrl}
-                      aria-label={t('admin.copyUrl')}
-                    >
-                      {copied ? (
-                        <CheckCircle className="h-4 w-4 text-success" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
+                    <p className="text-sm text-muted-foreground text-center">
+                      {t('admin.scanToAccess')}
+                    </p>
                   </div>
-                </div>
+                </DialogContent>
+              </Dialog>
 
-                {/* Action Buttons */}
-                <div className="flex flex-wrap gap-3 pt-4 border-t">
-                  <Button onClick={handleOpenPreview}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    {t('admin.preview')}
-                  </Button>
-
-                  <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline">
-                        <QrCode className="mr-2 h-4 w-4" />
-                        {t('admin.showQrCode')}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>{t('admin.kioskQrCode')}</DialogTitle>
-                        <DialogDescription>
-                          {t('admin.kioskQrCodeDesc')}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="flex flex-col items-center gap-4 py-4">
-                        <img 
-                          src={qrCodeUrl} 
-                          alt="Kiosk QR Code" 
-                          className="w-64 h-64 border rounded-lg"
-                        />
-                        <p className="text-sm text-muted-foreground text-center">
-                          {t('admin.scanToAccess')}
-                        </p>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-
-                  <AlertDialog open={regenerateDialogOpen} onOpenChange={setRegenerateDialogOpen}>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline">
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        {t('admin.regenerateToken')}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>{t('admin.regenerateTokenTitle')}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {t('admin.regenerateTokenWarning')}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                        <AlertDialogAction 
-                          onClick={handleRegenerateToken}
-                          disabled={regenerateTokenMutation.isPending}
-                        >
-                          {regenerateTokenMutation.isPending ? (
-                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                          ) : null}
-                          {t('admin.regenerateToken')}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-
-                  <Button variant="outline" onClick={handleGoToSettings}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    {t('admin.kioskSettings')}
-                  </Button>
-                </div>
-              </>
-            )}
+              <Button variant="outline" onClick={handleGoToSettings}>
+                <Settings className="mr-2 h-4 w-4" />
+                {t('admin.kioskSettings')}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -332,10 +232,6 @@ function KioskAdminContent() {
               <li className="flex items-start gap-2">
                 <CheckCircle className="h-4 w-4 mt-0.5 text-success shrink-0" />
                 {t('admin.kioskTip3')}
-              </li>
-              <li className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 mt-0.5 text-warning shrink-0" />
-                {t('admin.kioskTip4')}
               </li>
             </ul>
           </CardContent>

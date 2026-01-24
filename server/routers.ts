@@ -172,21 +172,15 @@ const storeRouter = router({
       };
     }),
 
-  // キオスク表示画面用（トークン必須）
-  getBySlugWithKioskToken: publicProcedure
+  // キオスク表示画面用（アクセスキー不要）
+  getBySlugForKiosk: publicProcedure
     .input(z.object({
       slug: z.string(),
-      token: z.string(),
     }))
     .query(async ({ input }) => {
       const store = await db.getStoreBySlug(input.slug);
       if (!store) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
-      }
-
-      // トークン検証（kioskTokenが設定されている場合のみ）
-      if (!store.kioskToken || input.token !== store.kioskToken) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Invalid or expired kiosk token' });
       }
 
       return {
@@ -369,21 +363,6 @@ const storeRouter = router({
 
       await db.updateStore(input.storeId, updateData);
       return { success: true };
-    }),
-
-  // キオスクトークン再生成（過去URL無効化）
-  regenerateKioskToken: protectedProcedure
-    .input(z.object({
-      storeId: z.number(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const store = await db.getStoreById(input.storeId);
-      if (!store || store.ownerId !== ctx.user.id) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
-      }
-
-      const newToken = await db.regenerateStoreKey(input.storeId, 'kiosk');
-      return { token: newToken };
     }),
 
   // Get store with keys (protected - owner only)
