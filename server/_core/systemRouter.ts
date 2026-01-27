@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { notifyOwner } from "./notification";
 import { adminProcedure, publicProcedure, router } from "./trpc";
+import { generateVapidKeys, getVapidStatus, getVapidPublicKey } from "../vapid";
 
 export const systemRouter = router({
   health: publicProcedure
@@ -25,5 +26,34 @@ export const systemRouter = router({
       return {
         success: delivered,
       } as const;
+    }),
+
+  // Get VAPID configuration status
+  getVapidStatus: adminProcedure
+    .query(() => {
+      return getVapidStatus();
+    }),
+
+  // Generate new VAPID keys
+  generateVapidKeys: adminProcedure
+    .mutation(() => {
+      const keys = generateVapidKeys();
+      return {
+        success: true,
+        keys,
+        instructions: {
+          VAPID_PUBLIC_KEY: keys.publicKey,
+          VAPID_PRIVATE_KEY: keys.privateKey,
+          VITE_VAPID_PUBLIC_KEY: keys.publicKey,
+        },
+      };
+    }),
+
+  // Get public VAPID key for frontend
+  getVapidPublicKey: publicProcedure
+    .query(() => {
+      return {
+        publicKey: getVapidPublicKey(),
+      };
     }),
 });

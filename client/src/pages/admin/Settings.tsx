@@ -54,6 +54,7 @@ import {
 import { toast } from 'sonner';
 import { getLoginUrl } from '@/const';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
+import { VapidSettings } from '@/components/VapidSettings';
 
 const LOCALE_OPTIONS = [
   { value: 'ja', label: '日本語' },
@@ -2617,6 +2618,11 @@ function SettingsContent() {
 
               </CardContent>
             </Card>
+
+            {/* VAPID Settings for Push Notifications */}
+            <div className="mt-6">
+              <VapidSettings t={t} />
+            </div>
           </TabsContent>
         </Tabs>
 
