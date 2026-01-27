@@ -69,3 +69,15 @@
 ### 新しいURL構造
 - キオスク: `/s/:storeSlug/kiosk/display`（アクセスキー不要）
 - ボード: `/s/:storeSlug/board/display`（アクセスキー不要）
+
+
+---
+
+## M14: Twilio SMS通知機能有効化
+
+### 完了項目
+- [x] Twilio環境変数の設定（TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER）
+- [x] 認証情報検証テストの作成と実行
+- [x] アカウント検証: My first Twilio account (active)
+- [x] 電話番号検証: (830) 359-4419 (SMS capable: Yes)
+- [x] 全61件のテストがパス
