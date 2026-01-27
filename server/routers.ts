@@ -1608,13 +1608,49 @@ const smsLogsRouter = router({
         return `"${textValue.replace(/"/g, '""')}"`;
       };
 
-      const headerRow = ['Date', 'Recipient', 'Type', 'Message', 'Status', 'Credits', 'TicketId'];
+      // Japanese headers for better readability in Excel
+      const headerRow = [
+        '送信日時',
+        '宛先電話番号',
+        'メッセージ種別',
+        'メッセージ内容',
+        'ステータス',
+        '消費クレジット(円)',
+        'チケットID',
+      ];
+
+      const statusLabels: Record<string, string> = {
+        pending: '送信中',
+        sent: '送信済み',
+        delivered: '配信完了',
+        failed: '失敗',
+      };
+
+      const typeLabels: Record<string, string> = {
+        call: '呼び出し',
+        recall: '再呼び出し',
+        reminder: 'リマインダー',
+        custom: 'カスタム',
+      };
+
+      const formatDateTime = (date: Date) => {
+        const d = new Date(date);
+        return d.toLocaleString('ja-JP', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        });
+      };
+
       const dataRows = logs.map((log) => [
-        new Date(log.createdAt).toISOString(),
+        formatDateTime(log.createdAt),
         log.phoneE164,
-        log.messageType,
+        typeLabels[log.messageType] || log.messageType,
         log.messageContent,
-        log.status,
+        statusLabels[log.status] || log.status,
         log.creditConsumed,
         log.ticketId ?? '',
       ]);
