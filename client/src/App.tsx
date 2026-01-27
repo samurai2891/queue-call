@@ -30,6 +30,7 @@ const BoardDisplay = lazy(() => import("./pages/store/BoardDisplay"));
 const Staff = lazy(() => import("./pages/store/Staff"));
 const Settings = lazy(() => import("./pages/admin/Settings"));
 const SmsHistory = lazy(() => import("./pages/admin/SmsHistory"));
+const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
 
 function LoadingFallback() {
   return (
@@ -70,6 +71,7 @@ function Router() {
         <Route path="/admin/settings" component={Settings} />
         <Route path="/admin/settings/:section" component={Settings} />
         <Route path="/admin/sms-history" component={SmsHistory} />
+        <Route path="/admin/dashboard" component={Dashboard} />
         
         {/* 404 */}
         <Route path="/404" component={NotFound} />

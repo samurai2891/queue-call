@@ -1023,3 +1023,160 @@ export async function getSmsLogStats(storeId: number, days: number = 30) {
 
   return { totalSent, totalFailed, totalCredits };
 }
+
+
+// ==================== Statistics Functions ====================
+
+/**
+ * 日別来店数を取得（過去N日間）
+ */
+export async function getDailyVisitorStats(storeId: number, days: number = 30) {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+
+  const result = await db.select({
+    date: tickets.dayKey,
+    total: sql<number>`count(*)`,
+    waiting: sql<number>`sum(case when ${tickets.status} = 'WAITING' then 1 else 0 end)`,
+    called: sql<number>`sum(case when ${tickets.status} = 'CALLED' then 1 else 0 end)`,
+    arrived: sql<number>`sum(case when ${tickets.status} = 'ARRIVED' then 1 else 0 end)`,
+    done: sql<number>`sum(case when ${tickets.status} = 'DONE' then 1 else 0 end)`,
+    skipped: sql<number>`sum(case when ${tickets.status} = 'SKIPPED' then 1 else 0 end)`,
+    canceled: sql<number>`sum(case when ${tickets.status} = 'CANCELED' then 1 else 0 end)`,
+  })
+    .from(tickets)
+    .where(and(
+      eq(tickets.storeId, storeId),
+      sql`${tickets.createdAt} >= ${startDate}`
+    ))
+    .groupBy(tickets.dayKey)
+    .orderBy(asc(tickets.dayKey));
+
+  return result;
+}
+
+/**
+ * 日別平均待ち時間を取得（過去N日間）
+ * 待ち時間 = calledAt - createdAt（呼び出しまでの時間）
+ */
+export async function getDailyWaitTimeStats(storeId: number, days: number = 30) {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+
+  // calledAtがnullでないチケットのみ対象
+  const result = await db.select({
+    date: tickets.dayKey,
+    avgWaitMinutes: sql<number>`avg(timestampdiff(minute, ${tickets.createdAt}, ${tickets.calledAt}))`,
+    minWaitMinutes: sql<number>`min(timestampdiff(minute, ${tickets.createdAt}, ${tickets.calledAt}))`,
+    maxWaitMinutes: sql<number>`max(timestampdiff(minute, ${tickets.createdAt}, ${tickets.calledAt}))`,
+    count: sql<number>`count(*)`,
+  })
+    .from(tickets)
+    .where(and(
+      eq(tickets.storeId, storeId),
+      sql`${tickets.createdAt} >= ${startDate}`,
+      sql`${tickets.calledAt} is not null`
+    ))
+    .groupBy(tickets.dayKey)
+    .orderBy(asc(tickets.dayKey));
+
+  return result;
+}
+
+/**
+ * 時間帯別来店数を取得（ピーク時間帯分析用）
+ */
+export async function getHourlyStats(storeId: number, days: number = 30) {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+
+  const result = await db.select({
+    hour: sql<number>`hour(${tickets.createdAt})`,
+    count: sql<number>`count(*)`,
+    avgWaitMinutes: sql<number>`avg(timestampdiff(minute, ${tickets.createdAt}, ${tickets.calledAt}))`,
+  })
+    .from(tickets)
+    .where(and(
+      eq(tickets.storeId, storeId),
+      sql`${tickets.createdAt} >= ${startDate}`
+    ))
+    .groupBy(sql`hour(${tickets.createdAt})`)
+    .orderBy(sql`hour(${tickets.createdAt})`);
+
+  return result;
+}
+
+/**
+ * 統計サマリーを取得（今日/今週/今月）
+ */
+export async function getStatsSummary(storeId: number) {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return {
+      today: { total: 0, done: 0, avgWaitMinutes: 0 },
+      thisWeek: { total: 0, done: 0, avgWaitMinutes: 0 },
+      thisMonth: { total: 0, done: 0, avgWaitMinutes: 0 },
+    };
+  }
+
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  // 今週の開始日（月曜日）
+  const weekStart = new Date(todayStart);
+  const dayOfWeek = weekStart.getDay();
+  const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  weekStart.setDate(weekStart.getDate() - diff);
+  
+  // 今月の開始日
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const getStats = async (startDate: Date) => {
+    const result = await db.select({
+      total: sql<number>`count(*)`,
+      done: sql<number>`sum(case when ${tickets.status} = 'DONE' then 1 else 0 end)`,
+      avgWaitMinutes: sql<number>`avg(case when ${tickets.calledAt} is not null then timestampdiff(minute, ${tickets.createdAt}, ${tickets.calledAt}) else null end)`,
+    })
+      .from(tickets)
+      .where(and(
+        eq(tickets.storeId, storeId),
+        sql`${tickets.createdAt} >= ${startDate}`
+      ));
+
+    return {
+      total: result[0]?.total || 0,
+      done: result[0]?.done || 0,
+      avgWaitMinutes: Math.round(result[0]?.avgWaitMinutes || 0),
+    };
+  };
+
+  const [today, thisWeek, thisMonth] = await Promise.all([
+    getStats(todayStart),
+    getStats(weekStart),
+    getStats(monthStart),
+  ]);
+
+  return { today, thisWeek, thisMonth };
+}

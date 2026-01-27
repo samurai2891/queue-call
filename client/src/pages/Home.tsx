@@ -12,7 +12,8 @@ import {
   Smartphone,
   ArrowRight,
   Store,
-  Loader2
+  Loader2,
+  BarChart3
 } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { useLocation } from "wouter";
@@ -52,6 +53,10 @@ export default function Home() {
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : isAuthenticated ? (
               <>
+                <Button variant="outline" onClick={() => navigate('/admin/dashboard')}>
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  ダッシュボード
+                </Button>
                 <Button variant="outline" onClick={() => navigate('/admin/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   店舗設定

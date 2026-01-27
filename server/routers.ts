@@ -375,6 +375,61 @@ const storeRouter = router({
       }
       return store;
     }),
+
+  // 統計API: 日別来店数
+  getDailyVisitorStats: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      days: z.number().min(1).max(365).optional().default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      return await db.getDailyVisitorStats(input.storeId, input.days);
+    }),
+
+  // 統計API: 日別平均待ち時間
+  getDailyWaitTimeStats: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      days: z.number().min(1).max(365).optional().default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      return await db.getDailyWaitTimeStats(input.storeId, input.days);
+    }),
+
+  // 統計API: 時間帯別来店数（ピーク時間帯分析）
+  getHourlyStats: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      days: z.number().min(1).max(365).optional().default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      return await db.getHourlyStats(input.storeId, input.days);
+    }),
+
+  // 統計API: サマリー（今日/今週/今月）
+  getStatsSummary: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      return await db.getStatsSummary(input.storeId);
+    }),
 });
 
 // ==================== Ticket Router ====================
