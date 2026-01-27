@@ -48,10 +48,12 @@ import {
   ExternalLink,
   Copy,
   CalendarDays,
+  QrCode,
 } from 'lucide-react';
 
 import { toast } from 'sonner';
 import { getLoginUrl } from '@/const';
+import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 
 const LOCALE_OPTIONS = [
   { value: 'ja', label: '日本語' },
@@ -1253,6 +1255,7 @@ function SettingsContent() {
     { id: 'kiosk', label: t('settings.kiosk'), icon: Monitor },
     { id: 'board', label: t('settings.board'), icon: Monitor },
     { id: 'reservation', label: t('settings.reservation'), icon: CalendarDays },
+    { id: 'qrcode', label: t('settings.qrcode'), icon: QrCode },
     { id: 'security', label: t('settings.security'), icon: Shield },
   ];
 
@@ -2460,6 +2463,16 @@ function SettingsContent() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* QR Code Settings */}
+          <TabsContent value="qrcode">
+            {store && (
+              <QRCodeGenerator
+                storeSlug={store.slug}
+                storeName={store.name}
+              />
+            )}
           </TabsContent>
 
           {/* Security Settings */}
