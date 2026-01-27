@@ -42,6 +42,8 @@ export const translations = {
     'connection.connected': '接続中',
     'connection.disconnected': '切断',
     'connection.pollingMode': 'ポーリングモード',
+    'offline.message': 'オフラインです。一部の機能が制限されます。',
+    'offline.backOnline': 'オンラインに復帰しました',
     
     // Store Top
 
@@ -675,6 +677,8 @@ export const translations = {
     'connection.connected': 'Connected',
     'connection.disconnected': 'Disconnected',
     'connection.pollingMode': 'Polling Mode',
+    'offline.message': 'You are offline. Some features may be limited.',
+    'offline.backOnline': 'Back online',
     
     // Store Top
 
@@ -1308,6 +1312,8 @@ export const translations = {
     'connection.connected': '연결됨',
     'connection.disconnected': '연결 끊김',
     'connection.pollingMode': '폴링 모드',
+    'offline.message': '오프라인입니다. 일부 기능이 제한될 수 있습니다.',
+    'offline.backOnline': '온라인으로 복귀했습니다',
     
     // Store Top
 
@@ -1942,6 +1948,8 @@ export const translations = {
     'connection.connected': '已连接',
     'connection.disconnected': '已断开',
     'connection.pollingMode': '轮询模式',
+    'offline.message': '您已离线。部分功能可能受限。',
+    'offline.backOnline': '已恢复在线',
     
     // Store Top
 
@@ -2576,6 +2584,8 @@ export const translations = {
     'connection.connected': '已連接',
     'connection.disconnected': '已斷開',
     'connection.pollingMode': '輪詢模式',
+    'offline.message': '您已離線。部分功能可能受限。',
+    'offline.backOnline': '已恢復在線',
     
     // Store Top
 
