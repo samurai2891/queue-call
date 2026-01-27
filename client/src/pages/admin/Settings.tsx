@@ -1287,7 +1287,44 @@ function SettingsContent() {
 
       <main className="container py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="flex flex-wrap justify-start gap-2 h-auto p-2">
+          {/* Mobile: Dropdown Select */}
+          <div className="md:hidden">
+            <Select value={activeTab} onValueChange={setActiveTab}>
+              <SelectTrigger className="w-full h-12">
+                <SelectValue>
+                  {(() => {
+                    const currentTab = tabs.find(tab => tab.id === activeTab);
+                    if (currentTab) {
+                      const IconComponent = currentTab.icon;
+                      return (
+                        <div className="flex items-center gap-3">
+                          <IconComponent className="h-5 w-5" />
+                          <span>{currentTab.label}</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {tabs.map(tab => {
+                  const IconComponent = tab.icon;
+                  return (
+                    <SelectItem key={tab.id} value={tab.id} className="h-12">
+                      <div className="flex items-center gap-3">
+                        <IconComponent className="h-5 w-5" />
+                        <span>{tab.label}</span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Desktop: Tab List */}
+          <TabsList className="hidden md:flex flex-wrap justify-start gap-2 h-auto p-2">
             {tabs.map(tab => (
               <TabsTrigger
                 key={tab.id}
