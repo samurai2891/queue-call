@@ -18,6 +18,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { ArrowLeft, Bell, BellOff, AlertCircle, CheckCircle, XCircle, Clock, MessageSquare } from 'lucide-react';
+import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { toast } from 'sonner';
 import { useSSE } from '@/hooks/useSSE';
 import { SmsRegistration } from '@/components/SmsRegistration';
@@ -293,6 +294,13 @@ function TicketContent() {
             <Bell className="mr-2 h-4 w-4" />
             {t('notification.title')}
           </Button>
+        )}
+
+        {/* PWA Install Card - shown on ticket page for better conversion */}
+        {isActive && (
+          <div className="w-full max-w-md mt-6">
+            <PwaInstallBanner variant="card" />
+          </div>
         )}
       </main>
     </div>

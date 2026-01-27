@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, ClipboardList, UtensilsCrossed, AlertCircle } from 'lucide-react';
+import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { useSSE } from '@/hooks/useSSE';
 import { useState, useEffect } from 'react';
 import type { Locale } from '@/contexts/LocaleContext';
@@ -157,6 +158,8 @@ function StoreTopContent() {
         {t('common.poweredBy')}
       </footer>
 
+      {/* PWA Install Banner */}
+      <PwaInstallBanner variant="banner" />
     </div>
   );
 }

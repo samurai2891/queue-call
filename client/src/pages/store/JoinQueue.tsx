@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Minus, Plus, AlertCircle, Loader2 } from 'lucide-react';
+import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { toast } from 'sonner';
 import { RATE_LIMITED_ERR_MSG } from '@shared/const';
 import type { Locale } from '@/contexts/LocaleContext';
@@ -193,6 +194,9 @@ function JoinQueueContent() {
           </CardContent>
         </Card>
       </main>
+
+      {/* PWA Install Banner */}
+      <PwaInstallBanner variant="banner" />
     </div>
   );
 }
