@@ -89,8 +89,8 @@ function App() {
           <Toaster />
           <LocaleProvider>
             <OfflineIndicator />
+            <Router />
           </LocaleProvider>
-          <Router />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
