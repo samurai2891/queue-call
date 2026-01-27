@@ -27,6 +27,7 @@ const KioskDisplay = lazy(() => import("./pages/store/KioskDisplay"));
 const BoardAdmin = lazy(() => import("./pages/store/BoardAdmin"));
 const BoardDisplay = lazy(() => import("./pages/store/BoardDisplay"));
 const Reservation = lazy(() => import("./pages/store/Reservation"));
+const ReservationCheck = lazy(() => import("./pages/store/ReservationCheck"));
 const ReservationManagement = lazy(() => import("./pages/store/ReservationManagement"));
 
 const Staff = lazy(() => import("./pages/store/Staff"));
@@ -68,6 +69,7 @@ function Router() {
         
         {/* Reservation */}
         <Route path="/s/:storeSlug/reservation" component={Reservation} />
+        <Route path="/s/:storeSlug/reservation/check" component={ReservationCheck} />
         <Route path="/s/:storeSlug/reservations" component={ReservationManagement} />
         
         {/* Store Staff */}

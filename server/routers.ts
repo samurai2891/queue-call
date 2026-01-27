@@ -1997,6 +1997,73 @@ const reservationRouter = router({
       return { success: true };
     }),
 
+  // 予約リマインダーSMSを送信（スタッフ向け）
+  sendReminder: publicProcedure
+    .input(z.object({
+      storeSlug: z.string(),
+      staffToken: z.string(),
+      reservationId: z.number(),
+    }))
+    .mutation(async ({ input }) => {
+      const store = await db.getStoreBySlug(input.storeSlug);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      // スタッフトークン検証
+      const session = await db.getStaffSession(input.staffToken);
+      if (!session || session.storeId !== store.id) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid staff token' });
+      }
+
+      // 予約を取得
+      const reservation = await db.getReservationById(input.reservationId);
+      if (!reservation || reservation.storeId !== store.id) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Reservation not found' });
+      }
+
+      if (!reservation.customerPhone) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No phone number registered for this reservation' });
+      }
+
+      // SMS設定を確認
+      const notificationSettings = store.settings?.notifications;
+      if (!notificationSettings?.smsEnabled) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'SMS notifications are not enabled for this store' });
+      }
+
+      // Twilio設定を取得
+      const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+      const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+      const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+      if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'SMS service not configured' });
+      }
+
+      // リマインダーメッセージを作成
+      const message = `【${store.name}】ご予約のリマインダーです。\n日時: ${reservation.reservationDate} ${reservation.reservationTime}\n人数: ${reservation.partySize}名\n予約番号: ${reservation.reservationNumber}\nご来店をお待ちしております。`;
+
+      const { sendReservationReminderSms } = await import('./notifications');
+      const result = await sendReservationReminderSms(
+        reservation.id,
+        store.id,
+        reservation.customerPhone,
+        message,
+        {
+          accountSid: twilioAccountSid,
+          authToken: twilioAuthToken,
+          fromNumber: twilioPhoneNumber,
+        }
+      );
+
+      if (!result.success) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: result.reason || 'Failed to send reminder' });
+      }
+
+      return { success: true, message: 'Reminder sent successfully' };
+    }),
+
   // 予約設定を更新（オーナー向け）
   updateSettings: protectedProcedure
     .input(z.object({

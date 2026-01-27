@@ -33,7 +33,8 @@ import {
   UserCheck,
   FileText,
   RefreshCw,
-  LogOut
+  LogOut,
+  MessageSquare
 } from "lucide-react";
 import { format } from "date-fns";
 import { ja, enUS, ko, zhCN, zhTW } from "date-fns/locale";
@@ -90,7 +91,7 @@ export default function ReservationManagement() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
-    action: "confirm" | "checkIn" | "cancel" | "noShow";
+    action: "confirm" | "checkIn" | "cancel" | "noShow" | "sendReminder";
     reservationId: number;
     reservationNumber: string;
   } | null>(null);
@@ -208,7 +209,17 @@ export default function ReservationManagement() {
     logoutMutation.mutate({ sessionToken });
   };
   
-  const handleAction = (action: "confirm" | "checkIn" | "cancel" | "noShow", reservationId: number, reservationNumber: string) => {
+  // リマインダーSMS送信
+  const sendReminderMutation = trpc.reservation.sendReminder.useMutation({
+    onSuccess: () => {
+      toast.success(t("reservation.reminderSent"));
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+  
+  const handleAction = (action: "confirm" | "checkIn" | "cancel" | "noShow" | "sendReminder", reservationId: number, reservationNumber: string) => {
     setConfirmDialog({ open: true, action, reservationId, reservationNumber });
   };
   
@@ -249,6 +260,13 @@ export default function ReservationManagement() {
           status: "NO_SHOW" 
         });
         break;
+      case "sendReminder":
+        await sendReminderMutation.mutateAsync({ 
+          storeSlug, 
+          staffToken: sessionToken, 
+          reservationId 
+        });
+        break;
     }
     
     setConfirmDialog(null);
@@ -266,12 +284,13 @@ export default function ReservationManagement() {
     return labels[status];
   };
   
-  const getActionLabel = (action: "confirm" | "checkIn" | "cancel" | "noShow") => {
+  const getActionLabel = (action: "confirm" | "checkIn" | "cancel" | "noShow" | "sendReminder") => {
     const labels = {
       confirm: t("reservation.confirmReservation"),
       checkIn: t("reservation.checkIn"),
       cancel: t("reservation.cancelReservation"),
       noShow: t("reservation.markNoShow"),
+      sendReminder: t("reservation.sendReminder"),
     };
     return labels[action];
   };
@@ -515,13 +534,14 @@ function ReservationCard({
   reservation: ReservationItem;
   statusColors: Record<ReservationStatus, string>;
   getStatusLabel: (status: ReservationStatus) => string;
-  onAction: (action: "confirm" | "checkIn" | "cancel" | "noShow", reservationId: number, reservationNumber: string) => void;
+  onAction: (action: "confirm" | "checkIn" | "cancel" | "noShow" | "sendReminder", reservationId: number, reservationNumber: string) => void;
   t: (key: any) => string;
 }) {
   const canConfirm = reservation.status === "PENDING";
   const canCheckIn = reservation.status === "CONFIRMED";
   const canCancel = reservation.status === "PENDING" || reservation.status === "CONFIRMED";
   const canMarkNoShow = reservation.status === "CONFIRMED";
+  const canSendReminder = (reservation.status === "PENDING" || reservation.status === "CONFIRMED") && reservation.customerPhone;
   
   return (
     <Card>
@@ -599,6 +619,16 @@ function ReservationCard({
               >
                 <AlertTriangle className="w-4 h-4 mr-1" />
                 {t("reservation.markNoShow")}
+              </Button>
+            )}
+            {canSendReminder && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => onAction("sendReminder", reservation.id, reservation.reservationNumber)}
+              >
+                <MessageSquare className="w-4 h-4 mr-1" />
+                {t("reservation.sendReminder")}
               </Button>
             )}
             {canCancel && (

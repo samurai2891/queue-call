@@ -483,3 +483,95 @@ export async function notifyTicketCalled(
   return results;
 }
 
+
+// Send reservation reminder SMS directly (without ticket subscription)
+export async function sendReservationReminderSms(
+  reservationId: number,
+  storeId: number,
+  phoneE164: string,
+  message: string,
+  twilioConfig: {
+    accountSid: string;
+    authToken: string;
+    fromNumber: string;
+  }
+): Promise<{ success: boolean; reason?: string }> {
+  const db = await getDb();
+  if (!db) return { success: false, reason: 'Database not available' };
+
+  const logContext = buildLogContext({
+    storeId,
+  });
+
+  try {
+    // Check and consume SMS balance BEFORE sending
+    const balanceResult = await consumeSmsBalance({
+      storeId,
+      ticketId: 0, // No ticket for reservation reminder
+    });
+
+    if (!balanceResult.success) {
+      console.warn("[SMS] Insufficient balance for reservation reminder", {
+        ...logContext,
+        reservationId,
+        reason: balanceResult.reason,
+      });
+      return { success: false, reason: balanceResult.reason };
+    }
+
+    // Create SMS log entry
+    const smsLogId = await createSmsLog({
+      storeId,
+      ticketId: 0, // No ticket for reservation reminder
+      phoneE164,
+      messageContent: message,
+      status: 'pending',
+      creditConsumed: SMS_COST_PER_MESSAGE,
+      messageType: 'reminder',
+    });
+
+    // Send via Twilio
+    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioConfig.accountSid}/Messages.json`;
+    const auth = Buffer.from(`${twilioConfig.accountSid}:${twilioConfig.authToken}`).toString('base64');
+
+    const response = await fetch(twilioUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        To: phoneE164,
+        From: twilioConfig.fromNumber,
+        Body: message,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[SMS] Twilio error for reservation reminder:', logContext, error);
+      await updateSmsLog(smsLogId, { status: 'failed', errorMessage: error });
+      return { success: false, reason: 'Twilio API error' };
+    }
+
+    const result = await response.json();
+
+    // Update SMS log with success
+    await updateSmsLog(smsLogId, {
+      status: 'sent',
+      twilioMessageSid: result.sid,
+      sentAt: new Date(),
+    });
+
+    console.log('[SMS] Reservation reminder sent successfully', {
+      ...logContext,
+      reservationId,
+      phoneE164,
+      messageSid: result.sid,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('[SMS] Error sending reservation reminder:', logContext, error);
+    return { success: false, reason: 'Internal error' };
+  }
+}
