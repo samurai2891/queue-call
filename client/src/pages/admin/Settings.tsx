@@ -47,6 +47,7 @@ import {
   History,
   ExternalLink,
   Copy,
+  CalendarDays,
 } from 'lucide-react';
 
 import { toast } from 'sonner';
@@ -530,6 +531,18 @@ function SettingsContent() {
     // Board
     boardNextCount: 3,
     
+    // Reservation
+    reservationEnabled: false,
+    reservationStartTime: '11:00',
+    reservationEndTime: '21:00',
+    reservationSlotDuration: 30,
+    reservationAvailableDays: [0, 1, 2, 3, 4, 5, 6],
+    reservationAdvanceDays: 30,
+    reservationMaxPerSlot: 5,
+    reservationMaxPartySize: 10,
+    reservationAutoConfirm: true,
+    reservationSmsReminder: false,
+    
     // Security
     staffPin: '',
     managerPin: '',
@@ -650,6 +663,18 @@ function SettingsContent() {
         
         boardNextCount: settings.board?.nextCount || 3,
         
+        // Reservation
+        reservationEnabled: settings.reservation?.enabled ?? false,
+        reservationStartTime: settings.reservation?.timeSlots?.[0] || '11:00',
+        reservationEndTime: settings.reservation?.timeSlots?.[settings.reservation?.timeSlots?.length - 1] || '21:00',
+        reservationSlotDuration: 30, // デフォルト30分
+        reservationAvailableDays: settings.reservation?.availableDays || [0, 1, 2, 3, 4, 5, 6],
+        reservationAdvanceDays: settings.reservation?.advanceDays || 30,
+        reservationMaxPerSlot: settings.reservation?.maxPerSlot || 5,
+        reservationMaxPartySize: settings.reservation?.maxPartySize || 10,
+        reservationAutoConfirm: settings.reservation?.autoConfirm ?? true,
+        reservationSmsReminder: settings.reservation?.smsReminder ?? false,
+        
         staffPin: '',
         managerPin: '',
       });
@@ -737,6 +762,20 @@ function SettingsContent() {
       board: {
         nextCount: formData.boardNextCount,
       },
+      reservation: {
+        enabled: formData.reservationEnabled,
+        timeSlots: generateTimeSlots(
+          formData.reservationStartTime,
+          formData.reservationEndTime,
+          formData.reservationSlotDuration
+        ),
+        availableDays: formData.reservationAvailableDays,
+        advanceDays: formData.reservationAdvanceDays,
+        maxPerSlot: formData.reservationMaxPerSlot,
+        maxPartySize: formData.reservationMaxPartySize,
+        autoConfirm: formData.reservationAutoConfirm,
+        smsReminder: formData.reservationSmsReminder,
+      },
     };
 
     if (store) {
@@ -793,11 +832,29 @@ function SettingsContent() {
   };
 
   const parsePrice = (value: string) => {
-
     const trimmed = value.trim();
     if (!trimmed) return undefined;
     const parsed = Number(trimmed);
     return Number.isNaN(parsed) ? undefined : parsed;
+  };
+
+  // 時間枠を生成するヘルパー関数
+  const generateTimeSlots = (startTime: string, endTime: string, duration: number): string[] => {
+    const slots: string[] = [];
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+    
+    let currentMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
+    
+    while (currentMinutes <= endMinutes) {
+      const hours = Math.floor(currentMinutes / 60);
+      const mins = currentMinutes % 60;
+      slots.push(`${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`);
+      currentMinutes += duration;
+    }
+    
+    return slots;
   };
 
   const uploadImage = async (file: File, kind: 'menu' | 'feed', storeId: number) => {
@@ -1195,6 +1252,7 @@ function SettingsContent() {
     { id: 'menu', label: t('settings.menu'), icon: Menu },
     { id: 'kiosk', label: t('settings.kiosk'), icon: Monitor },
     { id: 'board', label: t('settings.board'), icon: Monitor },
+    { id: 'reservation', label: t('settings.reservation'), icon: CalendarDays },
     { id: 'security', label: t('settings.security'), icon: Shield },
   ];
 
@@ -2209,6 +2267,197 @@ function SettingsContent() {
                   <p className="text-xs text-muted-foreground">{t('settings.boardNextCountHelp')}</p>
 
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Reservation Settings */}
+          <TabsContent value="reservation">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('settings.reservation')}</CardTitle>
+                <CardDescription>{t('settings.reservationDescription')}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* 予約受付ON/OFF */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t('settings.reservationEnabled')}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.reservationEnabledDescription')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.reservationEnabled}
+                    onCheckedChange={(checked) => updateField('reservationEnabled', checked)}
+                  />
+                </div>
+
+                {formData.reservationEnabled && (
+                  <>
+                    <Separator />
+                    
+                    {/* 時間設定 */}
+                    <div className="space-y-4">
+                      <h3 className="font-medium">{t('settings.reservationTimeSettings')}</h3>
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="reservationStartTime">{t('settings.reservationStartTime')}</Label>
+                          <Input
+                            id="reservationStartTime"
+                            type="time"
+                            value={formData.reservationStartTime}
+                            onChange={(e) => updateField('reservationStartTime', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="reservationEndTime">{t('settings.reservationEndTime')}</Label>
+                          <Input
+                            id="reservationEndTime"
+                            type="time"
+                            value={formData.reservationEndTime}
+                            onChange={(e) => updateField('reservationEndTime', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="reservationSlotDuration">{t('settings.reservationSlotDuration')}</Label>
+                          <Select
+                            value={String(formData.reservationSlotDuration)}
+                            onValueChange={(value) => updateField('reservationSlotDuration', Number(value))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="15">15分</SelectItem>
+                              <SelectItem value="30">30分</SelectItem>
+                              <SelectItem value="60">60分</SelectItem>
+                              <SelectItem value="90">90分</SelectItem>
+                              <SelectItem value="120">120分</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">{t('settings.reservationSlotDurationHelp')}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 予約可能曜日 */}
+                    <div className="space-y-4">
+                      <Label>{t('settings.reservationAvailableDays')}</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { day: 0, label: t('settings.daySunday') },
+                          { day: 1, label: t('settings.dayMonday') },
+                          { day: 2, label: t('settings.dayTuesday') },
+                          { day: 3, label: t('settings.dayWednesday') },
+                          { day: 4, label: t('settings.dayThursday') },
+                          { day: 5, label: t('settings.dayFriday') },
+                          { day: 6, label: t('settings.daySaturday') },
+                        ].map(({ day, label }) => (
+                          <Button
+                            key={day}
+                            type="button"
+                            variant={formData.reservationAvailableDays.includes(day) ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => {
+                              const days = formData.reservationAvailableDays;
+                              if (days.includes(day)) {
+                                updateField('reservationAvailableDays', days.filter(d => d !== day));
+                              } else {
+                                updateField('reservationAvailableDays', [...days, day].sort());
+                              }
+                            }}
+                          >
+                            {label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 予約可能日数 */}
+                    <div className="space-y-2">
+                      <Label htmlFor="reservationAdvanceDays">{t('settings.reservationAdvanceDays')}</Label>
+                      <Input
+                        id="reservationAdvanceDays"
+                        type="number"
+                        min={1}
+                        max={90}
+                        value={formData.reservationAdvanceDays}
+                        onChange={(e) => updateField('reservationAdvanceDays', Number(e.target.value))}
+                        className="w-32"
+                      />
+                      <p className="text-xs text-muted-foreground">{t('settings.reservationAdvanceDaysHelp')}</p>
+                    </div>
+
+                    <Separator />
+
+                    {/* 容量設定 */}
+                    <div className="space-y-4">
+                      <h3 className="font-medium">{t('settings.reservationCapacity')}</h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="reservationMaxPerSlot">{t('settings.reservationMaxPerSlot')}</Label>
+                          <Input
+                            id="reservationMaxPerSlot"
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={formData.reservationMaxPerSlot}
+                            onChange={(e) => updateField('reservationMaxPerSlot', Number(e.target.value))}
+                            className="w-32"
+                          />
+                          <p className="text-xs text-muted-foreground">{t('settings.reservationMaxPerSlotHelp')}</p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="reservationMaxPartySize">{t('settings.reservationMaxPartySize')}</Label>
+                          <Input
+                            id="reservationMaxPartySize"
+                            type="number"
+                            min={1}
+                            max={50}
+                            value={formData.reservationMaxPartySize}
+                            onChange={(e) => updateField('reservationMaxPartySize', Number(e.target.value))}
+                            className="w-32"
+                          />
+                          <p className="text-xs text-muted-foreground">{t('settings.reservationMaxPartySizeHelp')}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* その他の設定 */}
+                    <div className="space-y-4">
+                      <h3 className="font-medium">{t('settings.reservationOptions')}</h3>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label>{t('settings.reservationAutoConfirm')}</Label>
+                            <p className="text-sm text-muted-foreground">
+                              {t('settings.reservationAutoConfirmDescription')}
+                            </p>
+                          </div>
+                          <Switch
+                            checked={formData.reservationAutoConfirm}
+                            onCheckedChange={(checked) => updateField('reservationAutoConfirm', checked)}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label>{t('settings.reservationSmsReminder')}</Label>
+                            <p className="text-sm text-muted-foreground">
+                              {t('settings.reservationSmsReminderDescription')}
+                            </p>
+                          </div>
+                          <Switch
+                            checked={formData.reservationSmsReminder}
+                            onCheckedChange={(checked) => updateField('reservationSmsReminder', checked)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
