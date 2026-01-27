@@ -127,6 +127,46 @@ export async function sendPushNotification(
 
 }
 
+// Send test push notification directly to a subscription
+export async function sendTestPushNotification(
+  subscription: {
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+  },
+  payload: PushPayload
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!ensureVapidConfig()) {
+      return { success: false, error: 'VAPID keys not configured' };
+    }
+
+    const pushSubscription = {
+      endpoint: subscription.endpoint,
+      keys: {
+        p256dh: subscription.p256dh,
+        auth: subscription.auth,
+      },
+    };
+
+    const payloadJson = JSON.stringify(payload);
+    await webPush.sendNotification(pushSubscription, payloadJson, { TTL: 86400 });
+    return { success: true };
+  } catch (error) {
+    const statusCode =
+      typeof error === 'object' && error && 'statusCode' in error
+        ? (error as { statusCode?: number }).statusCode
+        : undefined;
+    const message =
+      typeof error === 'object' && error && 'message' in error
+        ? (error as { message?: string }).message
+        : 'Unknown error';
+    
+    console.error('[Push] Test notification failed:', { statusCode, message });
+    return { success: false, error: message || `Status code: ${statusCode}` };
+  }
+}
+
 // Send SMS notification via Twilio with balance check
 export async function sendSmsNotification(
   ticketId: number,

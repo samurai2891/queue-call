@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,7 +6,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Key, RefreshCw, Copy, Check, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Key, RefreshCw, Copy, Check, AlertTriangle, CheckCircle2, Info, Bell, Send, Loader2 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
 
@@ -21,8 +22,13 @@ export function VapidSettings({ t }: VapidSettingsProps) {
     privateKey: string;
   } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [pushSubscription, setPushSubscription] = useState<PushSubscription | null>(null);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
 
   const { data: vapidStatus, isLoading, refetch } = trpc.system.getVapidStatus.useQuery();
+  const { data: vapidPublicKey } = trpc.system.getVapidPublicKey.useQuery();
+  
   const generateKeysMutation = trpc.system.generateVapidKeys.useMutation({
     onSuccess: (data) => {
       setGeneratedKeys(data.keys);
@@ -32,6 +38,37 @@ export function VapidSettings({ t }: VapidSettingsProps) {
       toast.error(`${t('settings.vapid.generateError')}: ${error.message}`);
     },
   });
+
+  const sendTestMutation = trpc.system.sendTestPushNotification.useMutation({
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success(t('settings.vapid.testSent'));
+      } else {
+        toast.error(`${t('settings.vapid.testFailed')}: ${result.error}`);
+      }
+      setIsSendingTest(false);
+    },
+    onError: (error) => {
+      toast.error(`${t('settings.vapid.testFailed')}: ${error.message}`);
+      setIsSendingTest(false);
+    },
+  });
+
+  // Check for existing push subscription
+  useEffect(() => {
+    const checkSubscription = async () => {
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          const subscription = await registration.pushManager.getSubscription();
+          setPushSubscription(subscription);
+        } catch (error) {
+          console.error('Failed to check push subscription:', error);
+        }
+      }
+    };
+    checkSubscription();
+  }, []);
 
   const handleGenerateKeys = () => {
     generateKeysMutation.mutate();
@@ -52,6 +89,59 @@ export function VapidSettings({ t }: VapidSettingsProps) {
     setShowGenerateDialog(false);
     setGeneratedKeys(null);
     refetch();
+  };
+
+  // Subscribe to push notifications for testing
+  const handleSubscribeForTest = async () => {
+    if (!vapidPublicKey?.publicKey) {
+      toast.error(t('settings.vapid.notConfigured'));
+      return;
+    }
+
+    setIsSubscribing(true);
+    try {
+      // Request notification permission
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        toast.error(t('settings.vapid.permissionDenied'));
+        setIsSubscribing(false);
+        return;
+      }
+
+      // Get service worker registration
+      const registration = await navigator.serviceWorker.ready;
+
+      // Subscribe to push
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey.publicKey),
+      });
+
+      setPushSubscription(subscription);
+      toast.success(t('settings.vapid.subscribed'));
+    } catch (error) {
+      console.error('Failed to subscribe:', error);
+      toast.error(t('settings.vapid.subscribeFailed'));
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
+
+  // Send test notification
+  const handleSendTestNotification = async () => {
+    if (!pushSubscription) {
+      toast.error(t('settings.vapid.noSubscription'));
+      return;
+    }
+
+    setIsSendingTest(true);
+    const subscriptionJson = pushSubscription.toJSON();
+    
+    sendTestMutation.mutate({
+      endpoint: pushSubscription.endpoint,
+      p256dh: subscriptionJson.keys?.p256dh || '',
+      auth: subscriptionJson.keys?.auth || '',
+    });
   };
 
   if (isLoading) {
@@ -159,6 +249,74 @@ export function VapidSettings({ t }: VapidSettingsProps) {
               {t('settings.vapid.regenerateWarning')}
             </p>
           )}
+
+          {/* Test Notification Section */}
+          {vapidStatus?.configured && (
+            <>
+              <Separator className="my-4" />
+              
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-5 w-5" />
+                  <h4 className="font-medium">{t('settings.vapid.testNotification')}</h4>
+                </div>
+                
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.vapid.testDescription')}
+                </p>
+
+                {/* Subscription Status */}
+                <div className="flex items-center gap-3">
+                  <span className="text-sm">{t('settings.vapid.subscriptionStatus')}:</span>
+                  {pushSubscription ? (
+                    <Badge variant="default" className="bg-green-600">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      {t('settings.vapid.subscriptionActive')}
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">
+                      {t('settings.vapid.subscriptionInactive')}
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {!pushSubscription && (
+                    <Button
+                      variant="outline"
+                      onClick={handleSubscribeForTest}
+                      disabled={isSubscribing}
+                    >
+                      {isSubscribing ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Bell className="h-4 w-4 mr-2" />
+                      )}
+                      {t('settings.vapid.enableNotifications')}
+                    </Button>
+                  )}
+                  
+                  <Button
+                    onClick={handleSendTestNotification}
+                    disabled={!pushSubscription || isSendingTest}
+                  >
+                    {isSendingTest ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4 mr-2" />
+                    )}
+                    {t('settings.vapid.sendTest')}
+                  </Button>
+                </div>
+
+                {!pushSubscription && (
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.vapid.enableFirst')}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -255,4 +413,21 @@ export function VapidSettings({ t }: VapidSettingsProps) {
       </Dialog>
     </>
   );
+}
+
+// Helper function to convert VAPID public key
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const buffer = new ArrayBuffer(rawData.length);
+  const outputArray = new Uint8Array(buffer);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
 }
