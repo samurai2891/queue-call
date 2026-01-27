@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, inArray, lt } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, lt, gte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { 
   InsertUser, users, 
@@ -1110,6 +1110,8 @@ export async function getHourlyStats(storeId: number, days: number = 30) {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
   startDate.setHours(0, 0, 0, 0);
+  // Format as MySQL-compatible datetime string
+  const startDateStr = startDate.toISOString().slice(0, 19).replace('T', ' ');
 
   const result = await db.select({
     hour: sql<number>`hour(${tickets.createdAt})`,
@@ -1119,7 +1121,7 @@ export async function getHourlyStats(storeId: number, days: number = 30) {
     .from(tickets)
     .where(and(
       eq(tickets.storeId, storeId),
-      sql`${tickets.createdAt} >= ${startDate}`
+      gte(tickets.createdAt, new Date(startDateStr))
     ))
     .groupBy(sql`hour(${tickets.createdAt})`)
     .orderBy(sql`hour(${tickets.createdAt})`);
