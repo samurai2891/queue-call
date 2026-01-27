@@ -26,6 +26,8 @@ const KioskDisplay = lazy(() => import("./pages/store/KioskDisplay"));
 // Board: Admin (management) and Display (customer-facing)
 const BoardAdmin = lazy(() => import("./pages/store/BoardAdmin"));
 const BoardDisplay = lazy(() => import("./pages/store/BoardDisplay"));
+const Reservation = lazy(() => import("./pages/store/Reservation"));
+const ReservationManagement = lazy(() => import("./pages/store/ReservationManagement"));
 
 const Staff = lazy(() => import("./pages/store/Staff"));
 const Settings = lazy(() => import("./pages/admin/Settings"));
@@ -63,6 +65,10 @@ function Router() {
         {/* Board: Admin (management) and Display (customer-facing with access key) */}
         <Route path="/s/:storeSlug/board" component={BoardAdmin} />
         <Route path="/s/:storeSlug/board/display" component={BoardDisplay} />
+        
+        {/* Reservation */}
+        <Route path="/s/:storeSlug/reservation" component={Reservation} />
+        <Route path="/s/:storeSlug/reservations" component={ReservationManagement} />
         
         {/* Store Staff */}
         <Route path="/s/:storeSlug/staff" component={Staff} />

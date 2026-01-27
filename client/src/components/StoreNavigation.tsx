@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  CalendarDays,
 } from 'lucide-react';
 
 interface StoreNavigationProps {
@@ -19,7 +20,7 @@ interface StoreNavigationProps {
   storeName?: string;
 }
 
-type NavLabelKey = 'nav.storeTop' | 'nav.staff' | 'nav.kiosk' | 'nav.board' | 'nav.settings';
+type NavLabelKey = 'nav.storeTop' | 'nav.staff' | 'nav.kiosk' | 'nav.board' | 'nav.reservations' | 'nav.settings';
 
 interface NavItem {
   id: string;
@@ -69,6 +70,13 @@ export function StoreNavigation({ storeSlug, storeName }: StoreNavigationProps) 
       icon: <Monitor className="h-5 w-5" />,
       href: `/s/${storeSlug}/board`,
       matchPattern: new RegExp(`^/s/${storeSlug}/board(?!/display)`),
+    },
+    {
+      id: 'reservations',
+      labelKey: 'nav.reservations',
+      icon: <CalendarDays className="h-5 w-5" />,
+      href: `/s/${storeSlug}/reservations`,
+      matchPattern: new RegExp(`^/s/${storeSlug}/reservations`),
     },
     {
       id: 'settings',

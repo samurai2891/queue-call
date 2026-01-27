@@ -1723,6 +1723,316 @@ const smsLogsRouter = router({
     }),
 });
 
+// ==================== Reservation Router ====================
+const reservationRouter = router({
+  // 店舗の予約設定を取得
+  getSettings: publicProcedure
+    .input(z.object({ storeSlug: z.string() }))
+    .query(async ({ input }) => {
+      const store = await db.getStoreBySlug(input.storeSlug);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      const settings = store.settings?.reservation || {
+        enabled: false,
+        timeSlots: [],
+        availableDays: [0, 1, 2, 3, 4, 5, 6],
+        advanceDays: 30,
+        maxPerSlot: 5,
+        maxPartySize: 10,
+        autoConfirm: true,
+        smsReminder: false,
+      };
+
+      return {
+        storeId: store.id,
+        storeName: store.name,
+        settings,
+      };
+    }),
+
+  // 利用可能な時間枠を取得
+  getAvailableSlots: publicProcedure
+    .input(z.object({
+      storeSlug: z.string(),
+      date: z.string(), // YYYY-MM-DD
+    }))
+    .query(async ({ input }) => {
+      const store = await db.getStoreBySlug(input.storeSlug);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      const settings = store.settings?.reservation;
+      if (!settings?.enabled) {
+        return { slots: [], message: 'Reservations are not enabled for this store' };
+      }
+
+      const timeSlots = settings.timeSlots || [];
+      const maxPerSlot = settings.maxPerSlot || 5;
+
+      // 各時間枠の予約数を取得
+      const slots = await Promise.all(
+        timeSlots.map(async (time) => {
+          const count = await db.getReservationCountBySlot(store.id, input.date, time);
+          return {
+            time,
+            available: count < maxPerSlot,
+            remaining: maxPerSlot - count,
+          };
+        })
+      );
+
+      return { slots };
+    }),
+
+  // 予約を作成（顧客向け）
+  create: publicProcedure
+    .input(z.object({
+      storeSlug: z.string(),
+      reservationDate: z.string(),
+      reservationTime: z.string(),
+      customerName: z.string().min(1),
+      customerPhone: z.string().optional(),
+      customerEmail: z.string().email().optional(),
+      partySize: z.number().int().min(1),
+      note: z.string().optional(),
+      locale: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const store = await db.getStoreBySlug(input.storeSlug);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      const settings = store.settings?.reservation;
+      if (!settings?.enabled) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Reservations are not enabled for this store' });
+      }
+
+      // 時間枠の空きを確認
+      const count = await db.getReservationCountBySlot(store.id, input.reservationDate, input.reservationTime);
+      const maxPerSlot = settings.maxPerSlot || 5;
+      if (count >= maxPerSlot) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'This time slot is fully booked' });
+      }
+
+      // 人数チェック
+      const maxPartySize = settings.maxPartySize || 10;
+      if (input.partySize > maxPartySize) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `Maximum party size is ${maxPartySize}` });
+      }
+
+      const reservation = await db.createReservation({
+        storeId: store.id,
+        reservationDate: input.reservationDate,
+        reservationTime: input.reservationTime,
+        customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        customerEmail: input.customerEmail,
+        partySize: input.partySize,
+        note: input.note,
+        locale: input.locale,
+        autoConfirm: settings.autoConfirm,
+      });
+
+      if (!reservation) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create reservation' });
+      }
+
+      return {
+        reservation,
+        message: settings.autoConfirm ? 'Reservation confirmed' : 'Reservation pending confirmation',
+      };
+    }),
+
+  // 予約を取得（予約番号で）
+  getByNumber: publicProcedure
+    .input(z.object({ reservationNumber: z.string() }))
+    .query(async ({ input }) => {
+      const reservation = await db.getReservationByNumber(input.reservationNumber);
+      if (!reservation) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Reservation not found' });
+      }
+      return reservation;
+    }),
+
+  // 店舗の予約一覧を取得（スタッフ向け）
+  listByStore: publicProcedure
+    .input(z.object({
+      storeSlug: z.string(),
+      staffToken: z.string(),
+      date: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      status: z.array(z.string()).optional(),
+    }))
+    .query(async ({ input }) => {
+      const store = await db.getStoreBySlug(input.storeSlug);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      // スタッフトークン検証
+      const session = await db.getStaffSession(input.staffToken);
+      if (!session || session.storeId !== store.id) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid staff token' });
+      }
+
+      const reservations = await db.getReservationsByStore(store.id, {
+        date: input.date,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        status: input.status,
+      });
+
+      return reservations;
+    }),
+
+  // 予約ステータスを更新（スタッフ向け）
+  updateStatus: publicProcedure
+    .input(z.object({
+      storeSlug: z.string(),
+      staffToken: z.string(),
+      reservationId: z.number(),
+      status: z.enum(['CONFIRMED', 'CANCELED', 'NO_SHOW']),
+    }))
+    .mutation(async ({ input }) => {
+      const store = await db.getStoreBySlug(input.storeSlug);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      // スタッフトークン検証
+      const session = await db.getStaffSession(input.staffToken);
+      if (!session || session.storeId !== store.id) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid staff token' });
+      }
+
+      const success = await db.updateReservationStatus(input.reservationId, input.status);
+      if (!success) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to update reservation status' });
+      }
+
+      return { success: true };
+    }),
+
+  // 予約をチェックイン（チケット発行）
+  checkIn: publicProcedure
+    .input(z.object({
+      storeSlug: z.string(),
+      staffToken: z.string(),
+      reservationId: z.number(),
+    }))
+    .mutation(async ({ input }) => {
+      const store = await db.getStoreBySlug(input.storeSlug);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      // スタッフトークン検証
+      const session = await db.getStaffSession(input.staffToken);
+      if (!session || session.storeId !== store.id) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid staff token' });
+      }
+
+      // 予約を取得
+      const reservation = await db.getReservationById(input.reservationId);
+      if (!reservation || reservation.storeId !== store.id) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Reservation not found' });
+      }
+
+      if (reservation.status !== 'CONFIRMED' && reservation.status !== 'PENDING') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Reservation cannot be checked in' });
+      }
+
+      // チケットを発行
+      const ticket = await db.createTicket({
+        storeId: store.id,
+        partySize: reservation.partySize,
+        note: `予約: ${reservation.reservationNumber} / ${reservation.customerName}`,
+        locale: reservation.locale || 'ja',
+        source: 'web',
+      });
+
+      if (!ticket) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create ticket' });
+      }
+
+      // 予約をチェックイン済みに更新
+      await db.checkInReservation(input.reservationId, ticket.id);
+
+      // SSEでキュー更新をブロードキャスト
+      const waitingTickets = await db.getWaitingTickets(store.id);
+      broadcastQueueUpdate(store.id, {
+        currentNumber: ticket.number,
+        waitingCount: waitingTickets.length,
+      });
+
+      return {
+        ticket,
+        message: 'Reservation checked in successfully',
+      };
+    }),
+
+  // 予約をキャンセル（顧客向け）
+  cancel: publicProcedure
+    .input(z.object({ reservationNumber: z.string() }))
+    .mutation(async ({ input }) => {
+      const reservation = await db.getReservationByNumber(input.reservationNumber);
+      if (!reservation) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Reservation not found' });
+      }
+
+      if (reservation.status === 'CANCELED' || reservation.status === 'COMPLETED' || reservation.status === 'CHECKED_IN') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Reservation cannot be canceled' });
+      }
+
+      const success = await db.cancelReservation(reservation.id);
+      if (!success) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to cancel reservation' });
+      }
+
+      return { success: true };
+    }),
+
+  // 予約設定を更新（オーナー向け）
+  updateSettings: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      settings: z.object({
+        enabled: z.boolean().optional(),
+        timeSlots: z.array(z.string()).optional(),
+        availableDays: z.array(z.number()).optional(),
+        advanceDays: z.number().optional(),
+        maxPerSlot: z.number().optional(),
+        maxPartySize: z.number().optional(),
+        autoConfirm: z.boolean().optional(),
+        smsReminder: z.boolean().optional(),
+      }),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      const currentSettings = store.settings || {};
+      const newSettings = {
+        ...currentSettings,
+        reservation: {
+          ...currentSettings.reservation,
+          ...input.settings,
+        },
+      };
+
+      await db.updateStoreSettings(input.storeId, newSettings);
+
+      return { success: true };
+    }),
+});
+
 // ==================== Main Router ====================
 export const appRouter = router({
   system: systemRouter,
@@ -1741,6 +2051,7 @@ export const appRouter = router({
   notification: notificationRouter,
   stripe: stripeRouter,
   smsLogs: smsLogsRouter,
+  reservation: reservationRouter,
 });
 
 export type AppRouter = typeof appRouter;

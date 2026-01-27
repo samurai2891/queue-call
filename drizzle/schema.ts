@@ -102,6 +102,23 @@ export interface StoreSettings {
   board?: {
     nextCount?: number;
   };
+  reservation?: {
+    enabled?: boolean;
+    // 予約可能な時間帯（例: ["11:00", "11:30", "12:00", ...]）
+    timeSlots?: string[];
+    // 予約可能な曜日（0=日曜, 1=月曜, ..., 6=土曜）
+    availableDays?: number[];
+    // 予約可能な日数先（例: 30日先まで）
+    advanceDays?: number;
+    // 時間帯あたりの最大予約数
+    maxPerSlot?: number;
+    // 最大人数
+    maxPartySize?: number;
+    // 自動確認（手動確認が不要な場合）
+    autoConfirm?: boolean;
+    // SMSリマインダー（予約前日に送信）
+    smsReminder?: boolean;
+  };
 }
 
 /**
@@ -370,3 +387,44 @@ export const smsLogs = mysqlTable("sms_logs", {
 
 export type SmsLog = typeof smsLogs.$inferSelect;
 export type InsertSmsLog = typeof smsLogs.$inferInsert;
+
+/**
+ * Reservation - 予約
+ */
+export const reservations = mysqlTable("reservations", {
+  id: int("id").autoincrement().primaryKey(),
+  storeId: int("storeId").notNull(),
+  
+  // 予約番号（店舗内でユニーク）
+  reservationNumber: varchar("reservationNumber", { length: 20 }).notNull(),
+  
+  // 予約日時
+  reservationDate: varchar("reservationDate", { length: 10 }).notNull(), // YYYY-MM-DD
+  reservationTime: varchar("reservationTime", { length: 5 }).notNull(), // HH:mm
+  
+  // 予約者情報
+  customerName: varchar("customerName", { length: 255 }).notNull(),
+  customerPhone: varchar("customerPhone", { length: 20 }),
+  customerEmail: varchar("customerEmail", { length: 320 }),
+  partySize: int("partySize").notNull(),
+  note: text("note"),
+  locale: varchar("locale", { length: 10 }).default("ja"),
+  
+  // ステータス
+  status: mysqlEnum("status", ["PENDING", "CONFIRMED", "CHECKED_IN", "COMPLETED", "CANCELED", "NO_SHOW"]).default("PENDING").notNull(),
+  
+  // チェックイン時に発行されるチケットID
+  ticketId: int("ticketId"),
+  
+  // タイムスタンプ
+  confirmedAt: timestamp("confirmedAt"),
+  checkedInAt: timestamp("checkedInAt"),
+  completedAt: timestamp("completedAt"),
+  canceledAt: timestamp("canceledAt"),
+  
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Reservation = typeof reservations.$inferSelect;
+export type InsertReservation = typeof reservations.$inferInsert;

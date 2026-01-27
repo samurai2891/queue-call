@@ -36,6 +36,13 @@
       "when": 1768834429099,
       "tag": "0004_rapid_wilson_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1769518625675,
+      "tag": "0005_violet_red_hulk",
+      "breakpoints": true
     }
   ]
 }

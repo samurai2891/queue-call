@@ -1182,3 +1182,223 @@ export async function getStatsSummary(storeId: number) {
 
   return { today, thisWeek, thisMonth };
 }
+
+
+// ============================================
+// 予約関連
+// ============================================
+
+import { reservations, InsertReservation, Reservation } from "../drizzle/schema";
+
+/**
+ * 予約番号を生成（店舗ID + 日付 + 連番）
+ */
+function generateReservationNumber(storeId: number, date: string): string {
+  const dateStr = date.replace(/-/g, '');
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `R${storeId}-${dateStr}-${random}`;
+}
+
+/**
+ * 予約を作成
+ */
+export async function createReservation(data: {
+  storeId: number;
+  reservationDate: string;
+  reservationTime: string;
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  partySize: number;
+  note?: string;
+  locale?: string;
+  autoConfirm?: boolean;
+}): Promise<Reservation | null> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), data);
+    return null;
+  }
+
+  const reservationNumber = generateReservationNumber(data.storeId, data.reservationDate);
+  const status = data.autoConfirm ? "CONFIRMED" : "PENDING";
+  const confirmedAt = data.autoConfirm ? new Date() : null;
+
+  const result = await db.insert(reservations).values({
+    storeId: data.storeId,
+    reservationNumber,
+    reservationDate: data.reservationDate,
+    reservationTime: data.reservationTime,
+    customerName: data.customerName,
+    customerPhone: data.customerPhone,
+    customerEmail: data.customerEmail,
+    partySize: data.partySize,
+    note: data.note,
+    locale: data.locale || "ja",
+    status,
+    confirmedAt,
+  });
+
+  if (result[0].affectedRows === 0) {
+    return null;
+  }
+
+  const [reservation] = await db.select().from(reservations).where(eq(reservations.reservationNumber, reservationNumber));
+  return reservation || null;
+}
+
+/**
+ * 予約を取得（予約番号で）
+ */
+export async function getReservationByNumber(reservationNumber: string): Promise<Reservation | null> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { reservationNumber });
+    return null;
+  }
+
+  const [reservation] = await db.select().from(reservations).where(eq(reservations.reservationNumber, reservationNumber));
+  return reservation || null;
+}
+
+/**
+ * 予約を取得（IDで）
+ */
+export async function getReservationById(id: number): Promise<Reservation | null> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { id });
+    return null;
+  }
+
+  const [reservation] = await db.select().from(reservations).where(eq(reservations.id, id));
+  return reservation || null;
+}
+
+/**
+ * 店舗の予約一覧を取得（日付でフィルタリング）
+ */
+export async function getReservationsByStore(
+  storeId: number,
+  options?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string[];
+  }
+): Promise<Reservation[]> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
+
+  const conditions = [eq(reservations.storeId, storeId)];
+
+  if (options?.date) {
+    conditions.push(eq(reservations.reservationDate, options.date));
+  }
+
+  if (options?.startDate) {
+    conditions.push(gte(reservations.reservationDate, options.startDate));
+  }
+
+  if (options?.endDate) {
+    conditions.push(sql`${reservations.reservationDate} <= ${options.endDate}`);
+  }
+
+  if (options?.status && options.status.length > 0) {
+    conditions.push(inArray(reservations.status, options.status as any));
+  }
+
+  const result = await db.select()
+    .from(reservations)
+    .where(and(...conditions))
+    .orderBy(asc(reservations.reservationDate), asc(reservations.reservationTime));
+
+  return result;
+}
+
+/**
+ * 特定の時間帯の予約数を取得
+ */
+export async function getReservationCountBySlot(
+  storeId: number,
+  date: string,
+  time: string
+): Promise<number> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId, date, time });
+    return 0;
+  }
+
+  const result = await db.select({ count: sql<number>`count(*)` })
+    .from(reservations)
+    .where(and(
+      eq(reservations.storeId, storeId),
+      eq(reservations.reservationDate, date),
+      eq(reservations.reservationTime, time),
+      inArray(reservations.status, ["PENDING", "CONFIRMED"])
+    ));
+
+  return result[0]?.count || 0;
+}
+
+/**
+ * 予約ステータスを更新
+ */
+export async function updateReservationStatus(
+  id: number,
+  status: "PENDING" | "CONFIRMED" | "CHECKED_IN" | "COMPLETED" | "CANCELED" | "NO_SHOW",
+  ticketId?: number
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { id, status });
+    return false;
+  }
+
+  const updateData: any = { status };
+
+  switch (status) {
+    case "CONFIRMED":
+      updateData.confirmedAt = new Date();
+      break;
+    case "CHECKED_IN":
+      updateData.checkedInAt = new Date();
+      if (ticketId) {
+        updateData.ticketId = ticketId;
+      }
+      break;
+    case "COMPLETED":
+      updateData.completedAt = new Date();
+      break;
+    case "CANCELED":
+      updateData.canceledAt = new Date();
+      break;
+    case "NO_SHOW":
+      updateData.canceledAt = new Date();
+      break;
+  }
+
+  const result = await db.update(reservations)
+    .set(updateData)
+    .where(eq(reservations.id, id));
+
+  return result[0].affectedRows > 0;
+}
+
+/**
+ * 予約をキャンセル
+ */
+export async function cancelReservation(id: number): Promise<boolean> {
+  return updateReservationStatus(id, "CANCELED");
+}
+
+/**
+ * 予約をチェックイン（チケット発行と連携）
+ */
+export async function checkInReservation(id: number, ticketId: number): Promise<boolean> {
+  return updateReservationStatus(id, "CHECKED_IN", ticketId);
+}
