@@ -509,6 +509,10 @@ function SettingsContent() {
     reorderMaxMove: 3,
     reorderReasonRequired: true,
     showEstimatedWaitTime: false,
+    showCrowdLevel: false,
+    crowdLevelLow: 3,
+    crowdLevelModerate: 7,
+    crowdLevelBusy: 12,
     
     // Notifications
     pushEnabled: true,
@@ -646,6 +650,10 @@ function SettingsContent() {
         reorderMaxMove: settings.queue?.reorderMaxMove || 3,
         reorderReasonRequired: settings.queue?.reorderReasonRequired || true,
         showEstimatedWaitTime: settings.queue?.showEstimatedWaitTime ?? false,
+        showCrowdLevel: settings.queue?.showCrowdLevel ?? false,
+        crowdLevelLow: settings.queue?.crowdLevelThresholds?.low ?? 3,
+        crowdLevelModerate: settings.queue?.crowdLevelThresholds?.moderate ?? 7,
+        crowdLevelBusy: settings.queue?.crowdLevelThresholds?.busy ?? 12,
         
         pushEnabled: settings.notifications?.pushEnabled ?? true,
         smsEnabled: settings.notifications?.smsEnabled || false,
@@ -743,6 +751,12 @@ function SettingsContent() {
         reorderMaxMove: formData.reorderMaxMove,
         reorderReasonRequired: formData.reorderReasonRequired,
         showEstimatedWaitTime: formData.showEstimatedWaitTime,
+        showCrowdLevel: formData.showCrowdLevel,
+        crowdLevelThresholds: {
+          low: formData.crowdLevelLow,
+          moderate: formData.crowdLevelModerate,
+          busy: formData.crowdLevelBusy,
+        },
       },
       notifications: {
         pushEnabled: formData.pushEnabled,
@@ -1558,6 +1572,68 @@ function SettingsContent() {
                       onCheckedChange={(checked) => updateField('showEstimatedWaitTime', checked)}
                     />
                   </div>
+                </div>
+
+                <Separator />
+
+                {/* 混雑状況表示設定 */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>{t('settings.showCrowdLevel')}</Label>
+                      <p className="text-sm text-muted-foreground">{t('settings.showCrowdLevelDescription')}</p>
+                    </div>
+                    <Switch
+                      checked={formData.showCrowdLevel}
+                      onCheckedChange={(checked) => updateField('showCrowdLevel', checked)}
+                    />
+                  </div>
+
+                  {formData.showCrowdLevel && (
+                    <div className="space-y-4 pl-4 border-l-2 border-muted">
+                      <p className="text-sm font-medium text-muted-foreground">{t('settings.crowdLevelThresholds')}</p>
+                      
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-green-600">{t('settings.crowdLevelLow')}</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={formData.crowdLevelLow}
+                            onChange={(e) => updateField('crowdLevelLow', parseInt(e.target.value) || 3)}
+                          />
+                          <p className="text-xs text-muted-foreground">{t('settings.crowdLevelLowDescription')}</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label className="text-yellow-600">{t('settings.crowdLevelModerate')}</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={formData.crowdLevelModerate}
+                            onChange={(e) => updateField('crowdLevelModerate', parseInt(e.target.value) || 7)}
+                          />
+                          <p className="text-xs text-muted-foreground">{t('settings.crowdLevelModerateDescription')}</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label className="text-orange-600">{t('settings.crowdLevelBusy')}</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={formData.crowdLevelBusy}
+                            onChange={(e) => updateField('crowdLevelBusy', parseInt(e.target.value) || 12)}
+                          />
+                          <p className="text-xs text-muted-foreground">{t('settings.crowdLevelBusyDescription')}</p>
+                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground">{t('settings.crowdLevelCrowdedDescription')}</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

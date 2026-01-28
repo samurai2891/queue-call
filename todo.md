@@ -614,3 +614,47 @@ VAPID鍵設定後、管理者がテストプッシュ通知を送信して動作
 
 ### Phase 7: チェックポイント保存
 - [x] 7-1: チェックポイント保存
+
+
+---
+
+## M32: 混雑状況リアルタイム表示機能
+
+### Phase 1: 現状確認と設計
+- [x] 1-1: 店舗トップページの構造を確認
+- [x] 1-2: 混雑レベルの判定ロジック設計
+
+設計:
+- 混雑レベル: empty(0組), low(1-3組), moderate(4-7組), busy(8-12組), crowded(13組以上)
+- 店舗設定で閾値をカスタマイズ可能
+- 色分け: 緑(空き), 黄緑(やや混雑), 黄(混雑), 赤(大混雑)
+
+### Phase 2: データベーススキーマ変更
+- [x] 2-1: 店舗設定に混雑レベル閾値を追加
+  - showCrowdLevel: 混雑状況表示のON/OFF
+  - crowdLevelThresholds: low/moderate/busyの閾値設定
+
+### Phase 3: バックエンドAPI実装
+- [x] 3-1: 混雑レベル判定ロジックの実装
+  - empty(0組), low(1-3組), moderate(4-7組), busy(8-12組), crowded(13組以上)
+- [x] 3-2: getQueueStatusに混雑レベルを追加
+  - showCrowdLevel, crowdLevelをレスポンスに追加
+
+### Phase 4: フロントエンドUI実装
+- [x] 4-1: 混雑状況インジケーターコンポーネントの作成
+  - CrowdLevelIndicator.tsx: バッジコンポーネント
+- [x] 4-2: 店舗トップページに混雑状況を表示
+  - StoreTop.tsx: CrowdLevelBadgeを店舗名の下に表示
+- [x] 4-3: 店舗設定画面に閾値設定UIを追加
+  - Settings.tsx: 混雑状況表示ON/OFF、閾値設定
+
+### Phase 5: 多言語対応
+- [x] 5-1: 翻訳キーの追加（5言語）
+  - store.crowdLevel.*: 混雑状況ラベル
+  - settings.showCrowdLevel*, settings.crowdLevel*: 設定画面用
+
+### Phase 6: テストと動作確認
+- [x] 6-1: テスト実行（72件全パス）
+
+### Phase 7: チェックポイント保存
+- [ ] 7-1: チェックポイント保存

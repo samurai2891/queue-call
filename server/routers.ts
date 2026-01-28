@@ -241,6 +241,28 @@ const storeRouter = router({
       // 店舗設定を取得（予測待ち時間表示設定のため）
       const store = await db.getStoreById(input.storeId);
       const showEstimatedWaitTime = store?.settings?.queue?.showEstimatedWaitTime ?? false;
+      const showCrowdLevel = store?.settings?.queue?.showCrowdLevel ?? false;
+      
+      // 混雑レベルを計算
+      const thresholds = store?.settings?.queue?.crowdLevelThresholds ?? {
+        low: 3,      // 0-3組: 空いています
+        moderate: 7, // 4-7組: やや混雑
+        busy: 12,    // 8-12組: 混雑中
+        // 13組以上: 大混雑
+      };
+      
+      let crowdLevel: 'empty' | 'low' | 'moderate' | 'busy' | 'crowded' = 'empty';
+      if (waitingCount === 0) {
+        crowdLevel = 'empty';
+      } else if (waitingCount <= (thresholds.low ?? 3)) {
+        crowdLevel = 'low';
+      } else if (waitingCount <= (thresholds.moderate ?? 7)) {
+        crowdLevel = 'moderate';
+      } else if (waitingCount <= (thresholds.busy ?? 12)) {
+        crowdLevel = 'busy';
+      } else {
+        crowdLevel = 'crowded';
+      }
       
       return {
         currentNumber: calledTicket?.number || 0,
@@ -251,6 +273,8 @@ const storeRouter = router({
         estimatedWaitMinutes: waitTimeInfo.estimatedWaitMinutes,
         avgServiceTimeMinutes: waitTimeInfo.avgServiceTimeMinutes,
         showEstimatedWaitTime,
+        showCrowdLevel,
+        crowdLevel,
       };
     }),
 

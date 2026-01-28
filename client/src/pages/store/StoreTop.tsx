@@ -7,9 +7,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, ClipboardList, UtensilsCrossed, AlertCircle, Clock } from 'lucide-react';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
+import { CrowdLevelBadge } from '@/components/CrowdLevelIndicator';
 import { useSSE } from '@/hooks/useSSE';
 import { useState, useEffect } from 'react';
 import type { Locale } from '@/contexts/LocaleContext';
+
+type CrowdLevel = 'empty' | 'low' | 'moderate' | 'busy' | 'crowded';
 
 function StoreTopContent() {
   const params = useParams<{ storeSlug: string }>();
@@ -29,6 +32,8 @@ function StoreTopContent() {
   const [waitingCount, setWaitingCount] = useState(0);
   const [estimatedWaitMinutes, setEstimatedWaitMinutes] = useState<number | null>(null);
   const [showEstimatedWaitTime, setShowEstimatedWaitTime] = useState(false);
+  const [showCrowdLevel, setShowCrowdLevel] = useState(false);
+  const [crowdLevel, setCrowdLevel] = useState<CrowdLevel>('empty');
 
   useEffect(() => {
     if (queueStatus) {
@@ -36,6 +41,8 @@ function StoreTopContent() {
       setWaitingCount(queueStatus.waitingCount);
       setEstimatedWaitMinutes(queueStatus.estimatedWaitMinutes);
       setShowEstimatedWaitTime(queueStatus.showEstimatedWaitTime);
+      setShowCrowdLevel(queueStatus.showCrowdLevel);
+      setCrowdLevel(queueStatus.crowdLevel as CrowdLevel);
     }
   }, [queueStatus]);
 
@@ -46,9 +53,10 @@ function StoreTopContent() {
     storeSlug: params.storeSlug,
     enabled: !!store?.id,
     onQueueUpdate: (data) => {
-
       setCurrentNumber(data.currentNumber);
       setWaitingCount(data.waitingCount);
+      // SSE更新時に混雑レベルを再計算
+      refetchQueue();
     },
   });
 
@@ -101,6 +109,11 @@ function StoreTopContent() {
           <h1 className="text-3xl md:text-4xl font-bold">{store.name}</h1>
           <p className="text-muted-foreground mt-2">{t('store.welcome')}</p>
         </div>
+
+        {/* Crowd Level Badge */}
+        {showCrowdLevel && (
+          <CrowdLevelBadge level={crowdLevel} className="animate-in fade-in duration-300" />
+        )}
 
         {/* Queue Status Card */}
         <Card className="w-full max-w-md">

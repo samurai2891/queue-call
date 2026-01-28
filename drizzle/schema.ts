@@ -81,6 +81,13 @@ export interface StoreSettings {
     reorderReasonRequired?: boolean;
     auditLog?: boolean;
     showEstimatedWaitTime?: boolean; // 店舗トップページに予測待ち時間を表示
+    showCrowdLevel?: boolean; // 店舗トップページに混雑状況を表示
+    crowdLevelThresholds?: { // 混雑レベルの閾値
+      low?: number;      // この値以下は「空いています」
+      moderate?: number; // この値以下は「やや混雑」
+      busy?: number;     // この値以下は「混雑中」
+      // これ以上は「大混雑」
+    };
   };
 
   notifications?: {
