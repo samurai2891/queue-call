@@ -894,4 +894,28 @@ VAPID鍵設定後、管理者がテストプッシュ通知を送信して動作
 - [x] 2-1: テスト実行（72件全パス）
 
 ### Phase 3: チェックポイント保存
+- [x] 3-1: チェックポイント保存 (version: de6bc2aa)
+
+
+---
+
+## BUG-02: PDFエクスポートOKLCH色形式エラー
+
+### 問題
+html2canvasがOKLCH色形式をサポートしていないため、PDFエクスポートが失敗する
+
+### 原因
+Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの形式を解析できない
+
+### Phase 1: 修正
+- [x] 1-1: pdfExport.tsにOKLCH→RGB変換処理を追加
+  - oklchToRgb(): OKLCH色形式をRGBに変換
+  - convertOklchStyles(): 全要素のスタイルを変換
+  - restoreStyles(): 元のスタイルに復元
+- [x] 1-2: エクスポート前にスタイルを一時的に変換
+
+### Phase 2: テストと動作確認
+- [x] 2-1: テスト実行（72件全パス）
+
+### Phase 3: チェックポイント保存
 - [ ] 3-1: チェックポイント保存
