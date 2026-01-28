@@ -118,7 +118,9 @@ function CrowdHeatmapChart({ data, t }: {
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const { t } = useLocale();
-  const [days, setDays] = useState(30);
+  const [visitorDays, setVisitorDays] = useState(30);
+  const [waitTimeDays, setWaitTimeDays] = useState(30);
+  const [hourlyDays, setHourlyDays] = useState(30);
   const [heatmapDays, setHeatmapDays] = useState(30);
 
   // Get user's stores
@@ -135,17 +137,17 @@ export default function Dashboard() {
   );
 
   const { data: dailyVisitors, isLoading: dailyVisitorsLoading } = trpc.store.getDailyVisitorStats.useQuery(
-    { storeId: storeId!, days },
+    { storeId: storeId!, days: visitorDays },
     { enabled: !!storeId }
   );
 
   const { data: dailyWaitTime, isLoading: dailyWaitTimeLoading } = trpc.store.getDailyWaitTimeStats.useQuery(
-    { storeId: storeId!, days },
+    { storeId: storeId!, days: waitTimeDays },
     { enabled: !!storeId }
   );
 
   const { data: hourlyStats, isLoading: hourlyStatsLoading } = trpc.store.getHourlyStats.useQuery(
-    { storeId: storeId!, days },
+    { storeId: storeId!, days: hourlyDays },
     { enabled: !!storeId }
   );
 
@@ -281,18 +283,6 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
             )}
-            {/* Period selector */}
-            <Select value={days.toString()} onValueChange={(v) => setDays(parseInt(v))}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">{t("dashboard.last7Days")}</SelectItem>
-                <SelectItem value="14">{t("dashboard.last14Days")}</SelectItem>
-                <SelectItem value="30">{t("dashboard.last30Days")}</SelectItem>
-                <SelectItem value="90">{t("dashboard.last90Days")}</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
       </header>
@@ -364,11 +354,25 @@ export default function Dashboard() {
         {/* Daily Visitors Chart */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              {t("dashboard.dailyVisitors")}
-            </CardTitle>
-            <CardDescription>{t("dashboard.dailyVisitorsDescription")}</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  {t("dashboard.dailyVisitors")}
+                </CardTitle>
+                <CardDescription>{t("dashboard.dailyVisitorsDescription")}</CardDescription>
+              </div>
+              <Select value={visitorDays.toString()} onValueChange={(v) => setVisitorDays(parseInt(v))}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
+                  <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
+                  <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             {dailyVisitorsLoading ? (
@@ -417,11 +421,25 @@ export default function Dashboard() {
         {/* Wait Time Chart */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              {t("dashboard.waitTime")}
-            </CardTitle>
-            <CardDescription>{t("dashboard.waitTimeDescription")}</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  {t("dashboard.waitTime")}
+                </CardTitle>
+                <CardDescription>{t("dashboard.waitTimeDescription")}</CardDescription>
+              </div>
+              <Select value={waitTimeDays.toString()} onValueChange={(v) => setWaitTimeDays(parseInt(v))}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
+                  <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
+                  <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             {dailyWaitTimeLoading ? (
@@ -530,18 +548,32 @@ export default function Dashboard() {
         {/* Peak Hours Chart */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              {t("dashboard.peakHours")}
-            </CardTitle>
-            <CardDescription>
-              {t("dashboard.peakHoursDescription")}
-              {peakHour && (
-                <span className="ml-2 font-medium text-primary">
-                  {t("dashboard.peakTime")}: {formatHour(peakHour.hour)} ({peakHour.count}{t("dashboard.visitors")})
-                </span>
-              )}
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  {t("dashboard.peakHours")}
+                </CardTitle>
+                <CardDescription>
+                  {t("dashboard.peakHoursDescription")}
+                  {peakHour && (
+                    <span className="ml-2 font-medium text-primary">
+                      {t("dashboard.peakTime")}: {formatHour(peakHour.hour)} ({peakHour.count}{t("dashboard.visitors")})
+                    </span>
+                  )}
+                </CardDescription>
+              </div>
+              <Select value={hourlyDays.toString()} onValueChange={(v) => setHourlyDays(parseInt(v))}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
+                  <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
+                  <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             {hourlyStatsLoading ? (
