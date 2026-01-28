@@ -1114,20 +1114,24 @@ export async function getHourlyStats(storeId: number, days: number = 30) {
   // Format as MySQL-compatible datetime string
   const startDateStr = startDate.toISOString().slice(0, 19).replace('T', ' ');
 
-  const result = await db.select({
-    hour: sql<number>`hour(${tickets.createdAt})`,
-    count: sql<number>`count(*)`,
-    avgWaitMinutes: sql<number>`avg(timestampdiff(minute, ${tickets.createdAt}, ${tickets.calledAt}))`,
-  })
-    .from(tickets)
-    .where(and(
-      eq(tickets.storeId, storeId),
-      gte(tickets.createdAt, new Date(startDateStr))
-    ))
-    .groupBy(sql`hour(${tickets.createdAt})`)
-    .orderBy(sql`hour(${tickets.createdAt})`);
+  // Use raw SQL to avoid GROUP BY alias issues
+  const result = await db.execute(sql`
+    SELECT 
+      hour(${tickets.createdAt}) as hour,
+      count(*) as count,
+      avg(timestampdiff(minute, ${tickets.createdAt}, ${tickets.calledAt})) as avgWaitMinutes
+    FROM ${tickets}
+    WHERE ${tickets.storeId} = ${storeId}
+      AND ${tickets.createdAt} >= ${new Date(startDateStr)}
+    GROUP BY 1
+    ORDER BY 1
+  `) as any;
 
-  return result;
+  return (result[0] || []).map((r: any) => ({
+    hour: Number(r.hour),
+    count: Number(r.count),
+    avgWaitMinutes: r.avgWaitMinutes ? Number(r.avgWaitMinutes) : null,
+  }));
 }
 
 /**
@@ -1997,20 +2001,20 @@ export async function getHourlyCrowdHeatmap(
     busy: 12,
   };
 
-  const result = await db.select({
-    dayOfWeek: sql<number>`dayofweek(${tickets.createdAt}) - 1`,
-    hour: sql<number>`hour(${tickets.createdAt})`,
-    count: sql<number>`count(*) / count(distinct date(${tickets.createdAt}))`,
-  })
-    .from(tickets)
-    .where(and(
-      eq(tickets.storeId, storeId),
-      gte(tickets.createdAt, new Date(startDateStr))
-    ))
-    .groupBy(sql`dayofweek(${tickets.createdAt}) - 1`, sql`hour(${tickets.createdAt})`)
-    .orderBy(sql`dayofweek(${tickets.createdAt}) - 1`, sql`hour(${tickets.createdAt})`);
+  // Use raw SQL to avoid GROUP BY alias issues
+  const result = await db.execute(sql`
+    SELECT 
+      dayofweek(${tickets.createdAt}) - 1 as dayOfWeek,
+      hour(${tickets.createdAt}) as hour,
+      count(*) / count(distinct date(${tickets.createdAt})) as count
+    FROM ${tickets}
+    WHERE ${tickets.storeId} = ${storeId}
+      AND ${tickets.createdAt} >= ${new Date(startDateStr)}
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+  `) as any;
 
-  return result.map(r => {
+  return (result[0] || []).map((r: any) => {
     const avgCount = Math.round(Number(r.count) || 0);
     let crowdLevel: 'empty' | 'low' | 'moderate' | 'busy' | 'crowded';
     

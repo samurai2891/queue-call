@@ -235,14 +235,14 @@ export default function Dashboard() {
     max: Math.round(d.maxWaitMinutes || 0),
   })) || [];
 
-  const hourlyChartData = hourlyStats?.map((d) => ({
+  const hourlyChartData = hourlyStats?.map((d: { hour: number; count: number; avgWaitMinutes: number | null }) => ({
     hour: formatHour(d.hour),
     count: d.count,
     avgWait: Math.round(d.avgWaitMinutes || 0),
   })) || [];
 
   // Find peak hour
-  const peakHour = hourlyStats?.reduce((max, curr) => 
+  const peakHour = hourlyStats?.reduce((max: { hour: number; count: number; avgWaitMinutes: number | null } | undefined, curr: { hour: number; count: number; avgWaitMinutes: number | null }) => 
     (curr.count > (max?.count || 0)) ? curr : max
   , hourlyStats[0]);
 

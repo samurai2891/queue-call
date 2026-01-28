@@ -749,4 +749,26 @@ VAPID鍵設定後、管理者がテストプッシュ通知を送信して動作
 - [x] 3-1: テスト実行（72件全パス）
 
 ### Phase 4: チェックポイント保存
-- [ ] 4-1: チェックポイント保存
+- [x] 4-1: チェックポイント保存 (version: 9aeba6d0)
+
+
+---
+
+## BUG-01: ダッシュボードSQLクエリエラー修正
+
+### 問題
+- getCrowdHeatmapとgetHourlyStatsのSQLクエリでエラー発生
+- GROUP BY/ORDER BY句で式を直接使用しているため、MySQLで失敗
+
+### Phase 1: SQLクエリの修正
+- [x] 1-1: getHourlyCrowdHeatmapのGROUP BY/ORDER BY修正
+  - raw SQLでGROUP BY 1, 2を使用
+- [x] 1-2: getHourlyStatsのGROUP BY/ORDER BY修正
+  - raw SQLでGROUP BY 1を使用
+- [x] 1-3: Dashboard.tsxの型エラー修正
+
+### Phase 2: テストと動作確認
+- [x] 2-1: テスト実行（72件全パス）
+
+### Phase 3: チェックポイント保存
+- [ ] 3-1: チェックポイント保存
