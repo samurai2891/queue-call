@@ -1402,3 +1402,132 @@ export async function cancelReservation(id: number): Promise<boolean> {
 export async function checkInReservation(id: number, ticketId: number): Promise<boolean> {
   return updateReservationStatus(id, "CHECKED_IN", ticketId);
 }
+
+
+// ==================== Checkin PIN Functions ====================
+
+const PIN_VALIDITY_MINUTES = 15;
+
+/**
+ * 3桁のランダムPINを生成（000-999）
+ */
+export function generateCheckinPin(): string {
+  // crypto.randomIntを使用してより安全な乱数生成
+  const randomValue = Math.floor(Math.random() * 1000);
+  return randomValue.toString().padStart(3, '0');
+}
+
+/**
+ * 店舗のPINが期限切れかどうかを確認
+ */
+export function isPinExpired(checkinPinUpdatedAt: Date | null): boolean {
+  if (!checkinPinUpdatedAt) return true;
+  const now = new Date();
+  const expiresAt = new Date(checkinPinUpdatedAt.getTime() + PIN_VALIDITY_MINUTES * 60 * 1000);
+  return now >= expiresAt;
+}
+
+/**
+ * PINの有効期限を取得
+ */
+export function getPinExpiresAt(checkinPinUpdatedAt: Date | null): Date | null {
+  if (!checkinPinUpdatedAt) return null;
+  return new Date(checkinPinUpdatedAt.getTime() + PIN_VALIDITY_MINUTES * 60 * 1000);
+}
+
+/**
+ * 店舗のPINを更新（15分経過している場合のみ）
+ * @returns 現在のPINと有効期限
+ */
+export async function getOrUpdateStorePin(storeId: number): Promise<{
+  pin: string;
+  expiresAt: Date;
+  wasUpdated: boolean;
+}> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const store = await getStoreById(storeId);
+  if (!store) throw new Error("Store not found");
+
+  // PINが存在し、有効期限内の場合はそのまま返す
+  if (store.currentCheckinPin && store.checkinPinUpdatedAt && !isPinExpired(store.checkinPinUpdatedAt)) {
+    return {
+      pin: store.currentCheckinPin,
+      expiresAt: getPinExpiresAt(store.checkinPinUpdatedAt)!,
+      wasUpdated: false,
+    };
+  }
+
+  // 新しいPINを生成して更新
+  const newPin = generateCheckinPin();
+  const now = new Date();
+
+  await db.update(stores).set({
+    currentCheckinPin: newPin,
+    checkinPinUpdatedAt: now,
+  }).where(eq(stores.id, storeId));
+
+  return {
+    pin: newPin,
+    expiresAt: getPinExpiresAt(now)!,
+    wasUpdated: true,
+  };
+}
+
+/**
+ * 整理券のPIN試行回数をインクリメント
+ */
+export async function incrementPinAttempts(ticketId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const ticket = await getTicketById(ticketId);
+  if (!ticket) throw new Error("Ticket not found");
+
+  const newAttempts = (ticket.checkinPinAttempts || 0) + 1;
+  await db.update(tickets).set({
+    checkinPinAttempts: newAttempts,
+  }).where(eq(tickets.id, ticketId));
+
+  return newAttempts;
+}
+
+/**
+ * 整理券のPIN試行回数をリセット
+ */
+export async function resetPinAttempts(ticketId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(tickets).set({
+    checkinPinAttempts: 0,
+  }).where(eq(tickets.id, ticketId));
+}
+
+/**
+ * 待機中の番号リストを取得（次のN件）
+ */
+export async function getWaitingNumbers(storeId: number, limit: number = 10): Promise<number[]> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
+
+  const store = await getStoreById(storeId);
+  if (!store) return [];
+
+  const dayKey = await ensureStoreDayKey(store);
+  const result = await db.select({ number: tickets.number })
+    .from(tickets)
+    .where(and(
+      eq(tickets.storeId, storeId),
+      eq(tickets.dayKey, dayKey),
+      eq(tickets.status, 'WAITING')
+    ))
+    .orderBy(asc(tickets.queueRank))
+    .limit(limit);
+
+  return result.map(r => r.number);
+}

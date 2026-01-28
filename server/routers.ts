@@ -230,10 +230,17 @@ const storeRouter = router({
     .query(async ({ input }) => {
       const calledTicket = await db.getCalledTicket(input.storeId);
       const waitingCount = await db.getWaitingCount(input.storeId);
+      const waitingNumbers = await db.getWaitingNumbers(input.storeId, 10);
+      
+      // PINを取得または更新（15分経過時）
+      const { pin, expiresAt } = await db.getOrUpdateStorePin(input.storeId);
       
       return {
         currentNumber: calledTicket?.number || 0,
         waitingCount,
+        waitingNumbers,
+        currentPin: pin,
+        pinExpiresAt: expiresAt,
       };
     }),
 
@@ -1080,7 +1087,7 @@ const ticketRouter = router({
       return { success: true };
     }),
 
-  // Checkin (public)
+  // Checkin (public) - 後方互換性のため残す
   checkin: publicProcedure
     .input(z.object({ 
       storeId: z.number(),
@@ -1095,6 +1102,64 @@ const ticketRouter = router({
       }
 
       await db.updateTicketStatus(ticket.id, 'ARRIVED');
+
+      broadcastTicketUpdate(ticket.storeId, ticket.ticketToken, {
+        status: 'ARRIVED',
+        number: ticket.number,
+      });
+
+      return { success: true };
+    }),
+
+  // Checkin with PIN (public) - PIN認証付き到着確認
+  checkinWithPin: publicProcedure
+    .input(z.object({ 
+      ticketToken: z.string(),
+      pin: z.string().length(3),
+    }))
+    .mutation(async ({ input }) => {
+      const MAX_ATTEMPTS = 5;
+
+      // 整理券を取得
+      const ticket = await db.getTicketByToken(input.ticketToken);
+      if (!ticket) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
+      }
+
+      // ステータス確認
+      if (ticket.status !== 'CALLED') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Ticket is not in CALLED status' });
+      }
+
+      // 有効期限確認
+      if (ticket.checkinDeadlineAt && new Date() > ticket.checkinDeadlineAt) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Checkin deadline has passed' });
+      }
+
+      // 試行回数確認
+      if ((ticket.checkinPinAttempts || 0) >= MAX_ATTEMPTS) {
+        throw new TRPCError({ 
+          code: 'TOO_MANY_REQUESTS', 
+          message: 'Too many PIN attempts. Please contact staff.',
+        });
+      }
+
+      // 店舗の現在のPINを取得
+      const { pin: currentPin } = await db.getOrUpdateStorePin(ticket.storeId);
+
+      // PIN照合
+      if (input.pin !== currentPin) {
+        const newAttempts = await db.incrementPinAttempts(ticket.id);
+        const attemptsRemaining = MAX_ATTEMPTS - newAttempts;
+        throw new TRPCError({ 
+          code: 'BAD_REQUEST', 
+          message: `Invalid PIN. ${attemptsRemaining} attempts remaining.`,
+        });
+      }
+
+      // 到着確認成功
+      await db.updateTicketStatus(ticket.id, 'ARRIVED');
+      await db.resetPinAttempts(ticket.id);
 
       broadcastTicketUpdate(ticket.storeId, ticket.ticketToken, {
         status: 'ARRIVED',

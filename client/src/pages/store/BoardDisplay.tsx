@@ -1,9 +1,9 @@
 import { useParams, useLocation } from 'wouter';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { useSSE } from '@/hooks/useSSE';
-import { AlertCircle, Volume2, VolumeX } from 'lucide-react';
+import { AlertCircle, Volume2, VolumeX, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Locale } from '@/contexts/LocaleContext';
 
@@ -15,8 +15,11 @@ function BoardDisplayContent() {
   
   const [currentNumber, setCurrentNumber] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [nextNumbers, setNextNumbers] = useState<number[]>([]);
+  const [waitingNumbers, setWaitingNumbers] = useState<number[]>([]);
   const [lastCalledNumber, setLastCalledNumber] = useState<number>(0);
+  const [currentPin, setCurrentPin] = useState<string | null>(null);
+  const [pinExpiresAt, setPinExpiresAt] = useState<Date | null>(null);
+  const [pinCountdown, setPinCountdown] = useState<string>('');
 
   // ボードはアクセスキー不要
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlugForBoard.useQuery(
@@ -27,14 +30,47 @@ function BoardDisplayContent() {
 
   const { data: queueStatus, refetch: refetchQueue } = trpc.store.getQueueStatus.useQuery(
     { storeId: store?.id || 0 },
-    { enabled: !!store?.id }
+    { 
+      enabled: !!store?.id,
+      refetchInterval: 30000, // 30秒ごとに自動更新
+    }
   );
 
   useEffect(() => {
     if (queueStatus) {
       setCurrentNumber(queueStatus.currentNumber);
+      setWaitingNumbers(queueStatus.waitingNumbers || []);
+      setCurrentPin(queueStatus.currentPin || null);
+      setPinExpiresAt(queueStatus.pinExpiresAt ? new Date(queueStatus.pinExpiresAt) : null);
     }
   }, [queueStatus]);
+
+  // PIN更新カウントダウン
+  useEffect(() => {
+    if (!pinExpiresAt) {
+      setPinCountdown('');
+      return;
+    }
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const diff = pinExpiresAt.getTime() - now.getTime();
+      
+      if (diff <= 0) {
+        setPinCountdown('');
+        refetchQueue(); // PIN期限切れ時に再取得
+        return;
+      }
+
+      const minutes = Math.floor(diff / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      setPinCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [pinExpiresAt, refetchQueue]);
 
   // SSE for real-time updates
   const { isConnected, error: sseError, usePolling } = useSSE({
@@ -55,9 +91,8 @@ function BoardDisplayContent() {
       }
       
       setCurrentNumber(newNumber);
-      if (data.nextNumbers) {
-        setNextNumbers(data.nextNumbers);
-      }
+      // SSEからの更新時もrefetchしてPINと待機リストを更新
+      refetchQueue();
     },
     onMessage: (event, data) => {
       // Handle polling-active event to trigger manual refetch
@@ -107,10 +142,6 @@ function BoardDisplayContent() {
     );
   }
 
-
-  const boardSettings = store.settings?.board;
-  const nextCount = boardSettings?.nextCount || 3;
-
   return (
     <div className="kiosk-mode flex flex-col bg-gradient-to-b from-primary/5 to-background">
       {/* Header */}
@@ -133,32 +164,54 @@ function BoardDisplayContent() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center p-8">
+      <main className="flex-1 flex flex-col items-center justify-center p-8 overflow-hidden">
         {currentNumber > 0 ? (
           <>
-            {/* Current Number */}
-            <div className="text-center mb-12">
-              <p className="text-3xl text-muted-foreground mb-4 flex items-center justify-center gap-3">
-                <Volume2 className="h-8 w-8 animate-pulse text-primary" />
+            {/* Current Number & PIN Section */}
+            <div className="text-center mb-8">
+              <p className="text-2xl md:text-3xl text-muted-foreground mb-4 flex items-center justify-center gap-3">
+                <Volume2 className="h-6 w-6 md:h-8 md:w-8 animate-pulse text-primary" />
                 {t('board.nowCalling')}
               </p>
-              <div className="board-number text-primary animate-pulse">
+              <div className="board-number text-primary animate-pulse mb-6">
                 {currentNumber}
               </div>
+              
+              {/* PIN Display */}
+              {currentPin && (
+                <div className="bg-card border-2 border-primary/30 rounded-2xl p-6 inline-block">
+                  <p className="text-lg md:text-xl text-muted-foreground mb-2">
+                    {t('board.checkinPin')}
+                  </p>
+                  <div className="text-5xl md:text-7xl font-bold tracking-[0.3em] text-foreground">
+                    {currentPin}
+                  </div>
+                  {pinCountdown && (
+                    <div className="flex items-center justify-center gap-2 mt-3 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span>{t('board.pinUpdatesIn').replace('{time}', pinCountdown)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Next Numbers */}
-            {nextNumbers.length > 0 && (
-              <div className="text-center">
-                <p className="text-2xl text-muted-foreground mb-4">{t('board.next')}</p>
-                <div className="flex gap-6 justify-center flex-wrap">
-                  {nextNumbers.slice(0, nextCount).map((num, index) => (
+            {/* Waiting Numbers Grid */}
+            {waitingNumbers.length > 0 && (
+              <div className="w-full max-w-3xl">
+                <p className="text-xl md:text-2xl text-muted-foreground mb-4 text-center">
+                  {t('board.waitingNumbers')}
+                </p>
+                <div className="grid grid-cols-5 gap-3 md:gap-4">
+                  {waitingNumbers.slice(0, 10).map((num, index) => (
                     <div
                       key={num}
-                      className="text-5xl font-bold tabular-nums text-muted-foreground"
-                      style={{ opacity: 1 - index * 0.2 }}
+                      className="bg-card border rounded-xl p-3 md:p-4 text-center"
+                      style={{ opacity: 1 - index * 0.05 }}
                     >
-                      {num}
+                      <span className="text-2xl md:text-4xl font-bold tabular-nums text-muted-foreground">
+                        {num}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -174,7 +227,7 @@ function BoardDisplayContent() {
 
       {/* Footer */}
       <footer className="p-4 text-center text-muted-foreground border-t">
-        <div className="flex items-center justify-center gap-4">
+        <div className="flex items-center justify-center gap-4 flex-wrap">
           <p className="text-sm">{t('common.poweredBy')}</p>
           {/* Connection Status Indicator */}
           {usePolling && (

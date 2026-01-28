@@ -43,6 +43,13 @@
       "when": 1769518625675,
       "tag": "0005_violet_red_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1769544191438,
+      "tag": "0006_marvelous_tattoo",
+      "breakpoints": true
     }
   ]
 }

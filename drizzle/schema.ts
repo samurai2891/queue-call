@@ -60,6 +60,10 @@ export const stores = mysqlTable("stores", {
   // Stripe顧客ID
   stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
   
+  // 到着確認用PIN（15分ごとに更新）
+  currentCheckinPin: varchar("currentCheckinPin", { length: 3 }),
+  checkinPinUpdatedAt: timestamp("checkinPinUpdatedAt"),
+  
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -147,6 +151,9 @@ export const tickets = mysqlTable("tickets", {
   doneAt: timestamp("doneAt"),
   canceledAt: timestamp("canceledAt"),
   checkinDeadlineAt: timestamp("checkinDeadlineAt"),
+  
+  // PIN入力試行回数（5回まで）
+  checkinPinAttempts: int("checkinPinAttempts").default(0).notNull(),
   
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

@@ -1,11 +1,12 @@
 import { useParams, useLocation } from 'wouter';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +18,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Bell, BellOff, AlertCircle, CheckCircle, XCircle, Clock, MessageSquare } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ArrowLeft, Bell, BellOff, AlertCircle, CheckCircle, XCircle, Clock, MessageSquare, KeyRound } from 'lucide-react';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { toast } from 'sonner';
 import { useSSE } from '@/hooks/useSSE';
@@ -35,6 +43,10 @@ function TicketContent() {
   const [groupsAhead, setGroupsAhead] = useState(0);
   const [status, setStatus] = useState<TicketStatus>('WAITING');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showPinDialog, setShowPinDialog] = useState(false);
+  const [pinDigits, setPinDigits] = useState(['', '', '']);
+  const [pinError, setPinError] = useState<string | null>(null);
+  const pinInputRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
 
   const { data: store } = trpc.store.getBySlug.useQuery(
     { slug: params.storeSlug || '' },
@@ -53,6 +65,22 @@ function TicketContent() {
     },
     onError: (error) => {
       toast.error(error.message);
+    },
+  });
+
+  const checkinWithPinMutation = trpc.ticket.checkinWithPin.useMutation({
+    onSuccess: () => {
+      toast.success(t('ticket.status.ARRIVED'));
+      setShowPinDialog(false);
+      setPinDigits(['', '', '']);
+      setPinError(null);
+      refetch();
+    },
+    onError: (error) => {
+      setPinError(error.message);
+      // Clear PIN inputs on error
+      setPinDigits(['', '', '']);
+      pinInputRefs[0].current?.focus();
     },
   });
 
@@ -105,6 +133,45 @@ function TicketContent() {
       cancelMutation.mutate({ token: params.token });
     }
     setShowCancelDialog(false);
+  };
+
+  const handlePinDigitChange = (index: number, value: string) => {
+    // Only allow digits
+    const digit = value.replace(/\D/g, '').slice(-1);
+    
+    const newDigits = [...pinDigits];
+    newDigits[index] = digit;
+    setPinDigits(newDigits);
+    setPinError(null);
+
+    // Auto-focus next input
+    if (digit && index < 2) {
+      pinInputRefs[index + 1].current?.focus();
+    }
+
+    // Auto-submit when all digits are entered
+    if (digit && index === 2 && newDigits.every(d => d !== '')) {
+      const pin = newDigits.join('');
+      if (params.token) {
+        checkinWithPinMutation.mutate({ ticketToken: params.token, pin });
+      }
+    }
+  };
+
+  const handlePinKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !pinDigits[index] && index > 0) {
+      pinInputRefs[index - 1].current?.focus();
+    }
+  };
+
+  const handleOpenPinDialog = () => {
+    setShowPinDialog(true);
+    setPinDigits(['', '', '']);
+    setPinError(null);
+    // Focus first input after dialog opens
+    setTimeout(() => {
+      pinInputRefs[0].current?.focus();
+    }, 100);
   };
 
   const getStatusBadge = () => {
@@ -242,10 +309,10 @@ function TicketContent() {
                   <Button
                     size="lg"
                     className="w-full h-14 text-lg bg-success hover:bg-success/90"
-                    onClick={() => navigate(`/s/${params.storeSlug}/checkin`)}
+                    onClick={handleOpenPinDialog}
                   >
-                    <CheckCircle className="mr-2 h-5 w-5" />
-                    {t('ticket.checkinButton')}
+                    <KeyRound className="mr-2 h-5 w-5" />
+                    {t('ticket.checkinWithPin')}
                   </Button>
                 )}
 
@@ -303,6 +370,52 @@ function TicketContent() {
           </div>
         )}
       </main>
+
+      {/* PIN Input Dialog */}
+      <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">{t('ticket.enterPin')}</DialogTitle>
+            <DialogDescription className="text-center">
+              {t('ticket.pinRequired')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-6 py-4">
+            {/* PIN Input Fields */}
+            <div className="flex gap-4 justify-center">
+              {[0, 1, 2].map((index) => (
+                <Input
+                  key={index}
+                  ref={pinInputRefs[index]}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={pinDigits[index]}
+                  onChange={(e) => handlePinDigitChange(index, e.target.value)}
+                  onKeyDown={(e) => handlePinKeyDown(index, e)}
+                  className="w-16 h-20 text-4xl text-center font-bold"
+                  disabled={checkinWithPinMutation.isPending}
+                />
+              ))}
+            </div>
+
+            {/* Error Message */}
+            {pinError && (
+              <div className="text-destructive text-sm text-center">
+                <AlertCircle className="inline h-4 w-4 mr-1" />
+                {pinError}
+              </div>
+            )}
+
+            {/* Loading State */}
+            {checkinWithPinMutation.isPending && (
+              <div className="text-muted-foreground text-sm">
+                {t('common.loading')}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

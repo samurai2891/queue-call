@@ -26,6 +26,11 @@ vi.mock('./db', () => ({
   createAuditLog: vi.fn(),
   createStaffSession: vi.fn(),
   deleteStaffSession: vi.fn(),
+  // PIN関連の新しい関数
+  getWaitingNumbers: vi.fn(),
+  getOrUpdateStorePin: vi.fn(),
+  incrementPinAttempts: vi.fn(),
+  resetPinAttempts: vi.fn(),
 }));
 
 // Mock SSE functions
@@ -143,26 +148,33 @@ describe("Store Router", () => {
   });
 
   describe("getQueueStatus", () => {
-    it("returns current queue status", async () => {
-      const { getCalledTicket, getWaitingCount } = await import('./db');
+    it("returns current queue status with PIN and waiting numbers", async () => {
+      const { getCalledTicket, getWaitingCount, getWaitingNumbers, getOrUpdateStorePin } = await import('./db');
       (getCalledTicket as any).mockResolvedValue({ number: 5 });
       (getWaitingCount as any).mockResolvedValue(10);
+      (getWaitingNumbers as any).mockResolvedValue([6, 7, 8, 9, 10]);
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      (getOrUpdateStorePin as any).mockResolvedValue({ pin: '123', expiresAt });
 
       const ctx = createPublicContext();
       const caller = appRouter.createCaller(ctx);
 
       const result = await caller.store.getQueueStatus({ storeId: 1 });
 
-      expect(result).toEqual({
-        currentNumber: 5,
-        waitingCount: 10,
-      });
+      expect(result.currentNumber).toBe(5);
+      expect(result.waitingCount).toBe(10);
+      expect(result.waitingNumbers).toEqual([6, 7, 8, 9, 10]);
+      expect(result.currentPin).toBe('123');
+      expect(result.pinExpiresAt).toEqual(expiresAt);
     });
 
     it("returns 0 for currentNumber when no ticket is called", async () => {
-      const { getCalledTicket, getWaitingCount } = await import('./db');
+      const { getCalledTicket, getWaitingCount, getWaitingNumbers, getOrUpdateStorePin } = await import('./db');
       (getCalledTicket as any).mockResolvedValue(null);
       (getWaitingCount as any).mockResolvedValue(0);
+      (getWaitingNumbers as any).mockResolvedValue([]);
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      (getOrUpdateStorePin as any).mockResolvedValue({ pin: '456', expiresAt });
 
       const ctx = createPublicContext();
       const caller = appRouter.createCaller(ctx);
@@ -170,6 +182,7 @@ describe("Store Router", () => {
       const result = await caller.store.getQueueStatus({ storeId: 1 });
 
       expect(result.currentNumber).toBe(0);
+      expect(result.waitingNumbers).toEqual([]);
     });
   });
 
