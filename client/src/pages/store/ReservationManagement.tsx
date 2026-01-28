@@ -34,8 +34,25 @@ import {
   FileText,
   RefreshCw,
   LogOut,
-  MessageSquare
+  MessageSquare,
+  Plus
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { ja, enUS, ko, zhCN, zhTW } from "date-fns/locale";
 import { toast } from "sonner";
@@ -89,6 +106,19 @@ export default function ReservationManagement() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  
+  // 予約追加ダイアログのステート
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newReservation, setNewReservation] = useState({
+    reservationDate: format(new Date(), "yyyy-MM-dd"),
+    reservationTime: "",
+    customerName: "",
+    customerPhone: "",
+    customerEmail: "",
+    partySize: 2,
+    note: "",
+  });
+  
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     action: "confirm" | "checkIn" | "cancel" | "noShow" | "sendReminder";
@@ -126,6 +156,12 @@ export default function ReservationManagement() {
       date: dateStr 
     },
     { enabled: !!storeSlug && !!sessionToken && !!session }
+  );
+  
+  // 予約設定を取得（時間枠の選択肢用）
+  const { data: reservationSettings } = trpc.reservation.getSettings.useQuery(
+    { storeSlug: storeSlug || "" },
+    { enabled: !!storeSlug }
   );
   
   const utils = trpc.useUtils();
@@ -218,6 +254,59 @@ export default function ReservationManagement() {
       toast.error(error.message);
     },
   });
+  
+  // 予約作成（スタッフ用）
+  const createReservationMutation = trpc.reservation.createByStaff.useMutation({
+    onSuccess: (data) => {
+      toast.success(t("reservation.createSuccess").replace("{number}", data.reservation.reservationNumber));
+      utils.reservation.listByStore.invalidate();
+      setAddDialogOpen(false);
+      // フォームをリセット
+      setNewReservation({
+        reservationDate: format(new Date(), "yyyy-MM-dd"),
+        reservationTime: "",
+        customerName: "",
+        customerPhone: "",
+        customerEmail: "",
+        partySize: 2,
+        note: "",
+      });
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+  
+  // 予約追加ダイアログを開く
+  const handleOpenAddDialog = () => {
+    setNewReservation(prev => ({
+      ...prev,
+      reservationDate: format(selectedDate, "yyyy-MM-dd"),
+    }));
+    setAddDialogOpen(true);
+  };
+  
+  // 予約を作成
+  const handleCreateReservation = () => {
+    if (!storeSlug || !sessionToken) return;
+    if (!newReservation.customerName || !newReservation.reservationTime) {
+      toast.error(t("reservation.fillRequired"));
+      return;
+    }
+    
+    createReservationMutation.mutate({
+      storeSlug,
+      staffToken: sessionToken,
+      reservationDate: newReservation.reservationDate,
+      reservationTime: newReservation.reservationTime,
+      customerName: newReservation.customerName,
+      customerPhone: newReservation.customerPhone || undefined,
+      customerEmail: newReservation.customerEmail || undefined,
+      partySize: newReservation.partySize,
+      note: newReservation.note || undefined,
+      locale,
+    });
+  };
   
   const handleAction = (action: "confirm" | "checkIn" | "cancel" | "noShow" | "sendReminder", reservationId: number, reservationNumber: string) => {
     setConfirmDialog({ open: true, action, reservationId, reservationNumber });
@@ -360,6 +449,11 @@ export default function ReservationManagement() {
         </div>
         
         <div className="flex items-center gap-2">
+          <Button onClick={handleOpenAddDialog}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t("reservation.addReservation")}
+          </Button>
+          
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="justify-start">
@@ -513,6 +607,125 @@ export default function ReservationManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* 予約追加ダイアログ */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("reservation.addReservation")}</DialogTitle>
+            <DialogDescription>
+              {t("reservation.addReservationDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* 予約日 */}
+            <div className="space-y-2">
+              <Label>{t("reservation.date")}</Label>
+              <Input
+                type="date"
+                value={newReservation.reservationDate}
+                onChange={(e) => setNewReservation(prev => ({ ...prev, reservationDate: e.target.value }))}
+              />
+            </div>
+            
+            {/* 予約時間 */}
+            <div className="space-y-2">
+              <Label>{t("reservation.time")} *</Label>
+              <Select
+                value={newReservation.reservationTime}
+                onValueChange={(value) => setNewReservation(prev => ({ ...prev, reservationTime: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("reservation.selectTime")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(reservationSettings?.settings?.timeSlots || []).map((time: string) => (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* お客様名 */}
+            <div className="space-y-2">
+              <Label>{t("reservation.customerName")} *</Label>
+              <Input
+                value={newReservation.customerName}
+                onChange={(e) => setNewReservation(prev => ({ ...prev, customerName: e.target.value }))}
+                placeholder={t("reservation.customerNamePlaceholder")}
+              />
+            </div>
+            
+            {/* 電話番号 */}
+            <div className="space-y-2">
+              <Label>{t("reservation.customerPhone")}</Label>
+              <Input
+                type="tel"
+                value={newReservation.customerPhone}
+                onChange={(e) => setNewReservation(prev => ({ ...prev, customerPhone: e.target.value }))}
+                placeholder="090-1234-5678"
+              />
+            </div>
+            
+            {/* メールアドレス */}
+            <div className="space-y-2">
+              <Label>{t("reservation.customerEmail")}</Label>
+              <Input
+                type="email"
+                value={newReservation.customerEmail}
+                onChange={(e) => setNewReservation(prev => ({ ...prev, customerEmail: e.target.value }))}
+                placeholder="example@email.com"
+              />
+            </div>
+            
+            {/* 人数 */}
+            <div className="space-y-2">
+              <Label>{t("reservation.partySize")}</Label>
+              <Select
+                value={newReservation.partySize.toString()}
+                onValueChange={(value) => setNewReservation(prev => ({ ...prev, partySize: parseInt(value) }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: reservationSettings?.settings?.maxPartySize || 10 }, (_, i) => i + 1).map((num) => (
+                    <SelectItem key={num} value={num.toString()}>
+                      {num}{t("reservation.people")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* 備考 */}
+            <div className="space-y-2">
+              <Label>{t("reservation.note")}</Label>
+              <Textarea
+                value={newReservation.note}
+                onChange={(e) => setNewReservation(prev => ({ ...prev, note: e.target.value }))}
+                placeholder={t("reservation.notePlaceholder")}
+                rows={3}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button 
+              onClick={handleCreateReservation}
+              disabled={createReservationMutation.isPending}
+            >
+              {createReservationMutation.isPending ? t("common.loading") : t("reservation.createReservation")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
   

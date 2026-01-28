@@ -2159,6 +2159,76 @@ const reservationRouter = router({
       return { success: true, message: 'Reminder sent successfully' };
     }),
 
+  // スタッフによる予約作成（電話・DM受付用）
+  createByStaff: publicProcedure
+    .input(z.object({
+      storeSlug: z.string(),
+      staffToken: z.string(),
+      reservationDate: z.string(),
+      reservationTime: z.string(),
+      customerName: z.string().min(1),
+      customerPhone: z.string().optional(),
+      customerEmail: z.string().email().optional().or(z.literal('')),
+      partySize: z.number().int().min(1),
+      note: z.string().optional(),
+      locale: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const store = await db.getStoreBySlug(input.storeSlug);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      // スタッフトークン検証
+      const session = await db.getStaffSession(input.staffToken);
+      if (!session || session.storeId !== store.id) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid staff token' });
+      }
+
+      const settings = store.settings?.reservation;
+      if (!settings?.enabled) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Reservations are not enabled for this store' });
+      }
+
+      // 時間枠の空きを確認
+      const count = await db.getReservationCountBySlot(store.id, input.reservationDate, input.reservationTime);
+      const maxPerSlot = settings.maxPerSlot || 5;
+      if (count >= maxPerSlot) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'This time slot is fully booked' });
+      }
+
+      // 人数チェック
+      const maxPartySize = settings.maxPartySize || 10;
+      if (input.partySize > maxPartySize) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `Maximum party size is ${maxPartySize}` });
+      }
+
+      // メールアドレスが空文字の場合はundefinedに変換
+      const customerEmail = input.customerEmail && input.customerEmail.trim() !== '' ? input.customerEmail : undefined;
+
+      const reservation = await db.createReservation({
+        storeId: store.id,
+        reservationDate: input.reservationDate,
+        reservationTime: input.reservationTime,
+        customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        customerEmail,
+        partySize: input.partySize,
+        note: input.note,
+        locale: input.locale,
+        autoConfirm: true, // スタッフ登録は自動確認
+      });
+
+      if (!reservation) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create reservation' });
+      }
+
+      return {
+        reservation,
+        message: 'Reservation created successfully',
+      };
+    }),
+
   // 予約設定を更新（オーナー向け）
   updateSettings: protectedProcedure
     .input(z.object({
