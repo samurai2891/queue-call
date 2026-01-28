@@ -119,10 +119,20 @@ function CrowdHeatmapChart({ data, t }: {
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const { t } = useLocale();
+  const [globalDays, setGlobalDays] = useState(30);
   const [visitorDays, setVisitorDays] = useState(30);
   const [waitTimeDays, setWaitTimeDays] = useState(30);
   const [hourlyDays, setHourlyDays] = useState(30);
   const [heatmapDays, setHeatmapDays] = useState(30);
+
+  // Handler to sync all periods
+  const handleGlobalDaysChange = (days: number) => {
+    setGlobalDays(days);
+    setVisitorDays(days);
+    setWaitTimeDays(days);
+    setHourlyDays(days);
+    setHeatmapDays(days);
+  };
 
   // Get user's stores
   const { data: stores, isLoading: storesLoading } = trpc.store.getMyStores.useQuery();
@@ -266,6 +276,23 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            {/* Global period selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">{t('dashboard.globalPeriod')}:</span>
+              <Select
+                value={globalDays.toString()}
+                onValueChange={(v) => handleGlobalDaysChange(parseInt(v))}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">{t('dashboard.heatmapDays7')}</SelectItem>
+                  <SelectItem value="30">{t('dashboard.heatmapDays30')}</SelectItem>
+                  <SelectItem value="90">{t('dashboard.heatmapDays90')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {/* Store selector */}
             {stores.length > 1 && (
               <Select
