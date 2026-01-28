@@ -3,10 +3,57 @@ import { useState, useEffect, useMemo } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { useSSE } from '@/hooks/useSSE';
-import { AlertCircle, Volume2, VolumeX, Clock } from 'lucide-react';
+import { AlertCircle, Volume2, VolumeX, Clock, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Locale } from '@/contexts/LocaleContext';
 
+type CrowdLevel = 'empty' | 'low' | 'moderate' | 'busy' | 'crowded';
+
+const crowdLevelConfig: Record<CrowdLevel, { color: string; bgColor: string; icon: string }> = {
+  empty: {
+    color: 'text-green-600',
+    bgColor: 'bg-green-100',
+    icon: '○',
+  },
+  low: {
+    color: 'text-green-500',
+    bgColor: 'bg-green-50',
+    icon: '◎',
+  },
+  moderate: {
+    color: 'text-yellow-600',
+    bgColor: 'bg-yellow-100',
+    icon: '△',
+  },
+  busy: {
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-100',
+    icon: '▲',
+  },
+  crowded: {
+    color: 'text-red-600',
+    bgColor: 'bg-red-100',
+    icon: '×',
+  },
+};
+
+function CrowdLevelBadgeBoard({ level }: { level: CrowdLevel }) {
+  const { t } = useLocale();
+  const config = crowdLevelConfig[level];
+  const labelKey = `store.crowdLevel.${level}` as const;
+  
+  return (
+    <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${config.bgColor}`}>
+      <Users className={`h-5 w-5 ${config.color}`} />
+      <span className={`text-lg ${config.icon === '×' ? 'text-2xl' : 'text-xl'} ${config.color}`}>
+        {config.icon}
+      </span>
+      <span className={`font-semibold text-lg ${config.color}`}>
+        {t(labelKey)}
+      </span>
+    </div>
+  );
+}
 
 function BoardDisplayContent() {
   const params = useParams<{ storeSlug: string }>();
@@ -20,6 +67,8 @@ function BoardDisplayContent() {
   const [currentPin, setCurrentPin] = useState<string | null>(null);
   const [pinExpiresAt, setPinExpiresAt] = useState<Date | null>(null);
   const [pinCountdown, setPinCountdown] = useState<string>('');
+  const [showCrowdLevel, setShowCrowdLevel] = useState<boolean>(false);
+  const [crowdLevel, setCrowdLevel] = useState<string>('empty');
 
   // ボードはアクセスキー不要
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlugForBoard.useQuery(
@@ -42,6 +91,8 @@ function BoardDisplayContent() {
       setWaitingNumbers(queueStatus.waitingNumbers || []);
       setCurrentPin(queueStatus.currentPin || null);
       setPinExpiresAt(queueStatus.pinExpiresAt ? new Date(queueStatus.pinExpiresAt) : null);
+      setShowCrowdLevel(queueStatus.showCrowdLevel || false);
+      setCrowdLevel(queueStatus.crowdLevel || 'empty');
     }
   }, [queueStatus]);
 
@@ -147,7 +198,13 @@ function BoardDisplayContent() {
       {/* Header */}
       <header className="p-6 border-b flex items-center justify-between">
         <div className="w-16" /> {/* Spacer for centering */}
-        <h1 className="text-4xl font-bold">{store.name}</h1>
+        <div className="flex flex-col items-center gap-2">
+          <h1 className="text-4xl font-bold">{store.name}</h1>
+          {/* Crowd Level Badge */}
+          {showCrowdLevel && (
+            <CrowdLevelBadgeBoard level={crowdLevel as CrowdLevel} />
+          )}
+        </div>
         <Button
           variant="ghost"
           size="icon"
