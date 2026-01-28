@@ -514,6 +514,27 @@ const ticketRouter = router({
       };
     }),
 
+  // Set wait time alert (public)
+  setWaitAlert: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      alertMinutes: z.number().min(1).max(120).nullable(),
+    }))
+    .mutation(async ({ input }) => {
+      const ticket = await db.getTicketByToken(input.token);
+      if (!ticket) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
+      }
+
+      if (ticket.status !== 'WAITING') {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Cannot set alert for non-waiting ticket' });
+      }
+
+      await db.setWaitAlert(ticket.id, input.alertMinutes);
+
+      return { success: true, alertMinutes: input.alertMinutes };
+    }),
+
   // Cancel ticket (public)
   cancel: publicProcedure
     .input(z.object({ token: z.string() }))

@@ -1,5 +1,6 @@
 import { eq, and, desc, asc, sql, inArray, lt, gte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { isNotNull, isNull } from "drizzle-orm";
 import { 
   InsertUser, users, 
   stores, InsertStore, Store, StoreSettings,
@@ -1625,4 +1626,108 @@ export async function getWaitTimeInfo(storeId: number): Promise<{
     currentWaitingCount: waitingCount,
     estimatedWaitMinutes,
   };
+}
+
+
+// ==================== Wait Alert Functions ====================
+
+/**
+ * 整理券の待ち時間アラート設定を更新
+ */
+export async function setWaitAlert(ticketId: number, alertMinutes: number | null): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(tickets).set({
+    waitAlertMinutes: alertMinutes,
+    waitAlertSentAt: null, // アラート設定変更時はリセット
+  }).where(eq(tickets.id, ticketId));
+}
+
+/**
+ * 整理券の待ち時間アラートを送信済みとしてマーク
+ */
+export async function markWaitAlertSent(ticketId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(tickets).set({
+    waitAlertSentAt: new Date(),
+  }).where(eq(tickets.id, ticketId));
+}
+
+/**
+ * アラート送信対象の整理券を取得
+ * 条件: WAITING状態、アラート設定あり、未送信、予測待ち時間が閾値以下
+ */
+export async function getTicketsForWaitAlert(storeId: number): Promise<Array<{
+  id: number;
+  ticketToken: string;
+  number: number;
+  waitAlertMinutes: number;
+  groupsAhead: number;
+}>> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
+
+  const store = await getStoreById(storeId);
+  if (!store) return [];
+
+  const dayKey = await ensureStoreDayKey(store);
+
+  // アラート設定があり、未送信のWAITINGチケットを取得
+  const result = await db.select({
+    id: tickets.id,
+    ticketToken: tickets.ticketToken,
+    number: tickets.number,
+    waitAlertMinutes: tickets.waitAlertMinutes,
+    queueRank: tickets.queueRank,
+  })
+    .from(tickets)
+    .where(and(
+      eq(tickets.storeId, storeId),
+      eq(tickets.dayKey, dayKey),
+      eq(tickets.status, 'WAITING'),
+      isNotNull(tickets.waitAlertMinutes),
+      isNull(tickets.waitAlertSentAt)
+    ))
+    .orderBy(asc(tickets.queueRank));
+
+  // 各チケットの待ち組数を計算
+  const ticketsWithGroupsAhead = await Promise.all(
+    result.map(async (ticket) => {
+      const groupsAhead = await getGroupsAheadByRank(storeId, dayKey, ticket.queueRank);
+      return {
+        id: ticket.id,
+        ticketToken: ticket.ticketToken,
+        number: ticket.number,
+        waitAlertMinutes: ticket.waitAlertMinutes!,
+        groupsAhead,
+      };
+    })
+  );
+
+  return ticketsWithGroupsAhead;
+}
+
+/**
+ * queueRankを基に待ち組数を計算
+ */
+async function getGroupsAheadByRank(storeId: number, dayKey: string, queueRank: string | null): Promise<number> {
+  const db = await getDb();
+  if (!db || !queueRank) return 0;
+
+  const result = await db.select({ count: sql<number>`count(*)` })
+    .from(tickets)
+    .where(and(
+      eq(tickets.storeId, storeId),
+      eq(tickets.dayKey, dayKey),
+      eq(tickets.status, 'WAITING'),
+      sql`${tickets.queueRank} < ${queueRank}`
+    ));
+
+  return result[0]?.count || 0;
 }

@@ -155,6 +155,10 @@ export const tickets = mysqlTable("tickets", {
   // PIN入力試行回数（5回まで）
   checkinPinAttempts: int("checkinPinAttempts").default(0).notNull(),
   
+  // 予測待ち時間アラート設定
+  waitAlertMinutes: int("waitAlertMinutes"), // アラート閾値（分）、null=無効
+  waitAlertSentAt: timestamp("waitAlertSentAt"), // アラート送信済み日時
+  
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

@@ -25,7 +25,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ArrowLeft, Bell, BellOff, AlertCircle, CheckCircle, XCircle, Clock, MessageSquare, KeyRound } from 'lucide-react';
+import { ArrowLeft, Bell, BellOff, AlertCircle, CheckCircle, XCircle, Clock, MessageSquare, KeyRound, BellRing } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { toast } from 'sonner';
 import { useSSE } from '@/hooks/useSSE';
@@ -47,6 +54,7 @@ function TicketContent() {
   const [pinDigits, setPinDigits] = useState(['', '', '']);
   const [pinError, setPinError] = useState<string | null>(null);
   const pinInputRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
+  const [waitAlertMinutes, setWaitAlertMinutes] = useState<number | null>(null);
 
   const { data: store } = trpc.store.getBySlug.useQuery(
     { slug: params.storeSlug || '' },
@@ -62,6 +70,19 @@ function TicketContent() {
     onSuccess: () => {
       toast.success(t('ticket.status.CANCELED'));
       refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const setWaitAlertMutation = trpc.ticket.setWaitAlert.useMutation({
+    onSuccess: (data) => {
+      if (data.alertMinutes) {
+        toast.success(t('ticket.waitAlertSet').replace('{minutes}', String(data.alertMinutes)));
+      } else {
+        toast.success(t('ticket.waitAlertDisabled'));
+      }
     },
     onError: (error) => {
       toast.error(error.message);
@@ -89,6 +110,7 @@ function TicketContent() {
       setCurrentNumber(ticket.currentNumber);
       setGroupsAhead(ticket.groupsAhead);
       setStatus(ticket.status as TicketStatus);
+      setWaitAlertMinutes(ticket.waitAlertMinutes ?? null);
     }
   }, [ticket]);
 
@@ -295,6 +317,46 @@ function TicketContent() {
                     </p>
                   </div>
                 )}
+
+                {/* Wait Time Alert Setting */}
+                <div className="p-4 bg-muted/30 rounded-lg border">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BellRing className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">{t('ticket.waitAlertTitle')}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    {t('ticket.waitAlertDescription')}
+                  </p>
+                  <Select
+                    value={waitAlertMinutes?.toString() || 'off'}
+                    onValueChange={(value) => {
+                      const minutes = value === 'off' ? null : parseInt(value, 10);
+                      setWaitAlertMinutes(minutes);
+                      if (params.token) {
+                        setWaitAlertMutation.mutate({ token: params.token, alertMinutes: minutes });
+                      }
+                    }}
+                    disabled={setWaitAlertMutation.isPending}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={t('ticket.waitAlertOff')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="off">{t('ticket.waitAlertOff')}</SelectItem>
+                      <SelectItem value="5">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '5')}</SelectItem>
+                      <SelectItem value="10">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '10')}</SelectItem>
+                      <SelectItem value="15">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '15')}</SelectItem>
+                      <SelectItem value="20">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '20')}</SelectItem>
+                      <SelectItem value="30">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '30')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {waitAlertMinutes && ticket.waitAlertSentAt && (
+                    <p className="text-xs text-success mt-2 flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" />
+                      {t('ticket.waitAlertSent')}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 

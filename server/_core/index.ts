@@ -17,6 +17,7 @@ import { handleSSE } from "../sse";
 import { startAutoSkipJob } from "../jobs/autoSkip";
 import { startCleanupSmsLogsJob } from "../jobs/cleanupSmsLogs";
 import { startDailyResetJob } from "../jobs/dailyReset";
+import { startWaitAlertJob } from "../jobs/waitAlert";
 
 import { constructWebhookEvent, handleCheckoutCompleted } from "../stripe";
 import { storageGet, storagePut } from "../storage";
@@ -375,6 +376,7 @@ async function startServer() {
     startAutoSkipJob(60); // Run every 60 seconds
     startCleanupSmsLogsJob();
     startDailyResetJob(300);
+    startWaitAlertJob(60); // Run every 60 seconds
 
   });
 }

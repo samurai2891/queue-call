@@ -615,3 +615,47 @@ export async function sendReservationReminderSms(
     return { success: false, reason: 'Internal error' };
   }
 }
+
+// Send wait time alert notification
+export async function sendWaitTimeAlert(
+  ticketId: number,
+  storeId: number,
+  storeName: string,
+  ticketNumber: number,
+  estimatedMinutes: number,
+  options?: {
+    storeSlug?: string;
+    requestId?: string;
+  }
+): Promise<boolean> {
+  const logContext: NotificationLogContext = {
+    storeId,
+    storeSlug: options?.storeSlug,
+    ticketId,
+    requestId: options?.requestId,
+  };
+
+  const message = `まもなく順番です！予測待ち時間が約${estimatedMinutes}分になりました。`;
+
+  const result = await sendPushNotification(ticketId, {
+    title: `${storeName} - まもなく順番`,
+    body: message,
+    tag: `wait-alert-${ticketId}`,
+    data: {
+      type: 'wait_alert',
+      ticketId,
+      ticketNumber,
+      estimatedMinutes,
+    },
+  }, logContext);
+
+  if (result) {
+    console.log('[Push] Wait time alert sent', {
+      ...logContext,
+      ticketNumber,
+      estimatedMinutes,
+    });
+  }
+
+  return result;
+}
