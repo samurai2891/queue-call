@@ -508,6 +508,7 @@ function SettingsContent() {
     enableReorder: false,
     reorderMaxMove: 3,
     reorderReasonRequired: true,
+    showEstimatedWaitTime: false,
     
     // Notifications
     pushEnabled: true,
@@ -644,6 +645,7 @@ function SettingsContent() {
         enableReorder: settings.queue?.enableReorder || false,
         reorderMaxMove: settings.queue?.reorderMaxMove || 3,
         reorderReasonRequired: settings.queue?.reorderReasonRequired || true,
+        showEstimatedWaitTime: settings.queue?.showEstimatedWaitTime ?? false,
         
         pushEnabled: settings.notifications?.pushEnabled ?? true,
         smsEnabled: settings.notifications?.smsEnabled || false,
@@ -740,6 +742,7 @@ function SettingsContent() {
         enableReorder: formData.enableReorder,
         reorderMaxMove: formData.reorderMaxMove,
         reorderReasonRequired: formData.reorderReasonRequired,
+        showEstimatedWaitTime: formData.showEstimatedWaitTime,
       },
       notifications: {
         pushEnabled: formData.pushEnabled,
@@ -1540,6 +1543,21 @@ function SettingsContent() {
                       </div>
                     </div>
                   )}
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>{t('settings.showEstimatedWaitTime')}</Label>
+                      <p className="text-sm text-muted-foreground">{t('settings.showEstimatedWaitTimeDescription')}</p>
+                    </div>
+                    <Switch
+                      checked={formData.showEstimatedWaitTime}
+                      onCheckedChange={(checked) => updateField('showEstimatedWaitTime', checked)}
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -80,6 +80,7 @@ export interface StoreSettings {
     reorderMaxMove?: number;
     reorderReasonRequired?: boolean;
     auditLog?: boolean;
+    showEstimatedWaitTime?: boolean; // 店舗トップページに予測待ち時間を表示
   };
 
   notifications?: {

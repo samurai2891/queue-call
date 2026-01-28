@@ -238,6 +238,10 @@ const storeRouter = router({
       // 予測待ち時間を計算
       const waitTimeInfo = await db.getWaitTimeInfo(input.storeId);
       
+      // 店舗設定を取得（予測待ち時間表示設定のため）
+      const store = await db.getStoreById(input.storeId);
+      const showEstimatedWaitTime = store?.settings?.queue?.showEstimatedWaitTime ?? false;
+      
       return {
         currentNumber: calledTicket?.number || 0,
         waitingCount,
@@ -246,6 +250,7 @@ const storeRouter = router({
         pinExpiresAt: expiresAt,
         estimatedWaitMinutes: waitTimeInfo.estimatedWaitMinutes,
         avgServiceTimeMinutes: waitTimeInfo.avgServiceTimeMinutes,
+        showEstimatedWaitTime,
       };
     }),
 

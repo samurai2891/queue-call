@@ -5,7 +5,7 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, ClipboardList, UtensilsCrossed, AlertCircle } from 'lucide-react';
+import { Users, ClipboardList, UtensilsCrossed, AlertCircle, Clock } from 'lucide-react';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { useSSE } from '@/hooks/useSSE';
 import { useState, useEffect } from 'react';
@@ -27,11 +27,15 @@ function StoreTopContent() {
 
   const [currentNumber, setCurrentNumber] = useState(0);
   const [waitingCount, setWaitingCount] = useState(0);
+  const [estimatedWaitMinutes, setEstimatedWaitMinutes] = useState<number | null>(null);
+  const [showEstimatedWaitTime, setShowEstimatedWaitTime] = useState(false);
 
   useEffect(() => {
     if (queueStatus) {
       setCurrentNumber(queueStatus.currentNumber);
       setWaitingCount(queueStatus.waitingCount);
+      setEstimatedWaitMinutes(queueStatus.estimatedWaitMinutes);
+      setShowEstimatedWaitTime(queueStatus.showEstimatedWaitTime);
     }
   }, [queueStatus]);
 
@@ -122,6 +126,19 @@ function StoreTopContent() {
                 </div>
               </div>
             </div>
+
+            {/* Estimated Wait Time */}
+            {showEstimatedWaitTime && estimatedWaitMinutes !== null && (
+              <div className="mt-6 p-4 bg-primary/5 rounded-lg">
+                <div className="flex items-center justify-center gap-2">
+                  <Clock className="h-5 w-5 text-primary" />
+                  <p className="text-sm text-muted-foreground">{t('store.estimatedWait')}</p>
+                </div>
+                <p className="text-3xl font-bold text-center mt-2 text-primary">
+                  {estimatedWaitMinutes} {t('store.minutes')}
+                </p>
+              </div>
+            )}
 
             {/* Intake Status */}
             {isPaused && (
