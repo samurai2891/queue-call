@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Clock, TrendingUp, Calendar, BarChart3, ArrowLeft } from "lucide-react";
+import { Users, Clock, TrendingUp, Calendar, BarChart3, ArrowLeft, Flame } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 import {
@@ -21,6 +21,99 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+
+// Crowd level colors
+const crowdLevelColors: Record<string, string> = {
+  empty: 'bg-green-100 text-green-800',
+  low: 'bg-green-200 text-green-900',
+  moderate: 'bg-yellow-200 text-yellow-900',
+  busy: 'bg-orange-300 text-orange-900',
+  crowded: 'bg-red-400 text-red-900',
+};
+
+// Day of week labels
+const dayOfWeekLabels = ['dashboard.sunday', 'dashboard.monday', 'dashboard.tuesday', 'dashboard.wednesday', 'dashboard.thursday', 'dashboard.friday', 'dashboard.saturday'] as const;
+
+// Crowd Heatmap Component
+function CrowdHeatmapChart({ data, t }: { 
+  data: Array<{ dayOfWeek: number; hour: number; count: number; crowdLevel: string }>;
+  t: (key: any) => string;
+}) {
+  // Group data by dayOfWeek and hour
+  const heatmapData = new Map<string, { count: number; crowdLevel: string }>();
+  data.forEach(item => {
+    const key = `${item.dayOfWeek}-${item.hour}`;
+    heatmapData.set(key, { count: item.count, crowdLevel: item.crowdLevel });
+  });
+
+  // Generate hours (6:00 - 23:00)
+  const hours = Array.from({ length: 18 }, (_, i) => i + 6);
+  const days = [0, 1, 2, 3, 4, 5, 6]; // Sunday to Saturday
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[600px]">
+        {/* Header row with hours */}
+        <div className="flex">
+          <div className="w-16 shrink-0" /> {/* Empty corner */}
+          {hours.map(hour => (
+            <div key={hour} className="flex-1 text-center text-xs text-muted-foreground py-1">
+              {hour}:00
+            </div>
+          ))}
+        </div>
+        
+        {/* Data rows */}
+        {days.map(dayOfWeek => (
+          <div key={dayOfWeek} className="flex items-center">
+            <div className="w-16 shrink-0 text-xs text-muted-foreground pr-2 text-right">
+              {t(dayOfWeekLabels[dayOfWeek] as any)}
+            </div>
+            {hours.map(hour => {
+              const cellData = heatmapData.get(`${dayOfWeek}-${hour}`);
+              const crowdLevel = cellData?.crowdLevel || 'empty';
+              const count = cellData?.count || 0;
+              
+              return (
+                <div
+                  key={hour}
+                  className={`flex-1 h-8 m-0.5 rounded flex items-center justify-center text-xs font-medium ${crowdLevelColors[crowdLevel]}`}
+                  title={`${t(dayOfWeekLabels[dayOfWeek] as any)} ${hour}:00 - ${count}${t('dashboard.visitors')}`}
+                >
+                  {count > 0 ? count : ''}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+        
+        {/* Legend */}
+        <div className="flex items-center justify-center gap-4 mt-4 text-xs">
+          <div className="flex items-center gap-1">
+            <div className={`w-4 h-4 rounded ${crowdLevelColors.empty}`} />
+            <span>{t('dashboard.crowdEmpty')}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className={`w-4 h-4 rounded ${crowdLevelColors.low}`} />
+            <span>{t('dashboard.crowdLow')}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className={`w-4 h-4 rounded ${crowdLevelColors.moderate}`} />
+            <span>{t('dashboard.crowdModerate')}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className={`w-4 h-4 rounded ${crowdLevelColors.busy}`} />
+            <span>{t('dashboard.crowdBusy')}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className={`w-4 h-4 rounded ${crowdLevelColors.crowded}`} />
+            <span>{t('dashboard.crowdCrowded')}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
@@ -51,6 +144,12 @@ export default function Dashboard() {
   );
 
   const { data: hourlyStats, isLoading: hourlyStatsLoading } = trpc.store.getHourlyStats.useQuery(
+    { storeId: storeId!, days },
+    { enabled: !!storeId }
+  );
+
+  // Crowd heatmap query
+  const { data: crowdHeatmap, isLoading: crowdHeatmapLoading } = trpc.store.getCrowdHeatmap.useQuery(
     { storeId: storeId!, days },
     { enabled: !!storeId }
   );
@@ -355,6 +454,28 @@ export default function Dashboard() {
                   />
                 </LineChart>
               </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Crowd Heatmap */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Flame className="h-5 w-5" />
+              {t("dashboard.crowdHeatmap")}
+            </CardTitle>
+            <CardDescription>{t("dashboard.crowdHeatmapDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {crowdHeatmapLoading ? (
+              <Skeleton className="h-64 w-full" />
+            ) : !crowdHeatmap || crowdHeatmap.length === 0 ? (
+              <div className="h-64 flex items-center justify-center text-muted-foreground">
+                {t("dashboard.noData")}
+              </div>
+            ) : (
+              <CrowdHeatmapChart data={crowdHeatmap} t={t} />
             )}
           </CardContent>
         </Card>

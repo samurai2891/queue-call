@@ -1793,3 +1793,244 @@ export async function getWeeklyReservations(
 ): Promise<Reservation[]> {
   return getReservationsByStore(storeId, { startDate, endDate });
 }
+
+
+// ==================== Crowd Level History Functions ====================
+
+/**
+ * 時間帯別の混雑状況推移を取得（日別・時間帯別）
+ * 各時間帯の待機組数の最大値を集計
+ */
+export async function getCrowdLevelHistory(
+  storeId: number,
+  days: number = 7
+): Promise<Array<{
+  date: string;
+  hour: number;
+  maxWaitingCount: number;
+  avgWaitingCount: number;
+  ticketCount: number;
+}>> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+  const startDateStr = startDate.toISOString().slice(0, 19).replace('T', ' ');
+
+  // 各チケットが作成された時点での待機組数を計算するサブクエリ
+  // 簡略化: 各時間帯に発行されたチケット数を待機組数の指標として使用
+  const result = await db.select({
+    date: sql<string>`date(${tickets.createdAt})`,
+    hour: sql<number>`hour(${tickets.createdAt})`,
+    ticketCount: sql<number>`count(*)`,
+    // 待機中だったチケット数（SKIPPEDやCANCELED以外）
+    activeCount: sql<number>`sum(case when ${tickets.status} in ('WAITING', 'CALLED', 'ARRIVED', 'DONE') then 1 else 0 end)`,
+  })
+    .from(tickets)
+    .where(and(
+      eq(tickets.storeId, storeId),
+      gte(tickets.createdAt, new Date(startDateStr))
+    ))
+    .groupBy(sql`date(${tickets.createdAt})`, sql`hour(${tickets.createdAt})`)
+    .orderBy(sql`date(${tickets.createdAt})`, sql`hour(${tickets.createdAt})`);
+
+  return result.map(r => ({
+    date: r.date,
+    hour: r.hour,
+    maxWaitingCount: Number(r.activeCount) || 0,
+    avgWaitingCount: Number(r.activeCount) || 0,
+    ticketCount: Number(r.ticketCount) || 0,
+  }));
+}
+
+/**
+ * 日別の混雑ピーク時間帯を取得
+ */
+export async function getDailyPeakHours(
+  storeId: number,
+  days: number = 30
+): Promise<Array<{
+  date: string;
+  peakHour: number;
+  peakCount: number;
+  totalCount: number;
+}>> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+  const startDateStr = startDate.toISOString().slice(0, 19).replace('T', ' ');
+
+  // 日別・時間帯別の集計
+  const hourlyData = await db.select({
+    date: sql<string>`date(${tickets.createdAt})`,
+    hour: sql<number>`hour(${tickets.createdAt})`,
+    count: sql<number>`count(*)`,
+  })
+    .from(tickets)
+    .where(and(
+      eq(tickets.storeId, storeId),
+      gte(tickets.createdAt, new Date(startDateStr))
+    ))
+    .groupBy(sql`date(${tickets.createdAt})`, sql`hour(${tickets.createdAt})`)
+    .orderBy(sql`date(${tickets.createdAt})`, sql`hour(${tickets.createdAt})`);
+
+  // 日別にピーク時間帯を計算
+  const dailyMap = new Map<string, { peakHour: number; peakCount: number; totalCount: number }>();
+  
+  for (const row of hourlyData) {
+    const existing = dailyMap.get(row.date);
+    const count = Number(row.count) || 0;
+    
+    if (!existing) {
+      dailyMap.set(row.date, {
+        peakHour: row.hour,
+        peakCount: count,
+        totalCount: count,
+      });
+    } else {
+      existing.totalCount += count;
+      if (count > existing.peakCount) {
+        existing.peakHour = row.hour;
+        existing.peakCount = count;
+      }
+    }
+  }
+
+  return Array.from(dailyMap.entries()).map(([date, data]) => ({
+    date,
+    ...data,
+  }));
+}
+
+/**
+ * 曜日別・時間帯別の平均混雑状況を取得
+ */
+export async function getWeekdayHourlyCrowdPattern(
+  storeId: number,
+  days: number = 90
+): Promise<Array<{
+  dayOfWeek: number; // 0=日曜, 1=月曜, ..., 6=土曜
+  hour: number;
+  avgCount: number;
+  maxCount: number;
+}>> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+  const startDateStr = startDate.toISOString().slice(0, 19).replace('T', ' ');
+
+  const result = await db.select({
+    dayOfWeek: sql<number>`dayofweek(${tickets.createdAt}) - 1`, // MySQL: 1=日曜 → 0=日曜に変換
+    hour: sql<number>`hour(${tickets.createdAt})`,
+    avgCount: sql<number>`count(*) / count(distinct date(${tickets.createdAt}))`,
+    maxCount: sql<number>`max(daily_count)`,
+  })
+    .from(
+      db.select({
+        createdAt: tickets.createdAt,
+        dailyCount: sql<number>`count(*)`.as('daily_count'),
+      })
+        .from(tickets)
+        .where(and(
+          eq(tickets.storeId, storeId),
+          gte(tickets.createdAt, new Date(startDateStr))
+        ))
+        .groupBy(sql`date(${tickets.createdAt})`, sql`hour(${tickets.createdAt})`)
+        .as('daily_hourly')
+    )
+    .groupBy(sql`dayofweek(${tickets.createdAt}) - 1`, sql`hour(${tickets.createdAt})`)
+    .orderBy(sql`dayofweek(${tickets.createdAt}) - 1`, sql`hour(${tickets.createdAt})`);
+
+  return result.map(r => ({
+    dayOfWeek: Number(r.dayOfWeek),
+    hour: Number(r.hour),
+    avgCount: Math.round(Number(r.avgCount) || 0),
+    maxCount: Number(r.maxCount) || 0,
+  }));
+}
+
+/**
+ * 時間帯別の混雑パターンを取得（ヒートマップ用）
+ */
+export async function getHourlyCrowdHeatmap(
+  storeId: number,
+  days: number = 30
+): Promise<Array<{
+  dayOfWeek: number;
+  hour: number;
+  count: number;
+  crowdLevel: 'empty' | 'low' | 'moderate' | 'busy' | 'crowded';
+}>> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+  const startDateStr = startDate.toISOString().slice(0, 19).replace('T', ' ');
+
+  // 店舗の混雑レベル閾値を取得
+  const store = await getStoreById(storeId);
+  const thresholds = store?.settings?.queue?.crowdLevelThresholds || {
+    low: 3,
+    moderate: 7,
+    busy: 12,
+  };
+
+  const result = await db.select({
+    dayOfWeek: sql<number>`dayofweek(${tickets.createdAt}) - 1`,
+    hour: sql<number>`hour(${tickets.createdAt})`,
+    count: sql<number>`count(*) / count(distinct date(${tickets.createdAt}))`,
+  })
+    .from(tickets)
+    .where(and(
+      eq(tickets.storeId, storeId),
+      gte(tickets.createdAt, new Date(startDateStr))
+    ))
+    .groupBy(sql`dayofweek(${tickets.createdAt}) - 1`, sql`hour(${tickets.createdAt})`)
+    .orderBy(sql`dayofweek(${tickets.createdAt}) - 1`, sql`hour(${tickets.createdAt})`);
+
+  return result.map(r => {
+    const avgCount = Math.round(Number(r.count) || 0);
+    let crowdLevel: 'empty' | 'low' | 'moderate' | 'busy' | 'crowded';
+    
+    if (avgCount === 0) {
+      crowdLevel = 'empty';
+    } else if (avgCount <= (thresholds.low || 3)) {
+      crowdLevel = 'low';
+    } else if (avgCount <= (thresholds.moderate || 7)) {
+      crowdLevel = 'moderate';
+    } else if (avgCount <= (thresholds.busy || 12)) {
+      crowdLevel = 'busy';
+    } else {
+      crowdLevel = 'crowded';
+    }
+
+    return {
+      dayOfWeek: Number(r.dayOfWeek),
+      hour: Number(r.hour),
+      count: avgCount,
+      crowdLevel,
+    };
+  });
+}

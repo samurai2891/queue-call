@@ -471,6 +471,48 @@ const storeRouter = router({
       }
       return await db.getStatsSummary(input.storeId);
     }),
+
+  // 統計API: 混雑状況推移（時間帯別）
+  getCrowdLevelHistory: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      days: z.number().min(1).max(365).optional().default(7),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      return await db.getCrowdLevelHistory(input.storeId, input.days);
+    }),
+
+  // 統計API: 日別ピーク時間帯
+  getDailyPeakHours: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      days: z.number().min(1).max(365).optional().default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      return await db.getDailyPeakHours(input.storeId, input.days);
+    }),
+
+  // 統計API: 混雑ヒートマップ（曜日×時間帯）
+  getCrowdHeatmap: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      days: z.number().min(1).max(365).optional().default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      return await db.getHourlyCrowdHeatmap(input.storeId, input.days);
+    }),
 });
 
 // ==================== Ticket Router ====================
