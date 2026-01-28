@@ -49,6 +49,9 @@ import {
   Copy,
   CalendarDays,
   QrCode,
+  FolderPlus,
+  Pencil,
+  X,
 } from 'lucide-react';
 
 import { toast } from 'sonner';
@@ -578,13 +581,26 @@ function SettingsContent() {
   const [updatingMenuItemId, setUpdatingMenuItemId] = useState<number | null>(null);
   const [updatingFeedPostId, setUpdatingFeedPostId] = useState<number | null>(null);
 
+  // Category management state
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+  const [updatingCategoryId, setUpdatingCategoryId] = useState<number | null>(null);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(null);
+
   // Get user's store
   const { data: store, isLoading: storeLoading, refetch: refetchStore } = trpc.store.getByOwner.useQuery(
     undefined,
     { enabled: isAuthenticated }
   );
 
-  const { data: menuCategories } = trpc.menu.getCategories.useQuery(
+  const { data: menuCategories, refetch: refetchCategories } = trpc.menu.getCategories.useQuery(
+    { storeId: store?.id || 0 },
+    { enabled: !!store?.id }
+  );
+
+  const { data: adminCategories, refetch: refetchAdminCategories } = trpc.menu.getAdminCategories.useQuery(
     { storeId: store?.id || 0 },
     { enabled: !!store?.id }
   );
@@ -611,6 +627,50 @@ function SettingsContent() {
     if (!adminItems) return [];
     return [...adminItems].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [adminItems]);
+
+  // Group menu items by category for display
+  const groupedMenuItems = useMemo(() => {
+    if (!adminItems) return { categorized: [], uncategorized: [] };
+    
+    const sortedCategories = adminCategories 
+      ? [...adminCategories].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      : [];
+    
+    const categorized: Array<{
+      category: typeof sortedCategories[0];
+      items: typeof adminItems;
+    }> = [];
+    
+    const uncategorized: typeof adminItems = [];
+    
+    // Group items by category
+    const itemsByCategory = new Map<number, typeof adminItems>();
+    adminItems.forEach(item => {
+      if (item.categoryId) {
+        const existing = itemsByCategory.get(item.categoryId) || [];
+        existing.push(item);
+        itemsByCategory.set(item.categoryId, existing);
+      } else {
+        uncategorized.push(item);
+      }
+    });
+    
+    // Build categorized array in category sort order
+    sortedCategories.forEach(category => {
+      const items = itemsByCategory.get(category.id) || [];
+      if (items.length > 0) {
+        categorized.push({
+          category,
+          items: items.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+        });
+      }
+    });
+    
+    return {
+      categorized,
+      uncategorized: uncategorized.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+    };
+  }, [adminItems, adminCategories]);
 
   const sortedFeedPosts = useMemo(() => {
     if (!adminFeedPosts) return [];
@@ -723,12 +783,16 @@ function SettingsContent() {
 
 
   const createMenuItemMutation = trpc.menu.createItem.useMutation();
-
   const updateMenuItemMutation = trpc.menu.updateItem.useMutation();
   const deleteMenuItemMutation = trpc.menu.deleteItem.useMutation();
   const createFeedPostMutation = trpc.menu.createFeedPost.useMutation();
   const updateFeedPostMutation = trpc.menu.updateFeedPost.useMutation();
   const deleteFeedPostMutation = trpc.menu.deleteFeedPost.useMutation();
+
+  // Category mutations
+  const createCategoryMutation = trpc.menu.createCategory.useMutation();
+  const updateCategoryMutation = trpc.menu.updateCategory.useMutation();
+  const deleteCategoryMutation = trpc.menu.deleteCategory.useMutation();
 
   const handleSave = () => {
     // バリデーション
@@ -960,6 +1024,142 @@ function SettingsContent() {
       };
       return { ...prev, [post.id]: { ...current, ...updates } };
     });
+  };
+
+  // Category management handlers
+  const handleCreateCategory = async () => {
+    if (!store) return;
+    if (!newCategoryName.trim()) {
+      toast.error(t('settings.categoryNameRequired'));
+      return;
+    }
+
+    setIsCreatingCategory(true);
+    try {
+      const maxSortOrder = adminCategories?.reduce((max, cat) => Math.max(max, cat.sortOrder ?? 0), 0) ?? 0;
+      await createCategoryMutation.mutateAsync({
+        storeId: store.id,
+        nameJa: newCategoryName.trim(),
+        sortOrder: maxSortOrder + 1,
+      });
+
+      setNewCategoryName('');
+      await refetchAdminCategories();
+      await refetchCategories();
+      toast.success(t('settings.categoryCreateSuccess'));
+    } catch (error) {
+      console.error('Failed to create category:', error);
+      toast.error(t('settings.categoryCreateError'));
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  };
+
+  const handleUpdateCategory = async (categoryId: number) => {
+    if (!store) return;
+    if (!editingCategoryName.trim()) {
+      toast.error(t('settings.categoryNameRequired'));
+      return;
+    }
+
+    setUpdatingCategoryId(categoryId);
+    try {
+      await updateCategoryMutation.mutateAsync({
+        storeId: store.id,
+        categoryId,
+        nameJa: editingCategoryName.trim(),
+      });
+
+      setEditingCategoryId(null);
+      setEditingCategoryName('');
+      await refetchAdminCategories();
+      await refetchCategories();
+      await refetchAdminItems();
+      toast.success(t('settings.categoryUpdateSuccess'));
+    } catch (error) {
+      console.error('Failed to update category:', error);
+      toast.error(t('settings.categoryUpdateError'));
+    } finally {
+      setUpdatingCategoryId(null);
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: number) => {
+    if (!store) return;
+
+    setDeletingCategoryId(categoryId);
+    try {
+      await deleteCategoryMutation.mutateAsync({
+        storeId: store.id,
+        categoryId,
+      });
+
+      await refetchAdminCategories();
+      await refetchCategories();
+      await refetchAdminItems();
+      toast.success(t('settings.categoryDeleteSuccess'));
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      toast.error(t('settings.categoryDeleteError'));
+    } finally {
+      setDeletingCategoryId(null);
+    }
+  };
+
+  const handleMoveCategoryUp = async (categoryId: number) => {
+    if (!store || !adminCategories) return;
+    const sortedCategories = [...adminCategories].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const index = sortedCategories.findIndex(c => c.id === categoryId);
+    if (index <= 0) return;
+
+    const currentCategory = sortedCategories[index];
+    const prevCategory = sortedCategories[index - 1];
+
+    try {
+      await updateCategoryMutation.mutateAsync({
+        storeId: store.id,
+        categoryId: currentCategory.id,
+        sortOrder: prevCategory.sortOrder ?? 0,
+      });
+      await updateCategoryMutation.mutateAsync({
+        storeId: store.id,
+        categoryId: prevCategory.id,
+        sortOrder: currentCategory.sortOrder ?? 0,
+      });
+      await refetchAdminCategories();
+      await refetchCategories();
+    } catch (error) {
+      console.error('Failed to reorder category:', error);
+      toast.error(t('settings.categoryReorderError'));
+    }
+  };
+
+  const handleMoveCategoryDown = async (categoryId: number) => {
+    if (!store || !adminCategories) return;
+    const sortedCategories = [...adminCategories].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const index = sortedCategories.findIndex(c => c.id === categoryId);
+    if (index < 0 || index >= sortedCategories.length - 1) return;
+
+    const currentCategory = sortedCategories[index];
+    const nextCategory = sortedCategories[index + 1];
+
+    try {
+      await updateCategoryMutation.mutateAsync({
+        storeId: store.id,
+        categoryId: currentCategory.id,
+        sortOrder: nextCategory.sortOrder ?? 0,
+      });
+      await updateCategoryMutation.mutateAsync({
+        storeId: store.id,
+        categoryId: nextCategory.id,
+        sortOrder: currentCategory.sortOrder ?? 0,
+      });
+      await refetchAdminCategories();
+      await refetchCategories();
+    } catch (error) {
+      console.error('Failed to reorder category:', error);
+      toast.error(t('settings.categoryReorderError'));
+    }
   };
 
   const handleCreateMenuItem = async () => {
@@ -1857,6 +2057,151 @@ function SettingsContent() {
                       <Label htmlFor="allowPhotoSizeToggle">{t('settings.allowPhotoSizeToggle')}</Label>
 
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Category Management Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('settings.categoryManagement')}</CardTitle>
+                  <CardDescription>{t('settings.categoryManagementDescription')}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Add new category */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <FolderPlus className="h-4 w-4" />
+                      {t('settings.categoryAddNew')}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        placeholder={t('settings.categoryNamePlaceholder')}
+                        className="flex-1"
+                      />
+                      <Button
+                        onClick={handleCreateCategory}
+                        disabled={isCreatingCategory || createCategoryMutation.isPending}
+                      >
+                        {isCreatingCategory ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Plus className="mr-2 h-4 w-4" />
+                        )}
+                        {t('common.add')}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Category list */}
+                  <div className="space-y-2">
+                    {!adminCategories || adminCategories.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">{t('settings.categoryNoCategories')}</p>
+                    ) : (
+                      [...adminCategories]
+                        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                        .map((category, index, sortedArr) => {
+                          const itemCount = adminItems?.filter(item => item.categoryId === category.id).length ?? 0;
+                          const isEditing = editingCategoryId === category.id;
+
+                          return (
+                            <div
+                              key={category.id}
+                              className="flex items-center gap-2 rounded-lg border p-3"
+                            >
+                              {isEditing ? (
+                                <>
+                                  <Input
+                                    value={editingCategoryName}
+                                    onChange={(e) => setEditingCategoryName(e.target.value)}
+                                    className="flex-1"
+                                    autoFocus
+                                  />
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleUpdateCategory(category.id)}
+                                    disabled={updatingCategoryId === category.id}
+                                  >
+                                    {updatingCategoryId === category.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Save className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setEditingCategoryId(null);
+                                      setEditingCategoryName('');
+                                    }}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="flex-1">
+                                    <span className="font-medium">{category.nameJa}</span>
+                                    <span className="ml-2 text-sm text-muted-foreground">
+                                      ({formatMessage('settings.categoryItemCount', { count: itemCount })})
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => handleMoveCategoryUp(category.id)}
+                                      disabled={index === 0}
+                                    >
+                                      <ChevronUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => handleMoveCategoryDown(category.id)}
+                                      disabled={index === sortedArr.length - 1}
+                                    >
+                                      <ChevronDown className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => {
+                                        setEditingCategoryId(category.id);
+                                        setEditingCategoryName(category.nameJa ?? '');
+                                      }}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="text-destructive hover:text-destructive"
+                                      onClick={() => {
+                                        if (confirm(t('settings.categoryDeleteConfirm'))) {
+                                          handleDeleteCategory(category.id);
+                                        }
+                                      }}
+                                      disabled={deletingCategoryId === category.id}
+                                    >
+                                      {deletingCategoryId === category.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })
+                    )}
                   </div>
                 </CardContent>
               </Card>

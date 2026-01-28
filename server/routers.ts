@@ -1333,6 +1333,14 @@ const menuRouter = router({
       return await db.getFeedPostsForStore(input.storeId, true);
     }),
 
+  // Get categories for admin (protected)
+  getAdminCategories: protectedProcedure
+    .input(z.object({ storeId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertStoreOwner(input.storeId, ctx.user.id);
+      return await db.getMenuCategoriesForStore(input.storeId);
+    }),
+
   // Create category (protected)
   createCategory: protectedProcedure
     .input(z.object({
@@ -1351,6 +1359,41 @@ const menuRouter = router({
       }
 
       await db.createMenuCategory(input);
+      return { success: true };
+    }),
+
+  // Update category (protected)
+  updateCategory: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      categoryId: z.number(),
+      nameJa: z.string().optional(),
+      nameEn: z.string().optional(),
+      nameKo: z.string().optional(),
+      nameZhHans: z.string().optional(),
+      nameZhHant: z.string().optional(),
+      sortOrder: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertStoreOwner(input.storeId, ctx.user.id);
+      const { storeId, categoryId, ...updates } = input;
+      const updateData = stripUndefined(updates);
+      if (Object.keys(updateData).length === 0) {
+        return { success: true };
+      }
+      await db.updateMenuCategory(categoryId, updateData);
+      return { success: true };
+    }),
+
+  // Delete category (protected)
+  deleteCategory: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      categoryId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertStoreOwner(input.storeId, ctx.user.id);
+      await db.deleteMenuCategory(input.categoryId, input.storeId);
       return { success: true };
     }),
 

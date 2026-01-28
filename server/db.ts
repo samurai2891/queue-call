@@ -719,6 +719,38 @@ export async function updateMenuCategory(id: number, data: Partial<InsertMenuCat
   await db.update(menuCategories).set(data).where(eq(menuCategories.id, id));
 }
 
+export async function deleteMenuCategory(id: number, storeId?: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // First, set categoryId to null for all menu items in this category
+  const updateConditions = [eq(menuItems.categoryId, id)];
+  if (storeId) {
+    updateConditions.push(eq(menuItems.storeId, storeId));
+  }
+  await db.update(menuItems).set({ categoryId: null }).where(and(...updateConditions));
+
+  // Then delete the category
+  const deleteConditions = [eq(menuCategories.id, id)];
+  if (storeId) {
+    deleteConditions.push(eq(menuCategories.storeId, storeId));
+  }
+  await db.delete(menuCategories).where(and(...deleteConditions));
+}
+
+export async function getMenuCategoriesForStore(storeId: number) {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
+
+  return await db.select()
+    .from(menuCategories)
+    .where(eq(menuCategories.storeId, storeId))
+    .orderBy(asc(menuCategories.sortOrder), asc(menuCategories.id));
+}
+
 // ==================== Feed Post Functions ====================
 
 export async function getFeedPosts(storeId: number) {
