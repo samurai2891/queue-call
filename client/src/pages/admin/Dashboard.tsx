@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Clock, TrendingUp, Calendar, BarChart3, ArrowLeft, Flame } from "lucide-react";
+import { Users, Clock, TrendingUp, Calendar, BarChart3, ArrowLeft, Flame, Download } from "lucide-react";
+import { exportToCSV, generateFilename } from "@/lib/csvExport";
 import { useState } from "react";
 import { Link } from "wouter";
 import {
@@ -362,16 +363,48 @@ export default function Dashboard() {
                 </CardTitle>
                 <CardDescription>{t("dashboard.dailyVisitorsDescription")}</CardDescription>
               </div>
-              <Select value={visitorDays.toString()} onValueChange={(v) => setVisitorDays(parseInt(v))}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
-                  <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
-                  <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={visitorDays.toString()} onValueChange={(v) => setVisitorDays(parseInt(v))}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
+                    <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
+                    <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    if (dailyVisitors && dailyVisitors.length > 0) {
+                      const currentStore = stores?.find(s => s.id === storeId);
+                      exportToCSV(
+                        dailyVisitors.map(d => ({
+                          date: d.date,
+                          total: d.total,
+                          done: d.done,
+                          skipped: d.skipped,
+                          canceled: d.canceled,
+                        })),
+                        generateFilename('daily_visitors', currentStore?.name),
+                        {
+                          date: t('dashboard.date'),
+                          total: t('dashboard.total'),
+                          done: t('dashboard.completed'),
+                          skipped: t('dashboard.skipped'),
+                          canceled: t('dashboard.canceled'),
+                        }
+                      );
+                    }
+                  }}
+                  disabled={!dailyVisitors || dailyVisitors.length === 0}
+                  title={t('dashboard.exportCSV')}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -429,16 +462,46 @@ export default function Dashboard() {
                 </CardTitle>
                 <CardDescription>{t("dashboard.waitTimeDescription")}</CardDescription>
               </div>
-              <Select value={waitTimeDays.toString()} onValueChange={(v) => setWaitTimeDays(parseInt(v))}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
-                  <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
-                  <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={waitTimeDays.toString()} onValueChange={(v) => setWaitTimeDays(parseInt(v))}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
+                    <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
+                    <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    if (dailyWaitTime && dailyWaitTime.length > 0) {
+                      const currentStore = stores?.find(s => s.id === storeId);
+                      exportToCSV(
+                        dailyWaitTime.map(d => ({
+                          date: d.date,
+                          avgWaitMinutes: d.avgWaitMinutes,
+                          maxWaitMinutes: d.maxWaitMinutes,
+                          minWaitMinutes: d.minWaitMinutes,
+                        })),
+                        generateFilename('wait_time', currentStore?.name),
+                        {
+                          date: t('dashboard.date'),
+                          avgWaitMinutes: t('dashboard.avgWaitTime'),
+                          maxWaitMinutes: t('dashboard.maxWaitTime'),
+                          minWaitMinutes: t('dashboard.minWaitTime'),
+                        }
+                      );
+                    }
+                  }}
+                  disabled={!dailyWaitTime || dailyWaitTime.length === 0}
+                  title={t('dashboard.exportCSV')}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -520,16 +583,47 @@ export default function Dashboard() {
                 </CardTitle>
                 <CardDescription>{t("dashboard.crowdHeatmapDescription")}</CardDescription>
               </div>
-              <Select value={heatmapDays.toString()} onValueChange={(v) => setHeatmapDays(Number(v))}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
-                  <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
-                  <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={heatmapDays.toString()} onValueChange={(v) => setHeatmapDays(Number(v))}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
+                    <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
+                    <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    if (crowdHeatmap && crowdHeatmap.length > 0) {
+                      const currentStore = stores?.find(s => s.id === storeId);
+                      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+                      exportToCSV(
+                        crowdHeatmap.map((d: { dayOfWeek: number; hour: number; count: number; crowdLevel: string }) => ({
+                          dayOfWeek: t(`dashboard.${dayNames[d.dayOfWeek]}`),
+                          hour: `${d.hour}:00`,
+                          count: d.count,
+                          crowdLevel: d.crowdLevel,
+                        })),
+                        generateFilename('crowd_heatmap', currentStore?.name),
+                        {
+                          dayOfWeek: t('dashboard.dayOfWeek'),
+                          hour: t('dashboard.hour'),
+                          count: t('dashboard.count'),
+                          crowdLevel: t('store.crowdLevel'),
+                        }
+                      );
+                    }
+                  }}
+                  disabled={!crowdHeatmap || crowdHeatmap.length === 0}
+                  title={t('dashboard.exportCSV')}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -563,16 +657,44 @@ export default function Dashboard() {
                   )}
                 </CardDescription>
               </div>
-              <Select value={hourlyDays.toString()} onValueChange={(v) => setHourlyDays(parseInt(v))}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
-                  <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
-                  <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={hourlyDays.toString()} onValueChange={(v) => setHourlyDays(parseInt(v))}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
+                    <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
+                    <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    if (hourlyStats && hourlyStats.length > 0) {
+                      const currentStore = stores?.find(s => s.id === storeId);
+                      exportToCSV(
+                        hourlyStats.map((d: { hour: number; count: number; avgWaitMinutes: number }) => ({
+                          hour: `${d.hour}:00`,
+                          count: d.count,
+                          avgWaitMinutes: d.avgWaitMinutes,
+                        })),
+                        generateFilename('hourly_stats', currentStore?.name),
+                        {
+                          hour: t('dashboard.hour'),
+                          count: t('dashboard.count'),
+                          avgWaitMinutes: t('dashboard.avgWaitTime'),
+                        }
+                      );
+                    }
+                  }}
+                  disabled={!hourlyStats || hourlyStats.length === 0}
+                  title={t('dashboard.exportCSV')}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
