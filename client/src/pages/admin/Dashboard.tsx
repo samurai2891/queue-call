@@ -6,9 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Clock, TrendingUp, Calendar, BarChart3, ArrowLeft, Flame, Download } from "lucide-react";
+import { Users, Clock, TrendingUp, Calendar, BarChart3, ArrowLeft, Flame, Download, FileText } from "lucide-react";
 import { exportToCSV, generateFilename } from "@/lib/csvExport";
-import { useState } from "react";
+import { exportToPDF, generatePDFFilename } from "@/lib/pdfExport";
+import { useState, useRef } from "react";
+import { toast } from "sonner";
 import { Link } from "wouter";
 import {
   BarChart,
@@ -124,6 +126,8 @@ export default function Dashboard() {
   const [waitTimeDays, setWaitTimeDays] = useState(30);
   const [hourlyDays, setHourlyDays] = useState(30);
   const [heatmapDays, setHeatmapDays] = useState(30);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const dashboardContentRef = useRef<HTMLDivElement>(null);
 
   // Handler to sync all periods
   const handleGlobalDaysChange = (days: number) => {
@@ -132,6 +136,35 @@ export default function Dashboard() {
     setWaitTimeDays(days);
     setHourlyDays(days);
     setHeatmapDays(days);
+  };
+
+  // Handler for PDF export
+  const handleExportPDF = async () => {
+    if (!dashboardContentRef.current) return;
+    
+    setIsExportingPDF(true);
+    toast.info(t('dashboard.exportingPDF'));
+    
+    try {
+      const currentStore = stores?.find(s => s.id === storeId);
+      const periodLabel = globalDays === 7 ? t('dashboard.heatmapDays7') : 
+                          globalDays === 90 ? t('dashboard.heatmapDays90') : 
+                          t('dashboard.heatmapDays30');
+      
+      await exportToPDF(dashboardContentRef.current, {
+        filename: generatePDFFilename('dashboard', currentStore?.name),
+        title: t('dashboard.title'),
+        storeName: currentStore?.name,
+        period: periodLabel,
+      });
+      
+      toast.success(t('dashboard.exportPDFSuccess'));
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      toast.error(t('dashboard.exportPDFError'));
+    } finally {
+      setIsExportingPDF(false);
+    }
   };
 
   // Get user's stores
@@ -276,6 +309,17 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            {/* PDF Export button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPDF}
+              disabled={isExportingPDF}
+              className="gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              {t('dashboard.exportPDF')}
+            </Button>
             {/* Global period selector */}
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">{t('dashboard.globalPeriod')}:</span>
@@ -315,7 +359,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      <main ref={dashboardContentRef} className="max-w-7xl mx-auto px-4 py-6 space-y-6 bg-background">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Today */}
