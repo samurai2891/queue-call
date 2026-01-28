@@ -2229,6 +2229,54 @@ const reservationRouter = router({
       };
     }),
 
+  // 月間予約サマリーを取得（スタッフ向け）
+  getMonthlySummary: publicProcedure
+    .input(z.object({
+      storeSlug: z.string(),
+      staffToken: z.string(),
+      year: z.number(),
+      month: z.number(),
+    }))
+    .query(async ({ input }) => {
+      const store = await db.getStoreBySlug(input.storeSlug);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      // スタッフトークン検証
+      const session = await db.getStaffSession(input.staffToken);
+      if (!session || session.storeId !== store.id) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid staff token' });
+      }
+
+      const summary = await db.getMonthlyReservationSummary(store.id, input.year, input.month);
+      return summary;
+    }),
+
+  // 週間予約一覧を取得（スタッフ向け）
+  getWeeklyReservations: publicProcedure
+    .input(z.object({
+      storeSlug: z.string(),
+      staffToken: z.string(),
+      startDate: z.string(),
+      endDate: z.string(),
+    }))
+    .query(async ({ input }) => {
+      const store = await db.getStoreBySlug(input.storeSlug);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      // スタッフトークン検証
+      const session = await db.getStaffSession(input.staffToken);
+      if (!session || session.storeId !== store.id) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid staff token' });
+      }
+
+      const reservations = await db.getWeeklyReservations(store.id, input.startDate, input.endDate);
+      return reservations;
+    }),
+
   // 予約設定を更新（オーナー向け）
   updateSettings: protectedProcedure
     .input(z.object({

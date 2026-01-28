@@ -734,6 +734,11 @@ export const translations = {
     'reservation.createReservation': '予約を登録',
     'reservation.createSuccess': '予約を登録しました（予約番号: {number}）',
     'reservation.fillRequired': '必須項目を入力してください',
+    'reservation.calendarView': 'カレンダービュー',
+    'reservation.monthView': '月間',
+    'reservation.weekView': '週間',
+    'reservation.reservationCount': '件',
+    'reservation.today': '今日',
   },
   en: {
     // Common
@@ -1456,6 +1461,11 @@ export const translations = {
     'reservation.createReservation': 'Create Reservation',
     'reservation.createSuccess': 'Reservation created (Number: {number})',
     'reservation.fillRequired': 'Please fill in required fields',
+    'reservation.calendarView': 'Calendar View',
+    'reservation.monthView': 'Month',
+    'reservation.weekView': 'Week',
+    'reservation.reservationCount': '',
+    'reservation.today': 'Today',
   },
   ko: {
     // Common
@@ -2179,6 +2189,11 @@ export const translations = {
     'reservation.createReservation': '예약 등록',
     'reservation.createSuccess': '예약이 등록되었습니다 (예약번호: {number})',
     'reservation.fillRequired': '필수 항목을 입력해 주세요',
+    'reservation.calendarView': '캘린더 보기',
+    'reservation.monthView': '월간',
+    'reservation.weekView': '주간',
+    'reservation.reservationCount': '건',
+    'reservation.today': '오늘',
   },
   'zh-Hans': {
     // Common
@@ -2902,6 +2917,11 @@ export const translations = {
     'reservation.createReservation': '创建预约',
     'reservation.createSuccess': '预约已创建（预约号: {number}）',
     'reservation.fillRequired': '请填写必填项',
+    'reservation.calendarView': '日历视图',
+    'reservation.monthView': '月',
+    'reservation.weekView': '周',
+    'reservation.reservationCount': '件',
+    'reservation.today': '今天',
   },
   'zh-Hant': {
     // Common
@@ -3625,6 +3645,11 @@ export const translations = {
     'reservation.createReservation': '建立預約',
     'reservation.createSuccess': '預約已建立（預約號: {number}）',
     'reservation.fillRequired': '請填寫必填項',
+    'reservation.calendarView': '日曆檢視',
+    'reservation.monthView': '月',
+    'reservation.weekView': '週',
+    'reservation.reservationCount': '件',
+    'reservation.today': '今天',
   },
 } as const;
 

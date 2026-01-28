@@ -1731,3 +1731,65 @@ async function getGroupsAheadByRank(storeId: number, dayKey: string, queueRank: 
 
   return result[0]?.count || 0;
 }
+
+
+/**
+ * 月間予約サマリーを取得（日付ごとの予約数）
+ */
+export async function getMonthlyReservationSummary(
+  storeId: number,
+  year: number,
+  month: number
+): Promise<Array<{ date: string; total: number; pending: number; confirmed: number; checkedIn: number; completed: number; canceled: number; noShow: number }>> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return [];
+  }
+
+  // 月の開始日と終了日を計算
+  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+  const result = await db.select({
+    date: reservations.reservationDate,
+    total: sql<number>`count(*)`,
+    pending: sql<number>`sum(case when ${reservations.status} = 'PENDING' then 1 else 0 end)`,
+    confirmed: sql<number>`sum(case when ${reservations.status} = 'CONFIRMED' then 1 else 0 end)`,
+    checkedIn: sql<number>`sum(case when ${reservations.status} = 'CHECKED_IN' then 1 else 0 end)`,
+    completed: sql<number>`sum(case when ${reservations.status} = 'COMPLETED' then 1 else 0 end)`,
+    canceled: sql<number>`sum(case when ${reservations.status} = 'CANCELED' then 1 else 0 end)`,
+    noShow: sql<number>`sum(case when ${reservations.status} = 'NO_SHOW' then 1 else 0 end)`,
+  })
+    .from(reservations)
+    .where(and(
+      eq(reservations.storeId, storeId),
+      gte(reservations.reservationDate, startDate),
+      sql`${reservations.reservationDate} <= ${endDate}`
+    ))
+    .groupBy(reservations.reservationDate)
+    .orderBy(asc(reservations.reservationDate));
+
+  return result.map(r => ({
+    date: r.date,
+    total: Number(r.total) || 0,
+    pending: Number(r.pending) || 0,
+    confirmed: Number(r.confirmed) || 0,
+    checkedIn: Number(r.checkedIn) || 0,
+    completed: Number(r.completed) || 0,
+    canceled: Number(r.canceled) || 0,
+    noShow: Number(r.noShow) || 0,
+  }));
+}
+
+/**
+ * 週間予約一覧を取得
+ */
+export async function getWeeklyReservations(
+  storeId: number,
+  startDate: string,
+  endDate: string
+): Promise<Reservation[]> {
+  return getReservationsByStore(storeId, { startDate, endDate });
+}

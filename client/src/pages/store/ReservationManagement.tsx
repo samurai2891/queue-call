@@ -20,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { 
+import {
   CalendarIcon, 
   Clock, 
   Users, 
@@ -35,7 +35,9 @@ import {
   RefreshCw,
   LogOut,
   MessageSquare,
-  Plus
+  Plus,
+  List,
+  LayoutGrid
 } from "lucide-react";
 import {
   Dialog,
@@ -57,6 +59,8 @@ import { format } from "date-fns";
 import { ja, enUS, ko, zhCN, zhTW } from "date-fns/locale";
 import { toast } from "sonner";
 import { StoreLayout } from "@/components/StoreLayout";
+import { ReservationCalendar } from "@/components/ReservationCalendar";
+import { startOfWeek } from "date-fns";
 
 const dateLocales: Record<string, typeof ja> = {
   ja,
@@ -106,6 +110,9 @@ export default function ReservationManagement() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 0 }));
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   
   // 予約追加ダイアログのステート
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -162,6 +169,30 @@ export default function ReservationManagement() {
   const { data: reservationSettings } = trpc.reservation.getSettings.useQuery(
     { storeSlug: storeSlug || "" },
     { enabled: !!storeSlug }
+  );
+  
+  // 月間予約サマリーを取得
+  const { data: monthlySummaryData, isLoading: monthlySummaryLoading } = trpc.reservation.getMonthlySummary.useQuery(
+    {
+      storeSlug: storeSlug || "",
+      staffToken: sessionToken || "",
+      year: currentMonth.getFullYear(),
+      month: currentMonth.getMonth() + 1,
+    },
+    { enabled: !!storeSlug && !!sessionToken && !!session && viewMode === "calendar" }
+  );
+  
+  // 週間予約一覧を取得
+  const weekStartStr = format(currentWeekStart, "yyyy-MM-dd");
+  const weekEndStr = format(new Date(currentWeekStart.getTime() + 6 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
+  const { data: weeklyReservationsData, isLoading: weeklyReservationsLoading } = trpc.reservation.getWeeklyReservations.useQuery(
+    {
+      storeSlug: storeSlug || "",
+      staffToken: sessionToken || "",
+      startDate: weekStartStr,
+      endDate: weekEndStr,
+    },
+    { enabled: !!storeSlug && !!sessionToken && !!session && viewMode === "calendar" }
   );
   
   const utils = trpc.useUtils();
@@ -449,32 +480,56 @@ export default function ReservationManagement() {
         </div>
         
         <div className="flex items-center gap-2">
+          {/* ビュー切り替え */}
+          <div className="flex border rounded-md">
+            <Button
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="rounded-r-none"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "calendar" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("calendar")}
+              className="rounded-l-none"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+          
           <Button onClick={handleOpenAddDialog}>
             <Plus className="mr-2 h-4 w-4" />
             {t("reservation.addReservation")}
           </Button>
           
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="justify-start">
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(selectedDate, "yyyy/MM/dd (E)", { locale: dateLocales[locale] || ja })}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => date && setSelectedDate(date)}
-                locale={dateLocales[locale] || ja}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+          {viewMode === "list" && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-start">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(selectedDate, "yyyy/MM/dd (E)", { locale: dateLocales[locale] || ja })}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  locale={dateLocales[locale] || ja}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          )}
           
-          <Button variant="outline" size="icon" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+          {viewMode === "list" && (
+            <Button variant="outline" size="icon" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          )}
           
           <Button variant="ghost" size="icon" onClick={handleLogout}>
             <LogOut className="h-4 w-4" />
@@ -482,18 +537,46 @@ export default function ReservationManagement() {
         </div>
       </div>
       
-      {/* 予約一覧 */}
-      {reservationsLoading ? (
-        <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      ) : reservations.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            {t("reservation.noReservations")}
-          </CardContent>
-        </Card>
-      ) : (
+      {/* カレンダービュー */}
+      {viewMode === "calendar" && (
+        <ReservationCalendar
+          monthlySummary={monthlySummaryData || []}
+          weeklyReservations={(weeklyReservationsData || []).map(r => ({
+            id: r.id,
+            reservationNumber: r.reservationNumber,
+            reservationDate: r.reservationDate,
+            reservationTime: r.reservationTime,
+            customerName: r.customerName,
+            customerPhone: r.customerPhone,
+            partySize: r.partySize,
+            status: r.status as "PENDING" | "CONFIRMED" | "CHECKED_IN" | "COMPLETED" | "CANCELED" | "NO_SHOW",
+          }))}
+          currentMonth={currentMonth}
+          currentWeekStart={currentWeekStart}
+          onMonthChange={setCurrentMonth}
+          onWeekChange={setCurrentWeekStart}
+          onDateSelect={(date) => {
+            setSelectedDate(date);
+            setViewMode("list");
+          }}
+          isLoading={monthlySummaryLoading || weeklyReservationsLoading}
+        />
+      )}
+      
+      {/* リストビュー */}
+      {viewMode === "list" && (
+        <>
+          {reservationsLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : reservations.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                {t("reservation.noReservations")}
+              </CardContent>
+            </Card>
+          ) : (
         <Tabs defaultValue="all" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="all">
@@ -585,7 +668,9 @@ export default function ReservationManagement() {
               ))
             )}
           </TabsContent>
-        </Tabs>
+          </Tabs>
+          )}
+        </>
       )}
       
       {/* 確認ダイアログ */}
