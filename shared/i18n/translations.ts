@@ -687,6 +687,9 @@ export const translations = {
     'dashboard.thursday': '木',
     'dashboard.friday': '金',
     'dashboard.saturday': '土',
+    'dashboard.heatmapDays7': '過去7日間',
+    'dashboard.heatmapDays30': '過去30日間',
+    'dashboard.heatmapDays90': '過去90日間',
 
     // Reservation
     'reservation.title': '予約',
@@ -1446,6 +1449,9 @@ export const translations = {
     'dashboard.thursday': 'Thu',
     'dashboard.friday': 'Fri',
     'dashboard.saturday': 'Sat',
+    'dashboard.heatmapDays7': 'Last 7 days',
+    'dashboard.heatmapDays30': 'Last 30 days',
+    'dashboard.heatmapDays90': 'Last 90 days',
 
     // Reservation
     'reservation.title': 'Reservation',
@@ -2206,6 +2212,9 @@ export const translations = {
     'dashboard.thursday': '목',
     'dashboard.friday': '금',
     'dashboard.saturday': '토',
+    'dashboard.heatmapDays7': '최근 7일',
+    'dashboard.heatmapDays30': '최근 30일',
+    'dashboard.heatmapDays90': '최근 90일',
 
     // Reservation
     'reservation.title': '예약',
@@ -2966,6 +2975,9 @@ export const translations = {
     'dashboard.thursday': '四',
     'dashboard.friday': '五',
     'dashboard.saturday': '六',
+    'dashboard.heatmapDays7': '最近7天',
+    'dashboard.heatmapDays30': '最近30天',
+    'dashboard.heatmapDays90': '最近90天',
 
     // Reservation
     'reservation.title': '预约',
@@ -3726,6 +3738,9 @@ export const translations = {
     'dashboard.thursday': '四',
     'dashboard.friday': '五',
     'dashboard.saturday': '六',
+    'dashboard.heatmapDays7': '最近7天',
+    'dashboard.heatmapDays30': '最近30天',
+    'dashboard.heatmapDays90': '最近90天',
 
     // Reservation
     'reservation.title': '預約',

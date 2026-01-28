@@ -119,6 +119,7 @@ export default function Dashboard() {
   const { user, loading } = useAuth();
   const { t } = useLocale();
   const [days, setDays] = useState(30);
+  const [heatmapDays, setHeatmapDays] = useState(30);
 
   // Get user's stores
   const { data: stores, isLoading: storesLoading } = trpc.store.getMyStores.useQuery();
@@ -150,7 +151,7 @@ export default function Dashboard() {
 
   // Crowd heatmap query
   const { data: crowdHeatmap, isLoading: crowdHeatmapLoading } = trpc.store.getCrowdHeatmap.useQuery(
-    { storeId: storeId!, days },
+    { storeId: storeId!, days: heatmapDays },
     { enabled: !!storeId }
   );
 
@@ -461,11 +462,25 @@ export default function Dashboard() {
         {/* Crowd Heatmap */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Flame className="h-5 w-5" />
-              {t("dashboard.crowdHeatmap")}
-            </CardTitle>
-            <CardDescription>{t("dashboard.crowdHeatmapDescription")}</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Flame className="h-5 w-5" />
+                  {t("dashboard.crowdHeatmap")}
+                </CardTitle>
+                <CardDescription>{t("dashboard.crowdHeatmapDescription")}</CardDescription>
+              </div>
+              <Select value={heatmapDays.toString()} onValueChange={(v) => setHeatmapDays(Number(v))}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
+                  <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
+                  <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             {crowdHeatmapLoading ? (
