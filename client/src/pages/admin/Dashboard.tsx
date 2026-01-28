@@ -385,15 +385,29 @@ export default function Dashboard() {
                   <YAxis className="text-xs" />
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
+                      backgroundColor: 'rgba(0, 0, 0, 0.85)', 
+                      border: 'none',
                       borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                      padding: '12px 16px',
                     }}
+                    itemStyle={{
+                      color: '#fff',
+                      fontSize: '14px',
+                      padding: '4px 0',
+                    }}
+                    labelStyle={{
+                      color: '#fff',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                      marginBottom: '8px',
+                    }}
+                    cursor={{ fill: 'rgba(0, 0, 0, 0.1)' }}
                   />
                   <Legend />
-                  <Bar dataKey="done" name={t("dashboard.completed")} fill="hsl(var(--primary))" stackId="a" />
-                  <Bar dataKey="skipped" name={t("dashboard.skipped")} fill="hsl(var(--destructive))" stackId="a" />
-                  <Bar dataKey="canceled" name={t("dashboard.canceled")} fill="hsl(var(--muted-foreground))" stackId="a" />
+                  <Bar dataKey="done" name={t("dashboard.completed")} fill="#3b82f6" stackId="a" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="skipped" name={t("dashboard.skipped")} fill="#f97316" stackId="a" />
+                  <Bar dataKey="canceled" name={t("dashboard.canceled")} fill="#94a3b8" stackId="a" />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -424,9 +438,22 @@ export default function Dashboard() {
                   <YAxis className="text-xs" unit={t("dashboard.minutes")} />
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
+                      backgroundColor: 'rgba(0, 0, 0, 0.85)', 
+                      border: 'none',
                       borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                      padding: '12px 16px',
+                    }}
+                    itemStyle={{
+                      color: '#fff',
+                      fontSize: '14px',
+                      padding: '4px 0',
+                    }}
+                    labelStyle={{
+                      color: '#fff',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                      marginBottom: '8px',
                     }}
                     formatter={(value: number) => [`${value}${t("dashboard.minutes")}`, '']}
                   />
@@ -435,23 +462,28 @@ export default function Dashboard() {
                     type="monotone" 
                     dataKey="avg" 
                     name={t("dashboard.avgWait")} 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))' }}
+                    stroke="#10b981" 
+                    strokeWidth={3}
+                    dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, fill: '#10b981' }}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="max" 
                     name={t("dashboard.maxWait")} 
-                    stroke="hsl(var(--destructive))" 
+                    stroke="#ef4444" 
+                    strokeWidth={2}
                     strokeDasharray="5 5"
+                    dot={{ fill: '#ef4444', r: 3 }}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="min" 
                     name={t("dashboard.minWait")} 
-                    stroke="hsl(var(--muted-foreground))" 
+                    stroke="#8b5cf6" 
+                    strokeWidth={2}
                     strokeDasharray="5 5"
+                    dot={{ fill: '#8b5cf6', r: 3 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -527,20 +559,42 @@ export default function Dashboard() {
                   <YAxis yAxisId="right" orientation="right" className="text-xs" unit={t("dashboard.minutes")} />
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
+                      backgroundColor: 'rgba(0, 0, 0, 0.85)', 
+                      border: 'none',
                       borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                      padding: '12px 16px',
                     }}
+                    itemStyle={{
+                      color: '#fff',
+                      fontSize: '14px',
+                      padding: '4px 0',
+                    }}
+                    labelStyle={{
+                      color: '#fff',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                      marginBottom: '8px',
+                    }}
+                    cursor={{ fill: 'rgba(0, 0, 0, 0.1)' }}
                   />
                   <Legend />
-                  <Bar yAxisId="left" dataKey="count" name={t("dashboard.visitorCount")} fill="hsl(var(--primary))" />
+                  <Bar 
+                    yAxisId="left" 
+                    dataKey="count" 
+                    name={t("dashboard.visitorCount")} 
+                    fill="#6366f1" 
+                    radius={[4, 4, 0, 0]}
+                  />
                   <Line 
                     yAxisId="right" 
                     type="monotone" 
                     dataKey="avgWait" 
                     name={t("dashboard.avgWait")} 
-                    stroke="hsl(var(--destructive))" 
-                    strokeWidth={2}
+                    stroke="#f59e0b" 
+                    strokeWidth={3}
+                    dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, fill: '#f59e0b' }}
                   />
                 </BarChart>
               </ResponsiveContainer>
