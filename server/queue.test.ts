@@ -31,6 +31,9 @@ vi.mock('./db', () => ({
   getOrUpdateStorePin: vi.fn(),
   incrementPinAttempts: vi.fn(),
   resetPinAttempts: vi.fn(),
+  // 予測待ち時間関連
+  getEstimatedWaitTimeMinutes: vi.fn(),
+  getWaitTimeInfo: vi.fn(),
 }));
 
 // Mock SSE functions
@@ -148,13 +151,18 @@ describe("Store Router", () => {
   });
 
   describe("getQueueStatus", () => {
-    it("returns current queue status with PIN and waiting numbers", async () => {
-      const { getCalledTicket, getWaitingCount, getWaitingNumbers, getOrUpdateStorePin } = await import('./db');
+    it("returns current queue status with PIN, waiting numbers, and estimated wait time", async () => {
+      const { getCalledTicket, getWaitingCount, getWaitingNumbers, getOrUpdateStorePin, getWaitTimeInfo } = await import('./db');
       (getCalledTicket as any).mockResolvedValue({ number: 5 });
       (getWaitingCount as any).mockResolvedValue(10);
       (getWaitingNumbers as any).mockResolvedValue([6, 7, 8, 9, 10]);
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
       (getOrUpdateStorePin as any).mockResolvedValue({ pin: '123', expiresAt });
+      (getWaitTimeInfo as any).mockResolvedValue({
+        avgServiceTimeMinutes: 5,
+        currentWaitingCount: 10,
+        estimatedWaitMinutes: 50,
+      });
 
       const ctx = createPublicContext();
       const caller = appRouter.createCaller(ctx);
@@ -166,15 +174,22 @@ describe("Store Router", () => {
       expect(result.waitingNumbers).toEqual([6, 7, 8, 9, 10]);
       expect(result.currentPin).toBe('123');
       expect(result.pinExpiresAt).toEqual(expiresAt);
+      expect(result.estimatedWaitMinutes).toBe(50);
+      expect(result.avgServiceTimeMinutes).toBe(5);
     });
 
     it("returns 0 for currentNumber when no ticket is called", async () => {
-      const { getCalledTicket, getWaitingCount, getWaitingNumbers, getOrUpdateStorePin } = await import('./db');
+      const { getCalledTicket, getWaitingCount, getWaitingNumbers, getOrUpdateStorePin, getWaitTimeInfo } = await import('./db');
       (getCalledTicket as any).mockResolvedValue(null);
       (getWaitingCount as any).mockResolvedValue(0);
       (getWaitingNumbers as any).mockResolvedValue([]);
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
       (getOrUpdateStorePin as any).mockResolvedValue({ pin: '456', expiresAt });
+      (getWaitTimeInfo as any).mockResolvedValue({
+        avgServiceTimeMinutes: null,
+        currentWaitingCount: 0,
+        estimatedWaitMinutes: 0,
+      });
 
       const ctx = createPublicContext();
       const caller = appRouter.createCaller(ctx);
@@ -183,6 +198,7 @@ describe("Store Router", () => {
 
       expect(result.currentNumber).toBe(0);
       expect(result.waitingNumbers).toEqual([]);
+      expect(result.estimatedWaitMinutes).toBe(0);
     });
   });
 
@@ -282,8 +298,8 @@ describe("Ticket Router", () => {
   });
 
   describe("getByToken", () => {
-    it("returns ticket with queue position", async () => {
-      const { getTicketByToken, getCalledTicket, getWaitingCount, getGroupsAhead } = await import('./db');
+    it("returns ticket with queue position and estimated wait time", async () => {
+      const { getTicketByToken, getCalledTicket, getWaitingCount, getGroupsAhead, getEstimatedWaitTimeMinutes } = await import('./db');
       (getTicketByToken as any).mockResolvedValue({
         id: 1,
         number: 5,
@@ -300,6 +316,7 @@ describe("Ticket Router", () => {
       (getGroupsAhead as any).mockResolvedValue(3);
       (getCalledTicket as any).mockResolvedValue({ number: 2 });
       (getWaitingCount as any).mockResolvedValue(5);
+      (getEstimatedWaitTimeMinutes as any).mockResolvedValue(15);
 
       const ctx = createPublicContext();
       const caller = appRouter.createCaller(ctx);
@@ -311,6 +328,7 @@ describe("Ticket Router", () => {
         status: "WAITING",
       });
       expect(result.currentNumber).toBe(2);
+      expect(result.estimatedWaitMinutes).toBe(15);
     });
 
     it("throws NOT_FOUND when ticket does not exist", async () => {

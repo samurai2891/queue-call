@@ -1531,3 +1531,98 @@ export async function getWaitingNumbers(storeId: number, limit: number = 10): Pr
 
   return result.map(r => r.number);
 }
+
+
+// ==================== Wait Time Estimation Functions ====================
+
+/**
+ * 店舗の平均処理時間を計算（過去7日間のデータから）
+ * 処理時間 = calledAt - createdAt（発券から呼び出しまでの時間）
+ * @returns 平均処理時間（分）、データがない場合はnull
+ */
+export async function getAverageServiceTimeMinutes(storeId: number): Promise<number | null> {
+  const db = await getDb();
+  if (!db) {
+    logDbError("Database not available", new Error("Database not available"), { storeId });
+    return null;
+  }
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 7);
+  startDate.setHours(0, 0, 0, 0);
+
+  // 呼び出し済みチケットの平均待ち時間を計算
+  const result = await db.select({
+    avgMinutes: sql<number>`avg(timestampdiff(minute, ${tickets.createdAt}, ${tickets.calledAt}))`,
+    count: sql<number>`count(*)`,
+  })
+    .from(tickets)
+    .where(and(
+      eq(tickets.storeId, storeId),
+      sql`${tickets.createdAt} >= ${startDate}`,
+      sql`${tickets.calledAt} is not null`
+    ));
+
+  const avgMinutes = result[0]?.avgMinutes;
+  const count = result[0]?.count || 0;
+
+  // データが少なすぎる場合はnullを返す（最低5件必要）
+  if (count < 5 || avgMinutes === null) {
+    return null;
+  }
+
+  return Math.round(avgMinutes);
+}
+
+/**
+ * 整理券の予測待ち時間を計算
+ * @param storeId 店舗ID
+ * @param groupsAhead 前に待っている組数
+ * @returns 予測待ち時間（分）、計算できない場合はnull
+ */
+export async function getEstimatedWaitTimeMinutes(
+  storeId: number,
+  groupsAhead: number
+): Promise<number | null> {
+  if (groupsAhead <= 0) {
+    return 0;
+  }
+
+  const avgServiceTime = await getAverageServiceTimeMinutes(storeId);
+  if (avgServiceTime === null) {
+    return null;
+  }
+
+  // 予測待ち時間 = 前の組数 × 平均処理時間
+  // 最低1分、最大180分（3時間）に制限
+  const estimatedMinutes = Math.min(180, Math.max(1, groupsAhead * avgServiceTime));
+  return Math.round(estimatedMinutes);
+}
+
+/**
+ * 店舗の現在の待ち時間情報を取得
+ * @returns 待ち時間情報（平均処理時間、現在の待ち組数、予測待ち時間）
+ */
+export async function getWaitTimeInfo(storeId: number): Promise<{
+  avgServiceTimeMinutes: number | null;
+  currentWaitingCount: number;
+  estimatedWaitMinutes: number | null;
+}> {
+  const [avgServiceTime, waitingCount] = await Promise.all([
+    getAverageServiceTimeMinutes(storeId),
+    getWaitingCount(storeId),
+  ]);
+
+  let estimatedWaitMinutes: number | null = null;
+  if (avgServiceTime !== null && waitingCount > 0) {
+    estimatedWaitMinutes = Math.min(180, Math.max(1, waitingCount * avgServiceTime));
+  } else if (waitingCount === 0) {
+    estimatedWaitMinutes = 0;
+  }
+
+  return {
+    avgServiceTimeMinutes: avgServiceTime,
+    currentWaitingCount: waitingCount,
+    estimatedWaitMinutes,
+  };
+}

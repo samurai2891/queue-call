@@ -235,12 +235,17 @@ const storeRouter = router({
       // PINを取得または更新（15分経過時）
       const { pin, expiresAt } = await db.getOrUpdateStorePin(input.storeId);
       
+      // 予測待ち時間を計算
+      const waitTimeInfo = await db.getWaitTimeInfo(input.storeId);
+      
       return {
         currentNumber: calledTicket?.number || 0,
         waitingCount,
         waitingNumbers,
         currentPin: pin,
         pinExpiresAt: expiresAt,
+        estimatedWaitMinutes: waitTimeInfo.estimatedWaitMinutes,
+        avgServiceTimeMinutes: waitTimeInfo.avgServiceTimeMinutes,
       };
     }),
 
@@ -497,11 +502,15 @@ const ticketRouter = router({
 
       const groupsAhead = await db.getGroupsAhead(ticket);
       const calledTicket = await db.getCalledTicket(ticket.storeId);
+      
+      // 予測待ち時間を計算
+      const estimatedWaitMinutes = await db.getEstimatedWaitTimeMinutes(ticket.storeId, groupsAhead);
 
       return {
         ...ticket,
         groupsAhead,
         currentNumber: calledTicket?.number || 0,
+        estimatedWaitMinutes,
       };
     }),
 

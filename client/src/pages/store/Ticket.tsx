@@ -265,18 +265,36 @@ function TicketContent() {
 
             {/* Queue Info */}
             {isActive && !isCalled && (
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">{t('ticket.currentlyCalling')}</p>
-                  <p className="text-3xl font-bold tabular-nums">{currentNumber || '-'}</p>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">{t('ticket.currentlyCalling')}</p>
+                    <p className="text-3xl font-bold tabular-nums">{currentNumber || '-'}</p>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">{t('ticket.groupsAhead')}</p>
+                    <p className="text-3xl font-bold tabular-nums">
+                      {groupsAhead}
+                      <span className="text-lg text-muted-foreground ml-1">{t('ticket.groupsAheadSuffix')}</span>
+                    </p>
+                  </div>
                 </div>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">{t('ticket.groupsAhead')}</p>
-                  <p className="text-3xl font-bold tabular-nums">
-                    {groupsAhead}
-                    <span className="text-lg text-muted-foreground ml-1">{t('ticket.groupsAheadSuffix')}</span>
-                  </p>
-                </div>
+                
+                {/* Estimated Wait Time */}
+                {ticket.estimatedWaitMinutes !== null && ticket.estimatedWaitMinutes !== undefined && (
+                  <div className="p-4 bg-primary/5 rounded-lg text-center border border-primary/20">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <Clock className="h-4 w-4 text-primary" />
+                      <p className="text-sm text-muted-foreground">{t('ticket.estimatedWait')}</p>
+                    </div>
+                    <p className="text-2xl font-bold text-primary">
+                      {ticket.estimatedWaitMinutes === 0 
+                        ? t('ticket.estimatedWaitNow')
+                        : t('ticket.estimatedWaitMinutes').replace('{minutes}', String(ticket.estimatedWaitMinutes))
+                      }
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
