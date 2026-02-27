@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Minus, Plus, AlertCircle, Loader2, Users, Clock, Activity } from 'lucide-react';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { AnimatedPage, AnimatedCard } from '@/components/AnimatedPage';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { toast } from 'sonner';
 import { RATE_LIMITED_ERR_MSG } from '@shared/const';
 import type { Locale } from '@/contexts/LocaleContext';
@@ -148,9 +149,12 @@ function JoinQueueContent() {
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
       <header className="p-4 flex justify-between items-center">
-        <Button variant="ghost" size="icon" className="active:scale-90 transition-transform" onClick={() => navigate(`/s/${params.storeSlug}`)}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="active:scale-90 transition-transform" onClick={() => navigate(`/s/${params.storeSlug}`)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <ThemeToggle />
+        </div>
         <h1 className="text-lg font-semibold">{store.name}</h1>
         <LanguageSwitcher showLabel />
       </header>

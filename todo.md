@@ -1110,3 +1110,18 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 
 ### チェックポイント保存
 - [ ] チェックポイント保存
+
+### P3-1: ダークモード対応
+- [x] テーマトグルUI（ヘッダー/設定にダーク/ライト切り替えボタン）— ThemeToggle.tsx作成、全画面に配置
+- [x] Home画面のダークモード対応（ハードコード色→セマンティック色）
+- [x] StoreTop画面のダークモード対応
+- [x] JoinQueue画面のダークモード対応
+- [x] Ticket画面のダークモード対応
+- [x] KioskDisplay画面のダークモード対応
+- [x] BoardDisplay画面のダークモード対応（既にダーク背景あり、変更不要）
+- [x] Staff画面のダークモード対応
+- [x] 管理画面（Settings, Dashboard, DashboardLayout）のダークモード対応
+- [x] ダークモード時のコントラスト・可読性の確認
+- [x] NotFound, ReservationCheck, ReservationManagement, ManusDialog, OfflineIndicator, QRCodeGeneratorのセマンティック色修正
+- [x] ダークモード用skeleton-shimmerアニメーション追加
+- [x] テスト追加（theme-toggle.test.ts: 14件パス）

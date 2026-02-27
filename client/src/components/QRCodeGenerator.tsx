@@ -288,7 +288,7 @@ export function QRCodeGenerator({ storeSlug, storeName, baseUrl }: QRCodeGenerat
           <CardTitle>{t('qrcode.preview')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex justify-center p-4 bg-gray-100 rounded-lg">
+          <div className="flex justify-center p-4 bg-muted rounded-lg">
             {/* Simple QR Code */}
             {template === 'simple' && (
               <div

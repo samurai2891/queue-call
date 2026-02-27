@@ -9,6 +9,7 @@ import { Users, ClipboardList, UtensilsCrossed, AlertCircle, Clock } from 'lucid
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { CrowdLevelBadge } from '@/components/CrowdLevelIndicator';
 import { AnimatedPage, AnimatedCard } from '@/components/AnimatedPage';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useSSE } from '@/hooks/useSSE';
 import { useState, useEffect } from 'react';
 import type { Locale } from '@/contexts/LocaleContext';
@@ -99,7 +100,7 @@ function StoreTopContent() {
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
       <header className="p-4 flex justify-between items-center">
-        <div />
+        <ThemeToggle />
         <LanguageSwitcher showLabel />
       </header>
 

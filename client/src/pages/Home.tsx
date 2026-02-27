@@ -20,6 +20,7 @@ import { useLocation } from "wouter";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { AnimatedPage, AnimatedCard } from "@/components/AnimatedPage";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
@@ -50,6 +51,7 @@ export default function Home() {
             <span className="text-xl font-bold">Queue Call</span>
           </div>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             {loading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : isAuthenticated ? (

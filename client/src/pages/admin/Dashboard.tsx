@@ -513,9 +513,9 @@ export default function Dashboard() {
                     cursor={{ fill: 'rgba(0, 0, 0, 0.1)' }}
                   />
                   <Legend />
-                  <Bar dataKey="done" name={t("dashboard.completed")} fill="#3b82f6" stackId="a" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="skipped" name={t("dashboard.skipped")} fill="#f97316" stackId="a" />
-                  <Bar dataKey="canceled" name={t("dashboard.canceled")} fill="#94a3b8" stackId="a" />
+                  <Bar dataKey="done" name={t("dashboard.completed")} fill="oklch(0.59 0.2 255)" stackId="a" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="skipped" name={t("dashboard.skipped")} fill="oklch(0.7 0.18 55)" stackId="a" />
+                  <Bar dataKey="canceled" name={t("dashboard.canceled")} fill="oklch(0.65 0.03 255)" stackId="a" />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -614,28 +614,28 @@ export default function Dashboard() {
                     type="monotone" 
                     dataKey="avg" 
                     name={t("dashboard.avgWait")} 
-                    stroke="#10b981" 
+                    stroke="oklch(0.6 0.18 160)" 
                     strokeWidth={3}
-                    dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, fill: '#10b981' }}
+                    dot={{ fill: 'oklch(0.6 0.18 160)', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, fill: 'oklch(0.6 0.18 160)' }}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="max" 
                     name={t("dashboard.maxWait")} 
-                    stroke="#ef4444" 
+                    stroke="oklch(0.6 0.22 25)" 
                     strokeWidth={2}
                     strokeDasharray="5 5"
-                    dot={{ fill: '#ef4444', r: 3 }}
+                    dot={{ fill: 'oklch(0.6 0.22 25)', r: 3 }}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="min" 
                     name={t("dashboard.minWait")} 
-                    stroke="#8b5cf6" 
+                    stroke="oklch(0.55 0.25 290)" 
                     strokeWidth={2}
                     strokeDasharray="5 5"
-                    dot={{ fill: '#8b5cf6', r: 3 }}
+                    dot={{ fill: 'oklch(0.55 0.25 290)', r: 3 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -808,7 +808,7 @@ export default function Dashboard() {
                     yAxisId="left" 
                     dataKey="count" 
                     name={t("dashboard.visitorCount")} 
-                    fill="#6366f1" 
+                    fill="oklch(0.55 0.22 270)" 
                     radius={[4, 4, 0, 0]}
                   />
                   <Line 
@@ -816,10 +816,10 @@ export default function Dashboard() {
                     type="monotone" 
                     dataKey="avgWait" 
                     name={t("dashboard.avgWait")} 
-                    stroke="#f59e0b" 
+                    stroke="oklch(0.75 0.18 80)" 
                     strokeWidth={3}
-                    dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, fill: '#f59e0b' }}
+                    dot={{ fill: 'oklch(0.75 0.18 80)', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, fill: 'oklch(0.75 0.18 80)' }}
                   />
                 </BarChart>
               </ResponsiveContainer>

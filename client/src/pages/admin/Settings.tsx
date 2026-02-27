@@ -245,11 +245,11 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
       
       {/* チャージ促進モーダル */}
       {showChargePrompt && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-foreground/50 flex items-center justify-center z-50 p-4">
           <div className="bg-background rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="text-center mb-4">
-              <div className={`inline-flex p-3 rounded-full ${isCriticalBalance ? 'bg-destructive/10' : 'bg-yellow-100'} mb-3`}>
-                <Wallet className={`h-8 w-8 ${isCriticalBalance ? 'text-destructive' : 'text-yellow-600'}`} />
+              <div className={`inline-flex p-3 rounded-full ${isCriticalBalance ? 'bg-destructive/10' : 'bg-warning/10'} mb-3`}>
+                <Wallet className={`h-8 w-8 ${isCriticalBalance ? 'text-destructive' : 'text-warning'}`} />
               </div>
               <h3 className="text-lg font-bold">
                 {isCriticalBalance

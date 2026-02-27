@@ -34,12 +34,12 @@ const dateLocales: Record<string, typeof ja> = {
 type ReservationStatus = "PENDING" | "CONFIRMED" | "CHECKED_IN" | "COMPLETED" | "CANCELED" | "NO_SHOW";
 
 const statusConfig: Record<ReservationStatus, { color: string; icon: typeof CheckCircle; bgColor: string }> = {
-  PENDING: { color: "text-yellow-600", icon: AlertCircle, bgColor: "bg-yellow-100" },
-  CONFIRMED: { color: "text-blue-600", icon: CheckCircle, bgColor: "bg-blue-100" },
-  CHECKED_IN: { color: "text-green-600", icon: CheckCircle, bgColor: "bg-green-100" },
-  COMPLETED: { color: "text-gray-600", icon: CheckCircle, bgColor: "bg-gray-100" },
-  CANCELED: { color: "text-red-600", icon: XCircle, bgColor: "bg-red-100" },
-  NO_SHOW: { color: "text-red-600", icon: XCircle, bgColor: "bg-red-100" },
+  PENDING: { color: "text-warning", icon: AlertCircle, bgColor: "bg-warning/10" },
+  CONFIRMED: { color: "text-info", icon: CheckCircle, bgColor: "bg-info/10" },
+  CHECKED_IN: { color: "text-success", icon: CheckCircle, bgColor: "bg-success/10" },
+  COMPLETED: { color: "text-muted-foreground", icon: CheckCircle, bgColor: "bg-muted" },
+  CANCELED: { color: "text-destructive", icon: XCircle, bgColor: "bg-destructive/10" },
+  NO_SHOW: { color: "text-destructive", icon: XCircle, bgColor: "bg-destructive/10" },
 };
 
 export default function ReservationCheck() {
@@ -99,8 +99,8 @@ export default function ReservationCheck() {
   };
   
   const StatusIcon = reservation ? statusConfig[reservation.status as ReservationStatus]?.icon || AlertCircle : AlertCircle;
-  const statusColor = reservation ? statusConfig[reservation.status as ReservationStatus]?.color || "text-gray-600" : "text-gray-600";
-  const statusBgColor = reservation ? statusConfig[reservation.status as ReservationStatus]?.bgColor || "bg-gray-100" : "bg-gray-100";
+  const statusColor = reservation ? statusConfig[reservation.status as ReservationStatus]?.color || "text-muted-foreground" : "text-muted-foreground";
+  const statusBgColor = reservation ? statusConfig[reservation.status as ReservationStatus]?.bgColor || "bg-muted" : "bg-muted";
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 p-4">

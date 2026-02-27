@@ -45,7 +45,7 @@ export function OfflineIndicator() {
         role="status"
         aria-live="polite"
       >
-        <div className="flex items-center gap-2 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg">
+        <div className="flex items-center gap-2 bg-success text-success-foreground px-4 py-3 rounded-lg shadow-lg">
           <Wifi className="h-4 w-4 flex-shrink-0" />
           <span className="text-sm font-medium">{t('offline.backOnline')}</span>
         </div>
@@ -61,7 +61,7 @@ export function OfflineIndicator() {
         role="alert"
         aria-live="assertive"
       >
-        <div className="flex items-center gap-2 bg-amber-500 text-white px-4 py-3 rounded-lg shadow-lg">
+        <div className="flex items-center gap-2 bg-warning text-warning-foreground px-4 py-3 rounded-lg shadow-lg">
           <WifiOff className="h-4 w-4 flex-shrink-0" />
           <span className="text-sm font-medium">{t('offline.message')}</span>
         </div>

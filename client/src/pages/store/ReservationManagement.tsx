@@ -73,12 +73,12 @@ const dateLocales: Record<string, typeof ja> = {
 type ReservationStatus = "PENDING" | "CONFIRMED" | "CHECKED_IN" | "COMPLETED" | "CANCELED" | "NO_SHOW";
 
 const statusColors: Record<ReservationStatus, string> = {
-  PENDING: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  CONFIRMED: "bg-blue-100 text-blue-800 border-blue-200",
-  CHECKED_IN: "bg-green-100 text-green-800 border-green-200",
-  COMPLETED: "bg-gray-100 text-gray-800 border-gray-200",
-  CANCELED: "bg-red-100 text-red-800 border-red-200",
-  NO_SHOW: "bg-orange-100 text-orange-800 border-orange-200",
+  PENDING: "bg-warning/10 text-warning border-warning/30",
+  CONFIRMED: "bg-info/10 text-info border-info/30",
+  CHECKED_IN: "bg-success/10 text-success border-success/30",
+  COMPLETED: "bg-muted text-muted-foreground border-border",
+  CANCELED: "bg-destructive/10 text-destructive border-destructive/30",
+  NO_SHOW: "bg-warning/10 text-warning border-warning/30",
 };
 
 interface ReservationItem {

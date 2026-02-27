@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ArrowLeft, Bell, BellOff, AlertCircle, CheckCircle, XCircle, Clock, MessageSquare, KeyRound, BellRing } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import {
   Select,
   SelectContent,
@@ -385,9 +386,12 @@ function TicketContent() {
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
       <header className="p-4 flex justify-between items-center">
-        <Button variant="ghost" size="icon" className="active:scale-90 transition-transform" onClick={() => navigate(`/s/${params.storeSlug}`)}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="active:scale-90 transition-transform" onClick={() => navigate(`/s/${params.storeSlug}`)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <ThemeToggle />
+        </div>
         <LanguageSwitcher showLabel />
       </header>
 
