@@ -214,6 +214,15 @@ function JoinQueueContent() {
           <Card className="w-full shadow-sm">
             <CardContent className="p-5">
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Join Notice - 受付注意事項 */}
+                {store?.settings?.customMessages?.joinNotice && (
+                  <div className="rounded-lg bg-muted/50 border border-border/50 p-3">
+                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                      {store.settings.customMessages.joinNotice}
+                    </p>
+                  </div>
+                )}
+
                 {/* Party Size - 拡大版 */}
                 <div className="space-y-4">
                   <Label className="text-base font-medium">{t('join.partySize')}</Label>

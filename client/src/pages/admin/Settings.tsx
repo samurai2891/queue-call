@@ -565,6 +565,12 @@ function SettingsContent() {
     brandPrimaryColor: '',
     brandSecondaryColor: '',
     brandAccentColor: '',
+    
+    // Custom Messages
+    welcomeMessage: '',
+    joinNotice: '',
+    ticketMessage: '',
+    kioskMessage: '',
   });
 
   const [newMenuItem, setNewMenuItem] = useState<MenuItemDraft>({
@@ -763,6 +769,12 @@ function SettingsContent() {
         brandPrimaryColor: settings.branding?.primaryColor || '',
         brandSecondaryColor: settings.branding?.secondaryColor || '',
         brandAccentColor: settings.branding?.accentColor || '',
+        
+        // Custom Messages
+        welcomeMessage: settings.customMessages?.welcomeMessage || '',
+        joinNotice: settings.customMessages?.joinNotice || '',
+        ticketMessage: settings.customMessages?.ticketMessage || '',
+        kioskMessage: settings.customMessages?.kioskMessage || '',
       });
     }
   }, [store]);
@@ -933,6 +945,12 @@ function SettingsContent() {
           logoUrl: store.settings.branding.logoUrl,
           logoKey: store.settings.branding.logoKey,
         } : {}),
+      },
+      customMessages: {
+        welcomeMessage: formData.welcomeMessage || undefined,
+        joinNotice: formData.joinNotice || undefined,
+        ticketMessage: formData.ticketMessage || undefined,
+        kioskMessage: formData.kioskMessage || undefined,
       },
     };
 
@@ -1551,6 +1569,7 @@ function SettingsContent() {
     { id: 'board', label: t('settings.board'), icon: Monitor },
     { id: 'reservation', label: t('settings.reservation'), icon: CalendarDays },
     { id: 'branding', label: t('settings.branding'), icon: Palette },
+    { id: 'messages', label: t('settings.customMessages'), icon: MessageSquare },
     { id: 'qrcode', label: t('settings.qrcode'), icon: QrCode },
     { id: 'security', label: t('settings.security'), icon: Shield },
   ];
@@ -3293,6 +3312,126 @@ function SettingsContent() {
                       </div>
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Custom Messages Settings */}
+          <TabsContent value="messages">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  {t('settings.customMessages')}
+                </CardTitle>
+                <CardDescription>{t('settings.customMessagesDescription')}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Welcome Message */}
+                <div className="space-y-2">
+                  <Label htmlFor="welcomeMessage" className="text-base font-medium">
+                    {t('settings.welcomeMessage')}
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings.welcomeMessageHelp')}
+                  </p>
+                  <Textarea
+                    id="welcomeMessage"
+                    value={formData.welcomeMessage}
+                    onChange={(e) => {
+                      if (e.target.value.length <= 200) {
+                        setFormData({ ...formData, welcomeMessage: e.target.value });
+                      }
+                    }}
+                    placeholder={t('settings.welcomeMessagePlaceholder')}
+                    rows={3}
+                    className="resize-none"
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {t('settings.messageCharCount').replace('{count}', String(formData.welcomeMessage.length))}
+                  </p>
+                </div>
+
+                <Separator />
+
+                {/* Join Notice */}
+                <div className="space-y-2">
+                  <Label htmlFor="joinNotice" className="text-base font-medium">
+                    {t('settings.joinNotice')}
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings.joinNoticeHelp')}
+                  </p>
+                  <Textarea
+                    id="joinNotice"
+                    value={formData.joinNotice}
+                    onChange={(e) => {
+                      if (e.target.value.length <= 200) {
+                        setFormData({ ...formData, joinNotice: e.target.value });
+                      }
+                    }}
+                    placeholder={t('settings.joinNoticePlaceholder')}
+                    rows={3}
+                    className="resize-none"
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {t('settings.messageCharCount').replace('{count}', String(formData.joinNotice.length))}
+                  </p>
+                </div>
+
+                <Separator />
+
+                {/* Ticket Message */}
+                <div className="space-y-2">
+                  <Label htmlFor="ticketMessage" className="text-base font-medium">
+                    {t('settings.ticketMessage')}
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings.ticketMessageHelp')}
+                  </p>
+                  <Textarea
+                    id="ticketMessage"
+                    value={formData.ticketMessage}
+                    onChange={(e) => {
+                      if (e.target.value.length <= 200) {
+                        setFormData({ ...formData, ticketMessage: e.target.value });
+                      }
+                    }}
+                    placeholder={t('settings.ticketMessagePlaceholder')}
+                    rows={3}
+                    className="resize-none"
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {t('settings.messageCharCount').replace('{count}', String(formData.ticketMessage.length))}
+                  </p>
+                </div>
+
+                <Separator />
+
+                {/* Kiosk Message */}
+                <div className="space-y-2">
+                  <Label htmlFor="kioskMessage" className="text-base font-medium">
+                    {t('settings.kioskMessage')}
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings.kioskMessageHelp')}
+                  </p>
+                  <Textarea
+                    id="kioskMessage"
+                    value={formData.kioskMessage}
+                    onChange={(e) => {
+                      if (e.target.value.length <= 200) {
+                        setFormData({ ...formData, kioskMessage: e.target.value });
+                      }
+                    }}
+                    placeholder={t('settings.kioskMessagePlaceholder')}
+                    rows={3}
+                    className="resize-none"
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {t('settings.messageCharCount').replace('{count}', String(formData.kioskMessage.length))}
+                  </p>
                 </div>
               </CardContent>
             </Card>

@@ -1146,3 +1146,14 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] KioskDisplay（入力画面・成功画面）, BoardDisplay（ヘッダー）にロゴ表示
 - [x] 多言語対応（翻訳キー追加 5言語）
 - [x] テスト追加（store-logo.test.ts: 18件パス、全129件パス）
+
+### P3-4: 店舗ごとのカスタムメッセージ設定・表示機能（完了）
+- [x] StoreSettingsにcustomMessages追加（welcomeMessage, joinNotice, ticketMessage, kioskMessage）
+- [x] getBySlug/getBySlugForKiosk/getBySlugForBoard APIレスポンスにcustomMessages追加
+- [x] 管理画面Settings「メッセージ」タブ追加（4種のテキストエリア編集UI、200文字制限、プレビュー付き）
+- [x] StoreTop画面にウェルカムメッセージ表示（店舗名の下）
+- [x] JoinQueue画面に受付注意事項表示（フォーム上部、アラートスタイル）
+- [x] Ticket画面にチケットメッセージ表示（チケットカード内）
+- [x] KioskDisplay画面にキオスクメッセージ表示（入力画面）
+- [x] 多言語対応（翻訳キー追加 5言語）
+- [x] テスト追加（custom-messages.test.ts: 24件パス、全153件パス）

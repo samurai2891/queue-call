@@ -118,7 +118,11 @@ function StoreTopContent() {
               />
             )}
             <h1 className="text-3xl md:text-4xl font-bold">{store.name}</h1>
-            <p className="text-muted-foreground mt-1">{t('store.welcome')}</p>
+            {store.settings?.customMessages?.welcomeMessage ? (
+              <p className="text-muted-foreground mt-1 max-w-sm">{store.settings.customMessages.welcomeMessage}</p>
+            ) : (
+              <p className="text-muted-foreground mt-1">{t('store.welcome')}</p>
+            )}
           </div>
         </AnimatedPage>
 

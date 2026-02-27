@@ -138,6 +138,12 @@ export interface StoreSettings {
     logoUrl?: string;         // ロゴ画像URL（S3）
     logoKey?: string;         // ロゴ画像のS3キー
   };
+  customMessages?: {
+    welcomeMessage?: string;  // StoreTop画面のウェルカムメッセージ
+    joinNotice?: string;      // JoinQueue画面の受付注意事項
+    ticketMessage?: string;   // Ticket画面のチケットメッセージ
+    kioskMessage?: string;    // KioskDisplay画面のメッセージ
+  };
 }
 
 /**

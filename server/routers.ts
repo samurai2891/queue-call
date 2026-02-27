@@ -169,6 +169,7 @@ const storeRouter = router({
           kiosk: store.settings?.kiosk,
           board: store.settings?.board,
           branding: store.settings?.branding,
+          customMessages: store.settings?.customMessages,
         },
       };
     }),
@@ -196,6 +197,7 @@ const storeRouter = router({
           kiosk: store.settings?.kiosk,
           board: store.settings?.board,
           branding: store.settings?.branding,
+          customMessages: store.settings?.customMessages,
         },
       };
     }),
@@ -223,6 +225,7 @@ const storeRouter = router({
           kiosk: store.settings?.kiosk,
           board: store.settings?.board,
           branding: store.settings?.branding,
+          customMessages: store.settings?.customMessages,
         },
       };
     }),

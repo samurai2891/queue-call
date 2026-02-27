@@ -494,6 +494,15 @@ function TicketContent() {
                 </div>
               )}
 
+              {/* Custom Ticket Message */}
+              {isActive && store?.settings?.customMessages?.ticketMessage && (
+                <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
+                  <p className="text-sm text-center text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                    {store.settings.customMessages.ticketMessage}
+                  </p>
+                </div>
+              )}
+
               {/* Ticket Details */}
               <div className="text-center text-sm text-muted-foreground space-y-1">
                 <p>{ticket.partySize} {t('common.people')}</p>

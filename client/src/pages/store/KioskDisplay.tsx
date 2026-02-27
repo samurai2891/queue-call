@@ -184,6 +184,15 @@ function KioskDisplayContent() {
         <AnimatedPage variant="zoom-fade" delay={150}>
           <Card className="w-full max-w-lg">
             <CardContent className="p-8 space-y-8">
+              {/* Kiosk Custom Message */}
+              {store.settings?.customMessages?.kioskMessage && (
+                <div className="rounded-lg bg-muted/50 border border-border/50 p-4">
+                  <p className="text-lg text-center text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                    {store.settings.customMessages.kioskMessage}
+                  </p>
+                </div>
+              )}
+
               <div className="text-center">
                 <p className="text-2xl text-muted-foreground mb-4">{t('join.partySize')}</p>
                 <div className="flex items-center justify-center gap-6">
