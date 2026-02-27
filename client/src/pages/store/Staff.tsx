@@ -89,6 +89,7 @@ function StaffContent() {
   const [reorderTarget, setReorderTarget] = useState<{ ticketId: number; delta: number } | null>(null);
   const [manualPartySize, setManualPartySize] = useState(2);
   const [manualNote, setManualNote] = useState('');
+  const [showManualForm, setShowManualForm] = useState(false);
 
 
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
@@ -477,10 +478,46 @@ function StaffContent() {
         </div>
       </header>
 
+      {/* P0-4: 「次を呼ぶ」ボタン + ステータスをsticky固定 */}
+      <div className="sticky top-[53px] z-10 bg-background border-b shadow-sm">
+        <div className="container py-3 space-y-3">
+          {/* Call Next Button — 最も重要なアクション */}
+          <Button
+            size="lg"
+            className="w-full h-14 text-lg"
+            onClick={handleCallNext}
+            disabled={callNextMutation.isPending || waitingTickets.length === 0}
+          >
+            {callNextMutation.isPending ? (
+              <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+            ) : (
+              <Bell className="mr-2 h-6 w-6" />
+            )}
+            {t('staff.call')} ({waitingTickets.length})
+          </Button>
+
+          {/* Stats — コンパクトなインライン表示 */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex items-center justify-center gap-2 p-2 bg-muted/50 rounded-lg">
+              <span className="text-lg font-bold text-primary tabular-nums">{waitingTickets.length}</span>
+              <span className="text-xs text-muted-foreground">{t('ticket.status.WAITING')}</span>
+            </div>
+            <div className="flex items-center justify-center gap-2 p-2 bg-muted/50 rounded-lg">
+              <span className="text-lg font-bold text-warning tabular-nums">{calledTickets.length}</span>
+              <span className="text-xs text-muted-foreground">{t('ticket.status.CALLED')}</span>
+            </div>
+            <div className="flex items-center justify-center gap-2 p-2 bg-muted/50 rounded-lg">
+              <span className="text-lg font-bold text-success tabular-nums">{arrivedTickets.length}</span>
+              <span className="text-xs text-muted-foreground">{t('ticket.status.ARRIVED')}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Controls */}
       <div className="container py-4 space-y-4">
         {/* Intake Status */}
-        <div className="flex items-center justify-between p-4 bg-card rounded-lg border">
+        <div className="flex items-center justify-between p-3 bg-card rounded-lg border">
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium">{t('staff.intake')}</span>
             <Badge variant={intakeStatus === 'open' ? 'default' : 'destructive'}>
@@ -507,57 +544,65 @@ function StaffContent() {
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('staff.manualAddTitle')}</CardTitle>
-            <CardDescription>{t('staff.manualAddDescription')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={handleManualCreate}>
-              <div className="grid gap-4 md:grid-cols-[160px,1fr]">
-                <div className="space-y-2">
-                  <Label htmlFor="manualPartySize">{t('join.partySize')}</Label>
-                  <Input
-                    id="manualPartySize"
-                    type="number"
-                    min={1}
-                    max={manualMaxPartySize}
-                    value={manualPartySize}
-                    onChange={(e) => handleManualPartySizeChange(e.target.value)}
-                  />
+        {/* Manual Add — 折りたたみ */}
+        <div className="bg-card rounded-lg border">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between p-3 text-left"
+            onClick={() => setShowManualForm(!showManualForm)}
+          >
+            <span className="text-sm font-medium">{t('staff.manualAddTitle')}</span>
+            {showManualForm ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+          {showManualForm && (
+            <div className="px-3 pb-3 border-t">
+              <p className="text-xs text-muted-foreground mt-2 mb-3">{t('staff.manualAddDescription')}</p>
+              <form className="space-y-3" onSubmit={handleManualCreate}>
+                <div className="grid gap-3 md:grid-cols-[160px,1fr]">
+                  <div className="space-y-1">
+                    <Label htmlFor="manualPartySize">{t('join.partySize')}</Label>
+                    <Input
+                      id="manualPartySize"
+                      type="number"
+                      min={1}
+                      max={manualMaxPartySize}
+                      value={manualPartySize}
+                      onChange={(e) => handleManualPartySizeChange(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="manualNote">{t('join.note')}</Label>
+                    <Textarea
+                      id="manualNote"
+                      value={manualNote}
+                      onChange={(e) => setManualNote(e.target.value)}
+                      placeholder={t('join.notePlaceholder')}
+                      rows={2}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="manualNote">{t('join.note')}</Label>
-                  <Textarea
-                    id="manualNote"
-                    value={manualNote}
-                    onChange={(e) => setManualNote(e.target.value)}
-                    placeholder={t('join.notePlaceholder')}
-                    rows={3}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Button
-                  type="submit"
-                  disabled={manualCreateMutation.isPending || intakeStatus !== 'open'}
-                >
-                  {manualCreateMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={manualCreateMutation.isPending || intakeStatus !== 'open'}
+                  >
+                    {manualCreateMutation.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {t('staff.manualAddAction')}
+                  </Button>
+                  {intakeStatus !== 'open' && (
+                    <p className="text-xs text-muted-foreground">{t('staff.manualAddDisabled')}</p>
                   )}
-                  {t('staff.manualAddAction')}
-                </Button>
-                {intakeStatus !== 'open' && (
-                  <p className="text-xs text-muted-foreground">{t('staff.manualAddDisabled')}</p>
-                )}
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
 
         {reorderEnabled && (
-
-          <div className="flex items-center justify-between p-4 bg-card rounded-lg border">
+          <div className="flex items-center justify-between p-3 bg-card rounded-lg border">
             <div className="space-y-1">
               <span className="text-sm font-medium">{t('staff.reorderMode')}</span>
               <p className="text-xs text-muted-foreground">
@@ -578,43 +623,6 @@ function StaffContent() {
             <AlertDescription>{t('staff.reorderWarning')}</AlertDescription>
           </Alert>
         )}
-
-        {/* Call Next Button */}
-        <Button
-          size="lg"
-          className="w-full h-16 text-xl"
-          onClick={handleCallNext}
-          disabled={callNextMutation.isPending || waitingTickets.length === 0}
-        >
-          {callNextMutation.isPending ? (
-            <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-          ) : (
-            <Bell className="mr-2 h-6 w-6" />
-          )}
-          {t('staff.call')} ({waitingTickets.length})
-        </Button>
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-primary">{waitingTickets.length}</p>
-              <p className="text-xs text-muted-foreground">{t('ticket.status.WAITING')}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-warning">{calledTickets.length}</p>
-              <p className="text-xs text-muted-foreground">{t('ticket.status.CALLED')}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-success">{arrivedTickets.length}</p>
-              <p className="text-xs text-muted-foreground">{t('ticket.status.ARRIVED')}</p>
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       {/* Ticket List */}

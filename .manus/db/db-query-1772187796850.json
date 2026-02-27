@@ -1,0 +1,186 @@
+{
+  "query": "DESCRIBE stores",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user zN6v3835fExzWSq.4b780e52d435 --database 9PkSnVJ3696qvv2NFCWti9 --execute DESCRIBE stores",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "slug",
+      "Type": "varchar(64)",
+      "Null": "NO",
+      "Key": "UNI",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "name",
+      "Type": "varchar(255)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ownerId",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "staffPinHash",
+      "Type": "varchar(255)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "managerPinHash",
+      "Type": "varchar(255)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "intakeStatus",
+      "Type": "enum('open','paused')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "open",
+      "Extra": ""
+    },
+    {
+      "Field": "defaultLocale",
+      "Type": "varchar(10)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "ja",
+      "Extra": ""
+    },
+    {
+      "Field": "supportedLocales",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "resetTime",
+      "Type": "varchar(5)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "04:00",
+      "Extra": ""
+    },
+    {
+      "Field": "currentNumber",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "dayKey",
+      "Type": "varchar(10)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "kioskKey",
+      "Type": "varchar(64)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "boardKey",
+      "Type": "varchar(64)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "settings",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "createdAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "updatedAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    },
+    {
+      "Field": "smsBalance",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "stripeCustomerId",
+      "Type": "varchar(255)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "kioskToken",
+      "Type": "varchar(64)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "currentCheckinPin",
+      "Type": "varchar(3)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "checkinPinUpdatedAt",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint(11)\tNO\tPRI\tNULL\tauto_increment\nslug\tvarchar(64)\tNO\tUNI\tNULL\t\nname\tvarchar(255)\tNO\t\tNULL\t\nownerId\tint(11)\tNO\t\tNULL\t\nstaffPinHash\tvarchar(255)\tYES\t\tNULL\t\nmanagerPinHash\tvarchar(255)\tYES\t\tNULL\t\nintakeStatus\tenum('open','paused')\tNO\t\topen\t\ndefaultLocale\tvarchar(10)\tNO\t\tja\t\nsupportedLocales\tjson\tYES\t\tNULL\t\nresetTime\tvarchar(5)\tNO\t\t04:00\t\ncurrentNumber\tint(11)\tNO\t\t0\t\ndayKey\tvarchar(10)\tYES\t\tNULL\t\nkioskKey\tvarchar(64)\tYES\t\tNULL\t\nboardKey\tvarchar(64)\tYES\t\tNULL\t\nsettings\tjson\tYES\t\tNULL\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\nsmsBalance\tint(11)\tNO\t\t0\t\nstripeCustomerId\tvarchar(255)\tYES\t\tNULL\t\nkioskToken\tvarchar(64)\tYES\t\tNULL\t\ncurrentCheckinPin\tvarchar(3)\tYES\t\tNULL\t\ncheckinPinUpdatedAt\ttimestamp\tYES\t\tNULL\t\n",
+  "stderr": "",
+  "execution_time_ms": 1510
+}

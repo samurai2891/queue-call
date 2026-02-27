@@ -99,7 +99,6 @@ function TicketContent() {
     },
     onError: (error) => {
       setPinError(error.message);
-      // Clear PIN inputs on error
       setPinDigits(['', '', '']);
       pinInputRefs[0].current?.focus();
     },
@@ -122,7 +121,6 @@ function TicketContent() {
     ticketToken: params.token,
     enabled: !!store?.id && !!params.token,
     onQueueUpdate: (data) => {
-
       setCurrentNumber(data.currentNumber);
       refetch();
     },
@@ -136,11 +134,9 @@ function TicketContent() {
     onCalled: () => {
       setStatus('CALLED');
       refetch();
-      // Play notification sound if available
       if ('vibrate' in navigator) {
         navigator.vibrate([200, 100, 200, 100, 200]);
       }
-      // Show browser notification
       if (Notification.permission === 'granted') {
         new Notification(t('notification.called'), {
           body: t('notification.calledBody'),
@@ -158,20 +154,16 @@ function TicketContent() {
   };
 
   const handlePinDigitChange = (index: number, value: string) => {
-    // Only allow digits
     const digit = value.replace(/\D/g, '').slice(-1);
-    
     const newDigits = [...pinDigits];
     newDigits[index] = digit;
     setPinDigits(newDigits);
     setPinError(null);
 
-    // Auto-focus next input
     if (digit && index < 2) {
       pinInputRefs[index + 1].current?.focus();
     }
 
-    // Auto-submit when all digits are entered
     if (digit && index === 2 && newDigits.every(d => d !== '')) {
       const pin = newDigits.join('');
       if (params.token) {
@@ -190,7 +182,6 @@ function TicketContent() {
     setShowPinDialog(true);
     setPinDigits(['', '', '']);
     setPinError(null);
-    // Focus first input after dialog opens
     setTimeout(() => {
       pinInputRefs[0].current?.focus();
     }, 100);
@@ -246,8 +237,136 @@ function TicketContent() {
   const isActive = status === 'WAITING' || status === 'CALLED';
   const isCalled = status === 'CALLED';
 
+  // ========== P0-1: CALLED状態 — フルスクリーン緑背景 ==========
+  if (isCalled) {
+    return (
+      <div className="min-h-screen flex flex-col called-fullscreen-bg">
+        {/* Header - minimal */}
+        <header className="p-3 flex justify-between items-center relative z-10">
+          <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10" onClick={() => navigate(`/s/${params.storeSlug}`)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <LanguageSwitcher showLabel />
+        </header>
+
+        {/* Main - 番号を巨大表示 */}
+        <main className="flex-1 flex flex-col items-center justify-center px-4 pb-8 relative z-10">
+          {/* パルスアニメーション背景リング */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-72 h-72 rounded-full bg-white/10 animate-ping-slow" />
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-56 h-56 rounded-full bg-white/5 animate-ping-slower" />
+          </div>
+
+          {/* ステータスラベル */}
+          <div className="mb-4 px-5 py-2 rounded-full bg-white/20 backdrop-blur-sm">
+            <p className="text-white font-bold text-lg tracking-wider flex items-center gap-2">
+              <Bell className="h-5 w-5 animate-bounce" />
+              {t('ticket.calledHeading')}
+            </p>
+          </div>
+
+          {/* 番号 — 超巨大 */}
+          <p className="text-[8rem] sm:text-[10rem] font-black text-white tabular-nums leading-none drop-shadow-lg relative z-10">
+            {ticket.number}
+          </p>
+
+          {/* お店にお戻りください */}
+          <p className="text-white/90 text-xl font-semibold mt-4 mb-8">
+            {t('ticket.pleaseReturn')}
+          </p>
+
+          {/* 到着確認ボタン — 巨大化 */}
+          <Button
+            size="lg"
+            className="w-full max-w-xs h-16 text-xl font-bold bg-white text-emerald-700 hover:bg-white/90 shadow-2xl rounded-2xl"
+            onClick={handleOpenPinDialog}
+          >
+            <KeyRound className="mr-3 h-6 w-6" />
+            {t('ticket.checkinWithPin')}
+          </Button>
+
+          {/* 期限表示 */}
+          {ticket.checkinDeadlineAt && (
+            <div className="mt-4 px-4 py-2 rounded-lg bg-white/15 backdrop-blur-sm">
+              <p className="text-white/90 text-sm">
+                {t('ticket.deadlineLabel')}: {new Date(ticket.checkinDeadlineAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          )}
+
+          {/* キャンセルリンク — 控えめ */}
+          <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+            <AlertDialogTrigger asChild>
+              <button className="mt-6 text-white/50 text-sm underline underline-offset-4 hover:text-white/70 transition-colors">
+                {t('ticket.cancelButton')}
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t('ticket.cancelConfirm')}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('common.no')}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleCancel}>
+                  {t('common.yes')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </main>
+
+        {/* PIN Input Dialog */}
+        <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-center">{t('ticket.enterPin')}</DialogTitle>
+              <DialogDescription className="text-center">
+                {t('ticket.pinRequired')}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col items-center gap-6 py-4">
+              <div className="flex gap-4 justify-center">
+                {[0, 1, 2].map((index) => (
+                  <Input
+                    key={index}
+                    ref={pinInputRefs[index]}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={pinDigits[index]}
+                    onChange={(e) => handlePinDigitChange(index, e.target.value)}
+                    onKeyDown={(e) => handlePinKeyDown(index, e)}
+                    className="w-16 h-20 text-4xl text-center font-bold"
+                    disabled={checkinWithPinMutation.isPending}
+                  />
+                ))}
+              </div>
+              {pinError && (
+                <div className="text-destructive text-sm text-center">
+                  <AlertCircle className="inline h-4 w-4 mr-1" />
+                  {pinError}
+                </div>
+              )}
+              {checkinWithPinMutation.isPending && (
+                <div className="text-muted-foreground text-sm">
+                  {t('common.loading')}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // ========== WAITING / 完了 / その他の状態 ==========
   return (
-    <div className={`min-h-screen flex flex-col ${isCalled ? 'bg-success/5' : 'bg-gradient-to-b from-background to-muted/30'}`}>
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
       <header className="p-4 flex justify-between items-center">
         <Button variant="ghost" size="icon" onClick={() => navigate(`/s/${params.storeSlug}`)}>
@@ -258,7 +377,7 @@ function TicketContent() {
 
       {/* Main Content */}
       <main className="flex-1 container flex flex-col items-center justify-center py-8">
-        <Card className={`w-full max-w-md ticket-card ${isCalled ? 'ring-2 ring-success' : ''}`}>
+        <Card className="w-full max-w-md ticket-card">
           <CardContent className="p-6 space-y-6">
             {/* Status Badge */}
             <div className="flex justify-center">
@@ -268,22 +387,10 @@ function TicketContent() {
             {/* Your Number */}
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-2">{t('ticket.yourNumber')}</p>
-              <p className={`text-7xl font-bold tabular-nums ${isCalled ? 'text-success animate-pulse' : 'text-primary'}`}>
+              <p className="text-7xl font-bold tabular-nums text-primary">
                 {ticket.number}
               </p>
             </div>
-
-            {/* Called Message */}
-            {isCalled && (
-              <div className="text-center p-4 bg-success/10 rounded-lg">
-                <p className="text-2xl font-bold text-success">{t('ticket.yourTurn')}</p>
-                {ticket.checkinDeadlineAt && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {t('ticket.checkinDeadline')} {new Date(ticket.checkinDeadlineAt).toLocaleTimeString()}
-                  </p>
-                )}
-              </div>
-            )}
 
             {/* Queue Info */}
             {isActive && !isCalled && (
@@ -381,22 +488,9 @@ function TicketContent() {
               </div>
             )}
 
-            {/* Actions */}
-            {isActive && (
+            {/* Actions (WAITING only) */}
+            {isActive && !isCalled && (
               <div className="space-y-3">
-                {/* Checkin Button (when called) */}
-                {isCalled && (
-                  <Button
-                    size="lg"
-                    className="w-full h-14 text-lg bg-success hover:bg-success/90"
-                    onClick={handleOpenPinDialog}
-                  >
-                    <KeyRound className="mr-2 h-5 w-5" />
-                    {t('ticket.checkinWithPin')}
-                  </Button>
-                )}
-
-                {/* Cancel Button */}
                 <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" size="lg" className="w-full">
@@ -443,59 +537,13 @@ function TicketContent() {
           </Button>
         )}
 
-        {/* PWA Install Card - shown on ticket page for better conversion */}
+        {/* PWA Install Card */}
         {isActive && (
           <div className="w-full max-w-md mt-6">
             <PwaInstallBanner variant="card" />
           </div>
         )}
       </main>
-
-      {/* PIN Input Dialog */}
-      <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-center">{t('ticket.enterPin')}</DialogTitle>
-            <DialogDescription className="text-center">
-              {t('ticket.pinRequired')}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col items-center gap-6 py-4">
-            {/* PIN Input Fields */}
-            <div className="flex gap-4 justify-center">
-              {[0, 1, 2].map((index) => (
-                <Input
-                  key={index}
-                  ref={pinInputRefs[index]}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={pinDigits[index]}
-                  onChange={(e) => handlePinDigitChange(index, e.target.value)}
-                  onKeyDown={(e) => handlePinKeyDown(index, e)}
-                  className="w-16 h-20 text-4xl text-center font-bold"
-                  disabled={checkinWithPinMutation.isPending}
-                />
-              ))}
-            </div>
-
-            {/* Error Message */}
-            {pinError && (
-              <div className="text-destructive text-sm text-center">
-                <AlertCircle className="inline h-4 w-4 mr-1" />
-                {pinError}
-              </div>
-            )}
-
-            {/* Loading State */}
-            {checkinWithPinMutation.isPending && (
-              <div className="text-muted-foreground text-sm">
-                {t('common.loading')}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

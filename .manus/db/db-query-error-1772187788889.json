@@ -1,0 +1,8 @@
+{
+  "query": "SELECT id, name, staff_pin, manager_pin FROM stores WHERE slug = 'test'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user zN6v3835fExzWSq.4b780e52d435 --database 9PkSnVJ3696qvv2NFCWti9 --execute SELECT id, name, staff_pin, manager_pin FROM stores WHERE slug = 'test'",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'staff_pin' in 'field list'"
+  ]
+}

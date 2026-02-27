@@ -112,6 +112,9 @@ export const translations = {
     'ticket.expiredMessage': 'この整理券は有効期限が切れました',
     'ticket.skippedMessage': 'この整理券はスキップされました',
     'ticket.backToStore': '店舗トップに戻る',
+    'ticket.calledHeading': 'お呼び出し中',
+    'ticket.pleaseReturn': 'お店にお戻りください',
+    'ticket.deadlineLabel': '期限',
     
     // Notifications
     'notification.title': '通知設定',
@@ -200,6 +203,9 @@ export const translations = {
     'board.checkinPin': '到着確認PIN',
     'board.pinUpdatesIn': 'PIN更新まで {time}',
     'board.waitingNumbers': '待機中の番号',
+    'board.scanToJoin': 'QRコードを読み取って受付',
+    'board.scanInstruction': 'スマホでかんたん受付',
+    'board.readyToServe': 'お席の準備ができ次第ご案内します',
     
     // Staff
     'staff.title': 'スタッフ画面',
@@ -909,6 +915,9 @@ export const translations = {
     'ticket.expiredMessage': 'This ticket has expired',
     'ticket.skippedMessage': 'This ticket has been skipped',
     'ticket.backToStore': 'Back to Store',
+    'ticket.calledHeading': 'You Are Called',
+    'ticket.pleaseReturn': 'Please return to the store',
+    'ticket.deadlineLabel': 'Deadline',
     
     // Notifications
     'notification.title': 'Notifications',
@@ -997,6 +1006,9 @@ export const translations = {
     'board.checkinPin': 'Check-in PIN',
     'board.pinUpdatesIn': 'PIN updates in {time}',
     'board.waitingNumbers': 'Waiting Numbers',
+    'board.scanToJoin': 'Scan QR code to join the queue',
+    'board.scanInstruction': 'Easy check-in from your phone',
+    'board.readyToServe': 'Ready to serve you',
     
     // Staff
     'staff.title': 'Staff Panel',
@@ -1706,6 +1718,9 @@ export const translations = {
     'ticket.expiredMessage': '이 번호표는 만료되었습니다',
     'ticket.skippedMessage': '이 번호표는 건너뛰어졌습니다',
     'ticket.backToStore': '매장으로 돌아가기',
+    'ticket.calledHeading': '호출 중',
+    'ticket.pleaseReturn': '매장으로 돌아와 주세요',
+    'ticket.deadlineLabel': '기한',
     
     // Notifications
     'notification.title': '알림 설정',
@@ -1795,6 +1810,9 @@ export const translations = {
     'board.checkinPin': '도착 확인 PIN',
     'board.pinUpdatesIn': 'PIN 갱신까지 {time}',
     'board.waitingNumbers': '대기 중인 번호',
+    'board.scanToJoin': 'QR 코드를 스캔하여 대기 등록',
+    'board.scanInstruction': '스마트폰으로 간편 접수',
+    'board.readyToServe': '준비가 되면 안내해 드립니다',
     
     // Staff
     'staff.title': '직원 화면',
@@ -2504,6 +2522,9 @@ export const translations = {
     'ticket.expiredMessage': '此号码已过期',
     'ticket.skippedMessage': '此号码已跳过',
     'ticket.backToStore': '返回店铺',
+    'ticket.calledHeading': '叫号中',
+    'ticket.pleaseReturn': '请返回店铺',
+    'ticket.deadlineLabel': '截止时间',
     
     // Notifications
     'notification.title': '通知设置',
@@ -2593,6 +2614,9 @@ export const translations = {
     'board.checkinPin': '报到PIN',
     'board.pinUpdatesIn': 'PIN更新倒计时 {time}',
     'board.waitingNumbers': '等待中的号码',
+    'board.scanToJoin': '扫码排队',
+    'board.scanInstruction': '手机轻松取号',
+    'board.readyToServe': '准备就绪，随时为您服务',
     
     // Staff
     'staff.title': '员工界面',
@@ -3301,7 +3325,10 @@ export const translations = {
     'ticket.canceledMessage': '此號碼已取消',
     'ticket.expiredMessage': '此號碼已過期',
     'ticket.skippedMessage': '此號碼已跳過',
-    'ticket.backToStore': '返回店鋪',
+    'ticket.backToStore': '返回店舖',
+    'ticket.calledHeading': '叫號中',
+    'ticket.pleaseReturn': '請返回店舖',
+    'ticket.deadlineLabel': '截止時間',
     
     // Notifications
     'notification.title': '通知設定',
@@ -3391,6 +3418,9 @@ export const translations = {
     'board.checkinPin': '報到PIN',
     'board.pinUpdatesIn': 'PIN更新倒數 {time}',
     'board.waitingNumbers': '等待中的號碼',
+    'board.scanToJoin': '掃碼排隊',
+    'board.scanInstruction': '手機輕鬆取號',
+    'board.readyToServe': '準備就緒，隨時為您服務',
     
     // Staff
     'staff.title': '員工介面',

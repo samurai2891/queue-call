@@ -3,38 +3,18 @@ import { useState, useEffect, useMemo } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { useSSE } from '@/hooks/useSSE';
-import { AlertCircle, Volume2, VolumeX, Clock, Users } from 'lucide-react';
+import { AlertCircle, Volume2, VolumeX, Clock, Users, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Locale } from '@/contexts/LocaleContext';
 
 type CrowdLevel = 'empty' | 'low' | 'moderate' | 'busy' | 'crowded';
 
 const crowdLevelConfig: Record<CrowdLevel, { color: string; bgColor: string; icon: string }> = {
-  empty: {
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
-    icon: '○',
-  },
-  low: {
-    color: 'text-green-500',
-    bgColor: 'bg-green-50',
-    icon: '◎',
-  },
-  moderate: {
-    color: 'text-yellow-600',
-    bgColor: 'bg-yellow-100',
-    icon: '△',
-  },
-  busy: {
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-100',
-    icon: '▲',
-  },
-  crowded: {
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
-    icon: '×',
-  },
+  empty: { color: 'text-green-600', bgColor: 'bg-green-100', icon: '○' },
+  low: { color: 'text-green-500', bgColor: 'bg-green-50', icon: '◎' },
+  moderate: { color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '△' },
+  busy: { color: 'text-orange-600', bgColor: 'bg-orange-100', icon: '▲' },
+  crowded: { color: 'text-red-600', bgColor: 'bg-red-100', icon: '×' },
 };
 
 function CrowdLevelBadgeBoard({ level }: { level: CrowdLevel }) {
@@ -69,19 +49,18 @@ function BoardDisplayContent() {
   const [pinCountdown, setPinCountdown] = useState<string>('');
   const [showCrowdLevel, setShowCrowdLevel] = useState<boolean>(false);
   const [crowdLevel, setCrowdLevel] = useState<string>('empty');
+  const [numberChanged, setNumberChanged] = useState(false);
 
-  // ボードはアクセスキー不要
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlugForBoard.useQuery(
     { slug: params.storeSlug || '' },
     { enabled: !!params.storeSlug }
   );
 
-
   const { data: queueStatus, refetch: refetchQueue } = trpc.store.getQueueStatus.useQuery(
     { storeId: store?.id || 0 },
     { 
       enabled: !!store?.id,
-      refetchInterval: 30000, // 30秒ごとに自動更新
+      refetchInterval: 30000,
     }
   );
 
@@ -96,7 +75,7 @@ function BoardDisplayContent() {
     }
   }, [queueStatus]);
 
-  // PIN更新カウントダウン
+  // PIN countdown
   useEffect(() => {
     if (!pinExpiresAt) {
       setPinCountdown('');
@@ -109,7 +88,7 @@ function BoardDisplayContent() {
       
       if (diff <= 0) {
         setPinCountdown('');
-        refetchQueue(); // PIN期限切れ時に再取得
+        refetchQueue();
         return;
       }
 
@@ -130,23 +109,22 @@ function BoardDisplayContent() {
     storeSlug: params.storeSlug,
     enabled: !!store?.id,
     onQueueUpdate: (data) => {
-
       const newNumber = data.currentNumber;
       
-      // Play sound when number changes
       if (newNumber !== lastCalledNumber && newNumber > 0) {
         if (!isMuted) {
           playCallSound();
         }
         setLastCalledNumber(newNumber);
+        // Trigger number change animation
+        setNumberChanged(true);
+        setTimeout(() => setNumberChanged(false), 1500);
       }
       
       setCurrentNumber(newNumber);
-      // SSEからの更新時もrefetchしてPINと待機リストを更新
       refetchQueue();
     },
     onMessage: (event, data) => {
-      // Handle polling-active event to trigger manual refetch
       if (event === 'polling-active') {
         refetchQueue();
       }
@@ -154,7 +132,6 @@ function BoardDisplayContent() {
   });
 
   const playCallSound = () => {
-    // Create a simple beep sound
     try {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
@@ -163,7 +140,7 @@ function BoardDisplayContent() {
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
       
-      oscillator.frequency.value = 880; // A5 note
+      oscillator.frequency.value = 880;
       oscillator.type = 'sine';
       
       gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
@@ -175,6 +152,18 @@ function BoardDisplayContent() {
       console.log('Audio not available');
     }
   };
+
+  // Generate QR code URL for the store join page
+  const storeJoinUrl = useMemo(() => {
+    if (!params.storeSlug) return '';
+    const origin = window.location.origin;
+    return `${origin}/s/${params.storeSlug}`;
+  }, [params.storeSlug]);
+
+  const qrCodeUrl = useMemo(() => {
+    if (!storeJoinUrl) return '';
+    return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(storeJoinUrl)}&margin=8`;
+  }, [storeJoinUrl]);
 
   if (storeLoading) {
     return (
@@ -196,11 +185,10 @@ function BoardDisplayContent() {
   return (
     <div className="kiosk-mode flex flex-col bg-gradient-to-b from-primary/5 to-background">
       {/* Header */}
-      <header className="p-6 border-b flex items-center justify-between">
-        <div className="w-16" /> {/* Spacer for centering */}
+      <header className="p-4 md:p-6 border-b flex items-center justify-between">
+        <div className="w-12 md:w-16" />
         <div className="flex flex-col items-center gap-2">
-          <h1 className="text-4xl font-bold">{store.name}</h1>
-          {/* Crowd Level Badge */}
+          <h1 className="text-3xl md:text-4xl font-bold">{store.name}</h1>
           {showCrowdLevel && (
             <CrowdLevelBadgeBoard level={crowdLevel as CrowdLevel} />
           )}
@@ -208,65 +196,68 @@ function BoardDisplayContent() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-12 w-12"
+          className="h-10 w-10 md:h-12 md:w-12"
           onClick={() => setIsMuted(!isMuted)}
           aria-label={isMuted ? t('board.unmute') : t('board.mute')}
         >
           {isMuted ? (
-            <VolumeX className="h-6 w-6 text-muted-foreground" />
+            <VolumeX className="h-5 w-5 md:h-6 md:w-6 text-muted-foreground" />
           ) : (
-            <Volume2 className="h-6 w-6" />
+            <Volume2 className="h-5 w-5 md:h-6 md:w-6" />
           )}
         </Button>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center p-8 overflow-hidden">
+      <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
         {currentNumber > 0 ? (
-          <>
-            {/* Current Number & PIN Section */}
-            <div className="text-center mb-8">
-              <p className="text-2xl md:text-3xl text-muted-foreground mb-4 flex items-center justify-center gap-3">
-                <Volume2 className="h-6 w-6 md:h-8 md:w-8 animate-pulse text-primary" />
+          /* ========== P0-3: 呼び出し中 — 番号を巨大化 ========== */
+          <div className="w-full flex flex-col items-center">
+            {/* Now Calling Section — 画面の主役 */}
+            <div className="text-center mb-6 md:mb-8">
+              <p className="text-xl md:text-2xl lg:text-3xl text-muted-foreground mb-2 md:mb-4 flex items-center justify-center gap-3">
+                <Volume2 className="h-5 w-5 md:h-7 md:w-7 animate-pulse text-primary" />
                 {t('board.nowCalling')}
               </p>
-              <div className="board-number text-primary animate-pulse mb-6">
+              
+              {/* 番号 — 超巨大表示 */}
+              <div className={`board-number-hero ${numberChanged ? 'board-number-flash' : ''}`}>
                 {currentNumber}
               </div>
-              
-              {/* PIN Display */}
-              {currentPin && (
-                <div className="bg-card border-2 border-primary/30 rounded-2xl p-6 inline-block">
-                  <p className="text-lg md:text-xl text-muted-foreground mb-2">
-                    {t('board.checkinPin')}
-                  </p>
-                  <div className="text-5xl md:text-7xl font-bold tracking-[0.3em] text-foreground">
-                    {currentPin}
-                  </div>
-                  {pinCountdown && (
-                    <div className="flex items-center justify-center gap-2 mt-3 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span>{t('board.pinUpdatesIn').replace('{time}', pinCountdown)}</span>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
+
+            {/* PIN Display — 番号の下にコンパクトに */}
+            {currentPin && (
+              <div className="bg-card border-2 border-primary/30 rounded-2xl px-6 md:px-10 py-4 md:py-6 mb-6 md:mb-8">
+                <p className="text-base md:text-lg text-muted-foreground mb-1 text-center">
+                  {t('board.checkinPin')}
+                </p>
+                <div className="text-4xl md:text-6xl font-bold tracking-[0.3em] text-foreground text-center">
+                  {currentPin}
+                </div>
+                {pinCountdown && (
+                  <div className="flex items-center justify-center gap-2 mt-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>{t('board.pinUpdatesIn').replace('{time}', pinCountdown)}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Waiting Numbers Grid */}
             {waitingNumbers.length > 0 && (
               <div className="w-full max-w-3xl">
-                <p className="text-xl md:text-2xl text-muted-foreground mb-4 text-center">
+                <p className="text-lg md:text-xl text-muted-foreground mb-3 text-center">
                   {t('board.waitingNumbers')}
                 </p>
-                <div className="grid grid-cols-5 gap-3 md:gap-4">
+                <div className="grid grid-cols-5 gap-2 md:gap-3">
                   {waitingNumbers.slice(0, 10).map((num, index) => (
                     <div
                       key={num}
-                      className="bg-card border rounded-xl p-3 md:p-4 text-center"
+                      className="bg-card border rounded-xl p-2 md:p-3 text-center"
                       style={{ opacity: 1 - index * 0.05 }}
                     >
-                      <span className="text-2xl md:text-4xl font-bold tabular-nums text-muted-foreground">
+                      <span className="text-xl md:text-3xl font-bold tabular-nums text-muted-foreground">
                         {num}
                       </span>
                     </div>
@@ -274,19 +265,44 @@ function BoardDisplayContent() {
                 </div>
               </div>
             )}
-          </>
+          </div>
         ) : (
-          <div className="text-center">
-            <p className="text-4xl text-muted-foreground">{t('board.noQueue')}</p>
+          /* ========== P0-2: 空状態 — QRコード + 受付案内 ========== */
+          <div className="text-center flex flex-col items-center gap-6 md:gap-8">
+            {/* QRコード */}
+            {qrCodeUrl && (
+              <div className="bg-white p-4 md:p-6 rounded-2xl shadow-lg">
+                <img 
+                  src={qrCodeUrl} 
+                  alt="QR Code" 
+                  className="w-48 h-48 md:w-64 md:h-64"
+                  loading="eager"
+                />
+              </div>
+            )}
+
+            {/* 案内テキスト */}
+            <div className="space-y-2">
+              <p className="text-2xl md:text-4xl font-bold text-foreground">
+                {t('board.scanInstruction')}
+              </p>
+              <p className="text-lg md:text-2xl text-muted-foreground">
+                {t('board.scanToJoin')}
+              </p>
+            </div>
+
+            {/* 補足メッセージ */}
+            <p className="text-base md:text-lg text-muted-foreground/70">
+              {t('board.readyToServe')}
+            </p>
           </div>
         )}
       </main>
 
       {/* Footer */}
-      <footer className="p-4 text-center text-muted-foreground border-t">
+      <footer className="p-3 md:p-4 text-center text-muted-foreground border-t">
         <div className="flex items-center justify-center gap-4 flex-wrap">
-          <p className="text-sm">{t('common.poweredBy')}</p>
-          {/* Connection Status Indicator */}
+          <p className="text-xs md:text-sm">{t('common.poweredBy')}</p>
           {usePolling && (
             <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-500">
               <div className="h-2 w-2 rounded-full bg-yellow-600 dark:bg-yellow-500 animate-pulse" />
@@ -307,7 +323,6 @@ function BoardDisplayContent() {
           )}
         </div>
       </footer>
-
     </div>
   );
 }
