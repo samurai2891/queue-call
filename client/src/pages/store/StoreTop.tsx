@@ -127,6 +127,7 @@ function StoreTopContent() {
               <img
                 src={store.settings.branding.logoUrl}
                 alt={store.name}
+                loading="lazy"
                 className="h-16 w-16 md:h-20 md:w-20 rounded-xl object-contain"
               />
             )}

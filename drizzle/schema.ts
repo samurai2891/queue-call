@@ -135,8 +135,12 @@ export interface StoreSettings {
     primaryColor?: string;    // プライマリカラー（HEX形式: #3b82f6）
     secondaryColor?: string;  // セカンダリカラー（HEX形式）
     accentColor?: string;     // アクセントカラー（HEX形式）
-    logoUrl?: string;         // ロゴ画像URL（S3）
+    logoUrl?: string;         // ロゴ画像URL（最適化済み、S3）
     logoKey?: string;         // ロゴ画像のS3キー
+    logoThumbUrl?: string;    // ロゴサムネイルURL（64x64、S3）
+    logoThumbKey?: string;    // ロゴサムネイルのS3キー
+    logoOriginalUrl?: string; // ロゴ元画像URL（S3）
+    logoOriginalKey?: string; // ロゴ元画像のS3キー
   };
   customMessages?: {
     welcomeMessage?: string;  // StoreTop画面のウェルカムメッセージ

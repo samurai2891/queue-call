@@ -395,7 +395,7 @@ function TicketContent() {
         </div>
         <div className="flex items-center gap-2">
           {store?.settings?.branding?.logoUrl && (
-            <img src={store.settings.branding.logoUrl} alt={store?.name || ''} className="h-7 w-7 rounded-lg object-contain" />
+            <img src={store.settings.branding.logoThumbUrl || store.settings.branding.logoUrl} alt={store?.name || ''} className="h-7 w-7 rounded-lg object-contain" />
           )}
         </div>
         <LanguageSwitcher showLabel />

@@ -876,11 +876,15 @@ function SettingsContent() {
 
     setIsUploadingLogo(true);
     try {
-      const { publicUrl, key } = await uploadImage(file, 'logo', store.id);
+      const result = await uploadImage(file, 'logo', store.id);
       saveLogoMutation.mutate({
         storeId: store.id,
-        logoUrl: publicUrl,
-        logoKey: key,
+        logoUrl: result.publicUrl,
+        logoKey: result.key,
+        logoThumbUrl: result.thumbUrl,
+        logoThumbKey: result.thumbKey,
+        logoOriginalUrl: result.originalUrl,
+        logoOriginalKey: result.originalKey,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : t('settings.logoUploadFailed');
@@ -970,6 +974,10 @@ function SettingsContent() {
         ...(store?.settings?.branding?.logoUrl ? {
           logoUrl: store.settings.branding.logoUrl,
           logoKey: store.settings.branding.logoKey,
+          ...(store.settings.branding.logoThumbUrl && { logoThumbUrl: store.settings.branding.logoThumbUrl }),
+          ...(store.settings.branding.logoThumbKey && { logoThumbKey: store.settings.branding.logoThumbKey }),
+          ...(store.settings.branding.logoOriginalUrl && { logoOriginalUrl: store.settings.branding.logoOriginalUrl }),
+          ...(store.settings.branding.logoOriginalKey && { logoOriginalKey: store.settings.branding.logoOriginalKey }),
         } : {}),
       },
       customMessages: {
@@ -1116,7 +1124,16 @@ function SettingsContent() {
 
     }
 
-    return { publicUrl: publicUrl as string, key: key as string };
+    // Upload response may include additional URLs for logo (thumb, original)
+    const uploadResult = await uploadResponse.json().catch(() => ({}));
+    return {
+      publicUrl: publicUrl as string,
+      key: key as string,
+      thumbUrl: uploadResult.thumbUrl as string | undefined,
+      thumbKey: uploadResult.thumbKey as string | undefined,
+      originalUrl: uploadResult.originalUrl as string | undefined,
+      originalKey: uploadResult.originalKey as string | undefined,
+    };
   };
 
   const getNextSortOrder = (items: Array<{ sortOrder?: number }>) => {

@@ -357,6 +357,10 @@ const storeRouter = router({
       storeId: z.number(),
       logoUrl: z.string().url(),
       logoKey: z.string(),
+      logoThumbUrl: z.string().optional(),
+      logoThumbKey: z.string().optional(),
+      logoOriginalUrl: z.string().optional(),
+      logoOriginalKey: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const store = await db.getStoreById(input.storeId);
@@ -372,6 +376,10 @@ const storeRouter = router({
           ...currentBranding,
           logoUrl: input.logoUrl,
           logoKey: input.logoKey,
+          ...(input.logoThumbUrl && { logoThumbUrl: input.logoThumbUrl }),
+          ...(input.logoThumbKey && { logoThumbKey: input.logoThumbKey }),
+          ...(input.logoOriginalUrl && { logoOriginalUrl: input.logoOriginalUrl }),
+          ...(input.logoOriginalKey && { logoOriginalKey: input.logoOriginalKey }),
         },
       });
       return { success: true, logoUrl: input.logoUrl };
@@ -390,7 +398,12 @@ const storeRouter = router({
 
       const currentSettings = store.settings || {};
       const currentBranding = currentSettings.branding || {};
-      const { logoUrl, logoKey, ...restBranding } = currentBranding;
+      const {
+        logoUrl, logoKey,
+        logoThumbUrl, logoThumbKey,
+        logoOriginalUrl, logoOriginalKey,
+        ...restBranding
+      } = currentBranding;
       await db.updateStoreSettings(input.storeId, {
         ...currentSettings,
         branding: restBranding,

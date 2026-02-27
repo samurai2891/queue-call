@@ -188,7 +188,7 @@ function BoardDisplayContent() {
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center gap-3">
             {store.settings?.branding?.logoUrl && (
-              <img src={store.settings.branding.logoUrl} alt={store.name} className="h-10 w-10 md:h-12 md:w-12 rounded-xl object-contain bg-white/10 p-0.5" />
+              <img src={store.settings.branding.logoThumbUrl || store.settings.branding.logoUrl} alt={store.name} className="h-10 w-10 md:h-12 md:w-12 rounded-xl object-contain bg-white/10 p-0.5" />
             )}
             <h1 className="text-2xl md:text-3xl font-bold text-white/90 tracking-wide">{store.name}</h1>
           </div>

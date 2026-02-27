@@ -150,7 +150,7 @@ function KioskDisplayContent() {
         <AnimatedPage variant="zoom-fade" delay={50}>
           <div className="flex flex-col items-center gap-4">
             {store.settings?.branding?.logoUrl && (
-              <img src={store.settings.branding.logoUrl} alt={store.name} className="h-20 w-20 rounded-2xl object-contain" />
+              <img src={store.settings.branding.logoThumbUrl || store.settings.branding.logoUrl} alt={store.name} className="h-20 w-20 rounded-2xl object-contain" />
             )}
             <Clock className="h-32 w-32 text-destructive" />
             <h1 className="text-5xl font-bold text-center">{t('store.outsideBusinessHours')}</h1>
@@ -213,7 +213,7 @@ function KioskDisplayContent() {
         <AnimatedPage variant="fade-up" delay={50}>
           <div className="flex flex-col items-center gap-3">
             {store.settings?.branding?.logoUrl && (
-              <img src={store.settings.branding.logoUrl} alt={store.name} className="h-20 w-20 rounded-2xl object-contain" />
+              <img src={store.settings.branding.logoThumbUrl || store.settings.branding.logoUrl} alt={store.name} className="h-20 w-20 rounded-2xl object-contain" />
             )}
             <h1 className="text-4xl font-bold text-center">{store.name}</h1>
           </div>
@@ -292,7 +292,7 @@ function KioskDisplayContent() {
         <AnimatedPage variant="zoom-fade" delay={50}>
           <div className="flex flex-col items-center gap-2">
             {store.settings?.branding?.logoUrl && (
-              <img src={store.settings.branding.logoUrl} alt={store.name} className="h-14 w-14 rounded-xl object-contain" />
+              <img src={store.settings.branding.logoThumbUrl || store.settings.branding.logoUrl} alt={store.name} className="h-14 w-14 rounded-xl object-contain" />
             )}
             <CheckCircle className="h-24 w-24 text-success mx-auto" />
           </div>

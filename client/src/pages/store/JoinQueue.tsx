@@ -189,7 +189,7 @@ function JoinQueueContent() {
         </div>
         <div className="flex items-center gap-2">
           {store.settings?.branding?.logoUrl && (
-            <img src={store.settings.branding.logoUrl} alt={store.name} className="h-8 w-8 rounded-lg object-contain" />
+            <img src={store.settings.branding.logoThumbUrl || store.settings.branding.logoUrl} alt={store.name} className="h-8 w-8 rounded-lg object-contain" />
           )}
           <h1 className="text-lg font-semibold">{store.name}</h1>
         </div>

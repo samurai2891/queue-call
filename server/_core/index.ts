@@ -94,6 +94,34 @@ const ALLOWED_MIME_TYPES = new Map([
 const OUTPUT_IMAGE_EXTENSION = "webp";
 const OUTPUT_IMAGE_MIME = "image/webp";
 const WEBP_QUALITY = 80;
+
+/** Image size presets per kind */
+const IMAGE_SIZE_PRESETS: Record<string, { main: number; thumb?: number; original?: boolean }> = {
+  logo:  { main: 256, thumb: 64, original: true },
+  menu:  { main: 800 },
+  feed:  { main: 1200 },
+};
+
+async function optimizeImage(
+  buffer: Buffer,
+  maxDimension: number,
+  quality: number = WEBP_QUALITY,
+): Promise<Buffer> {
+  const image = sharp(buffer);
+  const metadata = await image.metadata();
+  const width = metadata.width || 0;
+  const height = metadata.height || 0;
+
+  // Only resize if larger than maxDimension
+  if (width > maxDimension || height > maxDimension) {
+    return image
+      .resize(maxDimension, maxDimension, { fit: "inside", withoutEnlargement: true })
+      .webp({ quality })
+      .toBuffer();
+  }
+
+  return image.webp({ quality }).toBuffer();
+}
 const uploadTokens = new Map<
 
   string,
@@ -237,13 +265,43 @@ function registerMediaRoutes(app: express.Express) {
       }
 
       try {
-        const outputBuffer = await sharp(body)
-          .webp({ quality: WEBP_QUALITY })
-          .toBuffer();
+        // Determine kind from key path (stores/{id}/{kind}/...)
+        const keyParts = uploadInfo.key.split("/");
+        const kind = keyParts.length >= 3 ? keyParts[2] : "feed";
+        const preset = IMAGE_SIZE_PRESETS[kind] || { main: 1200 };
 
-        await storagePut(uploadInfo.key, outputBuffer, OUTPUT_IMAGE_MIME);
+        // Generate optimized main image
+        const mainBuffer = await optimizeImage(body, preset.main);
+        await storagePut(uploadInfo.key, mainBuffer, OUTPUT_IMAGE_MIME);
+
+        const result: Record<string, string> = {
+          success: "true",
+          key: uploadInfo.key,
+          publicUrl: buildPublicUrl(uploadInfo.key),
+        };
+
+        // Generate thumbnail if preset requires it
+        if (preset.thumb) {
+          const thumbKey = uploadInfo.key.replace(/\.[^.]+$/, `-thumb.${OUTPUT_IMAGE_EXTENSION}`);
+          const thumbBuffer = await optimizeImage(body, preset.thumb, 70);
+          await storagePut(thumbKey, thumbBuffer, OUTPUT_IMAGE_MIME);
+          result.thumbKey = thumbKey;
+          result.thumbUrl = buildPublicUrl(thumbKey);
+        }
+
+        // Store original if preset requires it
+        if (preset.original) {
+          const originalKey = uploadInfo.key.replace(/\.[^.]+$/, `-original.${OUTPUT_IMAGE_EXTENSION}`);
+          const originalBuffer = await sharp(body).webp({ quality: 95 }).toBuffer();
+          await storagePut(originalKey, originalBuffer, OUTPUT_IMAGE_MIME);
+          result.originalKey = originalKey;
+          result.originalUrl = buildPublicUrl(originalKey);
+        }
+
         uploadTokens.delete(token);
-        res.json({ success: true, key: uploadInfo.key, publicUrl: buildPublicUrl(uploadInfo.key) });
+        const metadata = await sharp(mainBuffer).metadata();
+        console.log(`[Media] Optimized ${kind}: ${body.length} -> ${mainBuffer.length} bytes (${metadata.width}x${metadata.height})`);
+        res.json(result);
       } catch (error) {
         console.error("[Media] Upload failed", error);
         res.status(500).json({ error: "Upload failed" });

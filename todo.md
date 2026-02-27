@@ -1178,3 +1178,11 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] 顧客向け画面（StoreTop, JoinQueue, KioskDisplay）でオーバーライド時は受付可能に（API層で制御）
 - [x] 多言語対応（翻訳キー追加 5言語×7キー=35エントリ）
 - [x] テスト追加（business-hours.test.ts: 22件パス、全175件パス、TSエラーゼロ）
+
+### ロゴ画像の自動リサイズ・最適化（完了）
+- [x] sharpパッケージの導入（既存で導入済み、WebP変換に使用中）
+- [x] サーバー側の画像リサイズ・圧縮ユーティリティ関数の実装（optimizeImage関数、種類別プリセット: logo=256px+64px thumb, menu=800px, feed=1200px）
+- [x] 既存ロゴアップロードAPIの改修（saveLogo APIにthumb/original URLフィールド追加、removeLogoで全バリアント削除）
+- [x] アップロード時に元画像（品質95）・最適化済み画像（256px, 品質80）・サムネイル（64px, 品質70）の3バリアントをS3に保存
+- [x] フロントエンドでの最適化済み画像URLの利用（小サイズ表示にthumbUrl、大サイズ表示にmain logoUrl、lazy loading追加）
+- [x] テスト追加（image-optimization.test.ts: 11件パス、全186件パス、TSエラーゼロ）
