@@ -1193,3 +1193,9 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] メニュー画像保存時にthumbUrlをphotoSmallUrlに自動保存（作成・更新両方）
 - [x] フロントエンドのメニュー一覧・管理画面でphotoSmallUrlを優先利用（Menu.tsxは既に対応済み、Settings.tsxも更新）
 - [x] テスト追加（image-optimization.test.ts: 20件パス、全195件パス、TSエラーゼロ）
+
+### バグ修正: DONE→DONEステータス変更エラー（完了）
+- [x] 原因: done API完了後のSSE broadcastQueueUpdateでrefetchが発火し、ローカルstateがまだARRIVEDのチケットを保持していたため重複操作が発生
+- [x] 修正: doneMutation/skipMutationにonMutateで楽観的にチケットをローカルstateから即座に除去
+- [x] 修正: Done/Skip/Recallボタンにdisabled属性を追加し連打防止
+- [x] 修正: 全mutationのonErrorでrefetchWaitingList()を呼びロールバックを保証

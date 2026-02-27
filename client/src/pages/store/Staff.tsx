@@ -215,18 +215,21 @@ function StaffContent() {
   });
  
   const recallMutation = trpc.staff.recall.useMutation({
-
     onSuccess: () => {
       toast.success(t('staff.recall'));
       refetchWaitingList();
     },
     onError: (error: any) => {
       toast.error(error.message);
+      refetchWaitingList();
     },
   });
 
   const skipMutation = trpc.staff.skip.useMutation({
- 
+    onMutate: async (variables) => {
+      // Optimistically remove the skipped ticket from local state
+      setTickets(prev => prev.filter(t => t.id !== variables.ticketId));
+    },
     onSuccess: () => {
       toast.success(t('staff.skip'));
       refetchWaitingList();
@@ -236,6 +239,7 @@ function StaffContent() {
     },
     onError: (error: any) => {
       toast.error(error.message);
+      refetchWaitingList();
     },
   });
 
@@ -253,12 +257,17 @@ function StaffContent() {
   });
  
   const doneMutation = trpc.staff.done.useMutation({
+    onMutate: async (variables) => {
+      // Optimistically remove the done ticket from local state to prevent double-click
+      setTickets(prev => prev.filter(t => t.id !== variables.ticketId));
+    },
     onSuccess: () => {
       toast.success(t('staff.done'));
       refetchWaitingList();
     },
     onError: (error: any) => {
       toast.error(error.message);
+      refetchWaitingList();
     },
   });
 
@@ -818,7 +827,7 @@ function StaffContent() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleRecall(ticket.id)}
-                                disabled={recallMutation.isPending}
+                                disabled={recallMutation.isPending || doneMutation.isPending || skipMutation.isPending}
                               >
                                 <RefreshCw className="h-4 w-4" />
                               </Button>
@@ -826,6 +835,7 @@ function StaffContent() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleSkip(ticket.id)}
+                                disabled={skipMutation.isPending || doneMutation.isPending}
                               >
                                 <SkipForward className="h-4 w-4" />
                               </Button>
@@ -835,6 +845,7 @@ function StaffContent() {
                           <Button
                             size="sm"
                             onClick={() => handleDone(ticket.id)}
+                            disabled={doneMutation.isPending}
                           >
                             <CheckCircle className="mr-1 h-4 w-4" />
                             {t('staff.done')}
