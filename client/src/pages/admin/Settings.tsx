@@ -1313,9 +1313,11 @@ function SettingsContent() {
     setIsCreatingMenuItem(true);
     try {
       let photoUrl: string | undefined;
+      let photoThumbUrl: string | undefined;
       if (newMenuItem.photoFile) {
         const result = await uploadImage(newMenuItem.photoFile, 'menu', store.id);
         photoUrl = result.publicUrl;
+        photoThumbUrl = result.thumbUrl;
       }
 
       await createMenuItemMutation.mutateAsync({
@@ -1325,7 +1327,7 @@ function SettingsContent() {
         price: parsePrice(newMenuItem.price),
         categoryId: newMenuItem.categoryId ? Number(newMenuItem.categoryId) : undefined,
         photoLargeUrl: photoUrl,
-        photoSmallUrl: photoUrl,
+        photoSmallUrl: photoThumbUrl || photoUrl,
         sortOrder: getNextSortOrder(sortedMenuItems),
       });
 
@@ -1357,9 +1359,11 @@ function SettingsContent() {
     setUpdatingMenuItemId(item.id);
     try {
       let photoUrl: string | undefined;
+      let photoThumbUrl: string | undefined;
       if (draft.photoFile) {
         const result = await uploadImage(draft.photoFile, 'menu', store.id);
         photoUrl = result.publicUrl;
+        photoThumbUrl = result.thumbUrl;
       }
 
       await updateMenuItemMutation.mutateAsync({
@@ -1370,7 +1374,7 @@ function SettingsContent() {
         price: parsePrice(draft.price),
         categoryId: draft.categoryId ? Number(draft.categoryId) : null,
         photoLargeUrl: photoUrl,
-        photoSmallUrl: photoUrl,
+        photoSmallUrl: photoThumbUrl || photoUrl,
       });
 
       setMenuItemDrafts(prev => {
@@ -2481,7 +2485,7 @@ function SettingsContent() {
                               <div className="h-24 w-24 shrink-0 overflow-hidden rounded-md bg-muted">
                                 {item.photoLargeUrl ? (
                                   <img
-                                    src={item.photoLargeUrl}
+                                    src={item.photoSmallUrl || item.photoLargeUrl}
                                     alt={item.nameJa ?? ''}
                                     loading="lazy"
                                     decoding="async"
@@ -2713,7 +2717,7 @@ function SettingsContent() {
                               <div className="h-24 w-24 shrink-0 overflow-hidden rounded-md bg-muted">
                                 {post.photoLargeUrl ? (
                                   <img
-                                    src={post.photoLargeUrl}
+                                    src={post.photoSmallUrl || post.photoLargeUrl}
                                     alt={post.titleJa ?? ''}
                                     loading="lazy"
                                     decoding="async"

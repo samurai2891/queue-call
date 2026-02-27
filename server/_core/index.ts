@@ -98,7 +98,7 @@ const WEBP_QUALITY = 80;
 /** Image size presets per kind */
 const IMAGE_SIZE_PRESETS: Record<string, { main: number; thumb?: number; original?: boolean }> = {
   logo:  { main: 256, thumb: 64, original: true },
-  menu:  { main: 800 },
+  menu:  { main: 800, thumb: 200 },
   feed:  { main: 1200 },
 };
 

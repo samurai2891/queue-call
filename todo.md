@@ -1186,3 +1186,10 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] アップロード時に元画像（品質95）・最適化済み画像（256px, 品質80）・サムネイル（64px, 品質70）の3バリアントをS3に保存
 - [x] フロントエンドでの最適化済み画像URLの利用（小サイズ表示にthumbUrl、大サイズ表示にmain logoUrl、lazy loading追加）
 - [x] テスト追加（image-optimization.test.ts: 11件パス、全186件パス、TSエラーゼロ）
+
+### メニュー画像のサムネイル生成・一覧読み込み高速化（完了）
+- [x] メニュー画像アップロード時にサムネイル（200px, 品質70）を自動生成しS3に保存（IMAGE_SIZE_PRESETS.menu.thumb=200追加）
+- [x] 既存のphotoSmallUrlカラムを活用（スキーマ変更不要）
+- [x] メニュー画像保存時にthumbUrlをphotoSmallUrlに自動保存（作成・更新両方）
+- [x] フロントエンドのメニュー一覧・管理画面でphotoSmallUrlを優先利用（Menu.tsxは既に対応済み、Settings.tsxも更新）
+- [x] テスト追加（image-optimization.test.ts: 20件パス、全195件パス、TSエラーゼロ）
