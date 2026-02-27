@@ -72,6 +72,9 @@ export const translations = {
     'join.notePlaceholder': 'アレルギー、お子様連れなど',
     'join.submit': '発券する',
     'join.submitting': '発券中...',
+    'join.waitingGroups': '待ち組数',
+    'join.estimatedMinutes': '予想待ち時間(分)',
+    'join.crowdStatus': '混雑状況',
     
     // Ticket
     'ticket.title': '整理券',
@@ -875,6 +878,9 @@ export const translations = {
     'join.notePlaceholder': 'Allergies, children, etc.',
     'join.submit': 'Get Ticket',
     'join.submitting': 'Getting ticket...',
+    'join.waitingGroups': 'Groups Waiting',
+    'join.estimatedMinutes': 'Est. Wait (min)',
+    'join.crowdStatus': 'Crowd Status',
     
     // Ticket
     'ticket.title': 'Queue Ticket',
@@ -1678,6 +1684,9 @@ export const translations = {
     'join.notePlaceholder': '알레르기, 어린이 동반 등',
     'join.submit': '번호표 받기',
     'join.submitting': '발권 중...',
+    'join.waitingGroups': '대기 팀 수',
+    'join.estimatedMinutes': '예상 대기(분)',
+    'join.crowdStatus': '혼잡 상황',
     
     // Ticket
     'ticket.title': '대기표',
@@ -2482,6 +2491,9 @@ export const translations = {
     'join.notePlaceholder': '过敏、带小孩等',
     'join.submit': '取号',
     'join.submitting': '取号中...',
+    'join.waitingGroups': '等待组数',
+    'join.estimatedMinutes': '预计等待(分钟)',
+    'join.crowdStatus': '拥挤状况',
     
     // Ticket
     'ticket.title': '排队号',
@@ -3286,6 +3298,9 @@ export const translations = {
     'join.notePlaceholder': '過敏、帶小孩等',
     'join.submit': '取號',
     'join.submitting': '取號中...',
+    'join.waitingGroups': '等待組數',
+    'join.estimatedMinutes': '預計等待(分鐘)',
+    'join.crowdStatus': '擁擠狀況',
     
     // Ticket
     'ticket.title': '排隊號',

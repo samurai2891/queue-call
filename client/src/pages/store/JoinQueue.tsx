@@ -4,12 +4,11 @@ import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Minus, Plus, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Minus, Plus, AlertCircle, Loader2, Users, Clock, Activity } from 'lucide-react';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { toast } from 'sonner';
 import { RATE_LIMITED_ERR_MSG } from '@shared/const';
@@ -27,6 +26,12 @@ function JoinQueueContent() {
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
     { slug: params.storeSlug || '' },
     { enabled: !!params.storeSlug }
+  );
+
+  // 待ち状況を取得
+  const { data: queueStatus } = trpc.store.getQueueStatus.useQuery(
+    { storeId: store?.id || 0 },
+    { enabled: !!store?.id, refetchInterval: 10000 }
   );
 
   const createTicketMutation = trpc.ticket.create.useMutation({
@@ -62,6 +67,24 @@ function JoinQueueContent() {
   const incrementPartySize = () => {
     const maxSize = store?.settings?.kiosk?.maxPartySize || 10;
     if (partySize < maxSize) setPartySize(partySize + 1);
+  };
+
+  // 混雑レベルに応じた色とラベルを取得
+  const getCrowdInfo = (level: string) => {
+    switch (level) {
+      case 'empty':
+        return { color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', dot: 'bg-emerald-500' };
+      case 'low':
+        return { color: 'text-green-600', bg: 'bg-green-50 border-green-200', dot: 'bg-green-500' };
+      case 'moderate':
+        return { color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200', dot: 'bg-amber-500' };
+      case 'busy':
+        return { color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200', dot: 'bg-orange-500' };
+      case 'crowded':
+        return { color: 'text-red-600', bg: 'bg-red-50 border-red-200', dot: 'bg-red-500' };
+      default:
+        return { color: 'text-muted-foreground', bg: 'bg-muted/50 border-border', dot: 'bg-muted-foreground' };
+    }
   };
 
   if (storeLoading) {
@@ -112,6 +135,8 @@ function JoinQueueContent() {
     );
   }
 
+  const crowdInfo = queueStatus ? getCrowdInfo(queueStatus.crowdLevel) : null;
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
@@ -119,44 +144,83 @@ function JoinQueueContent() {
         <Button variant="ghost" size="icon" onClick={() => navigate(`/s/${params.storeSlug}`)}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
+        <h1 className="text-lg font-semibold">{store.name}</h1>
         <LanguageSwitcher showLabel />
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 container flex flex-col items-center py-8">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center">{t('join.title')}</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <main className="flex-1 container flex flex-col items-center py-4 px-4 gap-4">
+        
+        {/* 待ち状況カード */}
+        {queueStatus && (
+          <Card className="w-full max-w-md border shadow-sm">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                {/* 待ち組数 */}
+                <div className="flex flex-col items-center gap-1">
+                  <Users className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-2xl font-bold tabular-nums">{queueStatus.waitingCount}</span>
+                  <span className="text-xs text-muted-foreground">{t('join.waitingGroups')}</span>
+                </div>
+                
+                {/* 予想待ち時間 */}
+                {queueStatus.showEstimatedWaitTime && queueStatus.estimatedWaitMinutes !== null && (
+                  <div className="flex flex-col items-center gap-1">
+                    <Clock className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-2xl font-bold tabular-nums">
+                      {queueStatus.estimatedWaitMinutes > 0 ? `~${queueStatus.estimatedWaitMinutes}` : '-'}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{t('join.estimatedMinutes')}</span>
+                  </div>
+                )}
+                
+                {/* 混雑レベル */}
+                {queueStatus.showCrowdLevel && crowdInfo && (
+                  <div className="flex flex-col items-center gap-1">
+                    <Activity className="h-5 w-5 text-muted-foreground" />
+                    <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-sm font-medium border ${crowdInfo.bg} ${crowdInfo.color}`}>
+                      <span className={`w-2 h-2 rounded-full ${crowdInfo.dot} animate-pulse`} />
+                      {t(`store.crowdLevel.${queueStatus.crowdLevel}` as any)}
+                    </div>
+                    <span className="text-xs text-muted-foreground">{t('join.crowdStatus')}</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 発券フォーム */}
+        <Card className="w-full max-w-md shadow-sm">
+          <CardContent className="p-5">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Party Size */}
-              <div className="space-y-3">
-                <Label className="text-base">{t('join.partySize')}</Label>
-                <div className="flex items-center justify-center gap-4">
+              {/* Party Size - 拡大版 */}
+              <div className="space-y-4">
+                <Label className="text-base font-medium">{t('join.partySize')}</Label>
+                <div className="flex items-center justify-center gap-5">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="h-14 w-14 rounded-full"
+                    className="h-16 w-16 rounded-full text-xl shrink-0 active:scale-95 transition-transform"
                     onClick={decrementPartySize}
                     disabled={partySize <= 1}
                   >
-                    <Minus className="h-6 w-6" />
+                    <Minus className="h-7 w-7" />
                   </Button>
-                  <div className="text-center min-w-[100px]">
-                    <span className="text-5xl font-bold tabular-nums">{partySize}</span>
-                    <span className="text-xl text-muted-foreground ml-2">{t('common.people')}</span>
+                  <div className="text-center min-w-[120px]">
+                    <span className="text-6xl font-bold tabular-nums leading-none">{partySize}</span>
+                    <span className="text-lg text-muted-foreground ml-1">{t('common.people')}</span>
                   </div>
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="h-14 w-14 rounded-full"
+                    className="h-16 w-16 rounded-full text-xl shrink-0 active:scale-95 transition-transform"
                     onClick={incrementPartySize}
                     disabled={partySize >= (store?.settings?.kiosk?.maxPartySize || 10)}
                   >
-                    <Plus className="h-6 w-6" />
+                    <Plus className="h-7 w-7" />
                   </Button>
                 </div>
               </div>
@@ -174,16 +238,16 @@ function JoinQueueContent() {
                 />
               </div>
 
-              {/* Submit Button */}
+              {/* Submit Button - 視覚的に強化 */}
               <Button
                 type="submit"
                 size="lg"
-                className="w-full h-14 text-lg"
+                className="w-full h-16 text-xl font-bold active:scale-[0.98] transition-transform"
                 disabled={createTicketMutation.isPending}
               >
                 {createTicketMutation.isPending ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    <Loader2 className="mr-2 h-6 w-6 animate-spin" />
                     {t('join.submitting')}
                   </>
                 ) : (
