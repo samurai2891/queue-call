@@ -12,6 +12,7 @@ import { ArrowLeft, Minus, Plus, AlertCircle, Loader2, Users, Clock, Activity } 
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { AnimatedPage, AnimatedCard } from '@/components/AnimatedPage';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { BrandThemeProvider } from '@/components/BrandThemeProvider';
 import { toast } from 'sonner';
 import { RATE_LIMITED_ERR_MSG } from '@shared/const';
 import type { Locale } from '@/contexts/LocaleContext';
@@ -290,9 +291,13 @@ export default function JoinQueue() {
   const supportedLocales = (store?.supportedLocales || SUPPORTED_LOCALES) as Locale[];
   const defaultLocale = (store?.defaultLocale || 'ja') as Locale;
 
+  const branding = store?.settings?.branding as { primaryColor?: string; secondaryColor?: string; accentColor?: string } | undefined;
+
   return (
     <LocaleProvider defaultLocale={defaultLocale} supportedLocales={supportedLocales}>
-      <JoinQueueContent />
+      <BrandThemeProvider branding={branding}>
+        <JoinQueueContent />
+      </BrandThemeProvider>
     </LocaleProvider>
   );
 }

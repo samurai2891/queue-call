@@ -1125,3 +1125,13 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] NotFound, ReservationCheck, ReservationManagement, ManusDialog, OfflineIndicator, QRCodeGeneratorのセマンティック色修正
 - [x] ダークモード用skeleton-shimmerアニメーション追加
 - [x] テスト追加（theme-toggle.test.ts: 14件パス）
+
+### P3-2: 店舗ごとのブランドカラーカスタマイズ機能（完了）
+- [x] 店舗settingsにブランドカラー3色（primary, secondary, accent）のデータ構造追加
+- [x] ブランドカラー取得・更新APIの実装（getBySlug/getBySlugForKiosk/getBySlugForBoard）
+- [x] 管理画面の店舗設定にカラーピッカーUI追加（プレビュー付き、プリセット6種）
+- [x] 顧客向け画面（StoreTop, JoinQueue, Ticket）にブランドカラーを動的適用
+- [x] KioskDisplay, BoardDisplayにブランドカラーを動的適用
+- [x] デフォルトカラーのフォールバック処理（BrandThemeProvider）
+- [x] 多言語対応（翻訳キー追加 5言語）
+- [x] テスト追加（brand-theme.test.ts: 25件パス）

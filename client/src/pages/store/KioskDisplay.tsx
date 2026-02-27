@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Minus, Plus, Printer, CheckCircle, RotateCcw, AlertCircle, Globe, QrCode } from 'lucide-react';
 import { AnimatedPage } from '@/components/AnimatedPage';
+import { BrandThemeProvider } from '@/components/BrandThemeProvider';
 import { RATE_LIMITED_ERR_MSG } from '@shared/const';
 import type { Locale } from '@/contexts/LocaleContext';
 
@@ -341,9 +342,13 @@ export default function KioskDisplay() {
   const supportedLocales = (store?.supportedLocales || SUPPORTED_LOCALES) as Locale[];
   const defaultLocale = (store?.defaultLocale || 'ja') as Locale;
 
+  const branding = store?.settings?.branding as { primaryColor?: string; secondaryColor?: string; accentColor?: string } | undefined;
+
   return (
     <LocaleProvider defaultLocale={defaultLocale} supportedLocales={supportedLocales}>
-      <KioskDisplayContent />
+      <BrandThemeProvider branding={branding}>
+        <KioskDisplayContent />
+      </BrandThemeProvider>
     </LocaleProvider>
   );
 }

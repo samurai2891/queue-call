@@ -10,6 +10,7 @@ import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { CrowdLevelBadge } from '@/components/CrowdLevelIndicator';
 import { AnimatedPage, AnimatedCard } from '@/components/AnimatedPage';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { BrandThemeProvider } from '@/components/BrandThemeProvider';
 import { useSSE } from '@/hooks/useSSE';
 import { useState, useEffect } from 'react';
 import type { Locale } from '@/contexts/LocaleContext';
@@ -214,9 +215,13 @@ export default function StoreTop() {
   const supportedLocales = (store?.supportedLocales || SUPPORTED_LOCALES) as Locale[];
   const defaultLocale = (store?.defaultLocale || 'ja') as Locale;
 
+  const branding = store?.settings?.branding as { primaryColor?: string; secondaryColor?: string; accentColor?: string } | undefined;
+
   return (
     <LocaleProvider defaultLocale={defaultLocale} supportedLocales={supportedLocales}>
-      <StoreTopContent />
+      <BrandThemeProvider branding={branding}>
+        <StoreTopContent />
+      </BrandThemeProvider>
     </LocaleProvider>
   );
 }

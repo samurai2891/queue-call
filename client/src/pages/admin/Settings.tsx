@@ -52,6 +52,8 @@ import {
   FolderPlus,
   Pencil,
   X,
+  Palette,
+  RotateCcw,
 } from 'lucide-react';
 
 import { toast } from 'sonner';
@@ -557,6 +559,11 @@ function SettingsContent() {
     // Security
     staffPin: '',
     managerPin: '',
+    
+    // Branding
+    brandPrimaryColor: '',
+    brandSecondaryColor: '',
+    brandAccentColor: '',
   });
 
   const [newMenuItem, setNewMenuItem] = useState<MenuItemDraft>({
@@ -750,6 +757,11 @@ function SettingsContent() {
         
         staffPin: '',
         managerPin: '',
+        
+        // Branding
+        brandPrimaryColor: settings.branding?.primaryColor || '',
+        brandSecondaryColor: settings.branding?.secondaryColor || '',
+        brandAccentColor: settings.branding?.accentColor || '',
       });
     }
   }, [store]);
@@ -859,6 +871,11 @@ function SettingsContent() {
         maxPartySize: formData.reservationMaxPartySize,
         autoConfirm: formData.reservationAutoConfirm,
         smsReminder: formData.reservationSmsReminder,
+      },
+      branding: {
+        primaryColor: formData.brandPrimaryColor || undefined,
+        secondaryColor: formData.brandSecondaryColor || undefined,
+        accentColor: formData.brandAccentColor || undefined,
       },
     };
 
@@ -1473,6 +1490,7 @@ function SettingsContent() {
     { id: 'kiosk', label: t('settings.kiosk'), icon: Monitor },
     { id: 'board', label: t('settings.board'), icon: Monitor },
     { id: 'reservation', label: t('settings.reservation'), icon: CalendarDays },
+    { id: 'branding', label: t('settings.branding'), icon: Palette },
     { id: 'qrcode', label: t('settings.qrcode'), icon: QrCode },
     { id: 'security', label: t('settings.security'), icon: Shield },
   ];
@@ -2938,6 +2956,215 @@ function SettingsContent() {
                     </div>
                   </>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Branding Settings */}
+          <TabsContent value="branding">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="h-5 w-5" />
+                  {t('settings.branding')}
+                </CardTitle>
+                <CardDescription>{t('settings.brandingDescription')}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Presets */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">{t('settings.brandPresets')}</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {(['default', 'warm', 'cool', 'nature', 'elegant', 'vivid'] as const).map((presetKey) => {
+                      const presetColors = {
+                        default: { primary: '#3366cc', secondary: '#6699cc', accent: '#ff6633' },
+                        warm: { primary: '#d4532b', secondary: '#e8a44a', accent: '#c2185b' },
+                        cool: { primary: '#1976d2', secondary: '#42a5f5', accent: '#00bcd4' },
+                        nature: { primary: '#2e7d32', secondary: '#66bb6a', accent: '#ff8f00' },
+                        elegant: { primary: '#37474f', secondary: '#78909c', accent: '#c6a052' },
+                        vivid: { primary: '#7b1fa2', secondary: '#e91e63', accent: '#ff5722' },
+                      };
+                      const preset = presetColors[presetKey];
+                      return (
+                        <button
+                          key={presetKey}
+                          type="button"
+                          className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all hover:bg-muted/50 active:scale-95"
+                          onClick={() => {
+                            setFormData(prev => ({
+                              ...prev,
+                              brandPrimaryColor: preset.primary,
+                              brandSecondaryColor: preset.secondary,
+                              brandAccentColor: preset.accent,
+                            }));
+                          }}
+                        >
+                          <div className="flex gap-0.5">
+                            <div className="h-4 w-4 rounded-full border" style={{ backgroundColor: preset.primary }} />
+                            <div className="h-4 w-4 rounded-full border" style={{ backgroundColor: preset.secondary }} />
+                            <div className="h-4 w-4 rounded-full border" style={{ backgroundColor: preset.accent }} />
+                          </div>
+                          <span>{t(`settings.brandPreset${presetKey.charAt(0).toUpperCase() + presetKey.slice(1)}` as any)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Color Pickers */}
+                <div className="grid gap-6 md:grid-cols-3">
+                  {/* Primary Color */}
+                  <div className="space-y-3">
+                    <Label htmlFor="brandPrimaryColor">{t('settings.brandPrimaryColor')}</Label>
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <input
+                          type="color"
+                          id="brandPrimaryColor"
+                          value={formData.brandPrimaryColor || '#3366cc'}
+                          onChange={(e) => updateField('brandPrimaryColor', e.target.value)}
+                          className="h-10 w-10 cursor-pointer rounded-lg border-2 border-border"
+                        />
+                      </div>
+                      <Input
+                        value={formData.brandPrimaryColor}
+                        onChange={(e) => updateField('brandPrimaryColor', e.target.value)}
+                        placeholder="#3366cc"
+                        className="w-28 font-mono text-sm"
+                        maxLength={7}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t('settings.brandPrimaryColorHelp')}</p>
+                  </div>
+
+                  {/* Secondary Color */}
+                  <div className="space-y-3">
+                    <Label htmlFor="brandSecondaryColor">{t('settings.brandSecondaryColor')}</Label>
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <input
+                          type="color"
+                          id="brandSecondaryColor"
+                          value={formData.brandSecondaryColor || '#6699cc'}
+                          onChange={(e) => updateField('brandSecondaryColor', e.target.value)}
+                          className="h-10 w-10 cursor-pointer rounded-lg border-2 border-border"
+                        />
+                      </div>
+                      <Input
+                        value={formData.brandSecondaryColor}
+                        onChange={(e) => updateField('brandSecondaryColor', e.target.value)}
+                        placeholder="#6699cc"
+                        className="w-28 font-mono text-sm"
+                        maxLength={7}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t('settings.brandSecondaryColorHelp')}</p>
+                  </div>
+
+                  {/* Accent Color */}
+                  <div className="space-y-3">
+                    <Label htmlFor="brandAccentColor">{t('settings.brandAccentColor')}</Label>
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <input
+                          type="color"
+                          id="brandAccentColor"
+                          value={formData.brandAccentColor || '#ff6633'}
+                          onChange={(e) => updateField('brandAccentColor', e.target.value)}
+                          className="h-10 w-10 cursor-pointer rounded-lg border-2 border-border"
+                        />
+                      </div>
+                      <Input
+                        value={formData.brandAccentColor}
+                        onChange={(e) => updateField('brandAccentColor', e.target.value)}
+                        placeholder="#ff6633"
+                        className="w-28 font-mono text-sm"
+                        maxLength={7}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t('settings.brandAccentColorHelp')}</p>
+                  </div>
+                </div>
+
+                {/* Reset Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        brandPrimaryColor: '',
+                        brandSecondaryColor: '',
+                        brandAccentColor: '',
+                      }));
+                      toast.success(t('settings.brandReset'));
+                    }}
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    {t('settings.brandReset')}
+                  </Button>
+                </div>
+
+                <Separator />
+
+                {/* Preview */}
+                <div className="space-y-4">
+                  <Label className="text-sm font-medium">{t('settings.brandPreview')}</Label>
+                  <div className="rounded-xl border bg-card p-6 space-y-4">
+                    {/* Button Preview */}
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">{t('settings.brandPreviewButton')}</p>
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-all hover:opacity-90"
+                          style={{ backgroundColor: formData.brandPrimaryColor || '#3366cc' }}
+                        >
+                          {t('settings.brandPrimaryColor')}
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-all hover:opacity-90"
+                          style={{ backgroundColor: formData.brandSecondaryColor || '#6699cc' }}
+                        >
+                          {t('settings.brandSecondaryColor')}
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-all hover:opacity-90"
+                          style={{ backgroundColor: formData.brandAccentColor || '#ff6633' }}
+                        >
+                          {t('settings.brandAccentColor')}
+                        </button>
+                      </div>
+                    </div>
+                    {/* Card Preview */}
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">{t('settings.brandPreviewCard')}</p>
+                      <div className="rounded-lg border-l-4 bg-muted/30 p-4" style={{ borderLeftColor: formData.brandPrimaryColor || '#3366cc' }}>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full text-white text-sm font-bold" style={{ backgroundColor: formData.brandPrimaryColor || '#3366cc' }}>
+                            A1
+                          </div>
+                          <div>
+                            <p className="font-medium" style={{ color: formData.brandPrimaryColor || '#3366cc' }}>
+                              {t('settings.brandPreviewText')}
+                            </p>
+                            <p className="text-sm text-muted-foreground">2名 ・ 待ち時間: 約5分</p>
+                          </div>
+                          <div className="ml-auto">
+                            <span className="rounded-full px-2 py-0.5 text-xs font-medium text-white" style={{ backgroundColor: formData.brandAccentColor || '#ff6633' }}>
+                              呼び出し中
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

@@ -168,6 +168,7 @@ const storeRouter = router({
           menu: store.settings?.menu,
           kiosk: store.settings?.kiosk,
           board: store.settings?.board,
+          branding: store.settings?.branding,
         },
       };
     }),
@@ -194,6 +195,7 @@ const storeRouter = router({
           menu: store.settings?.menu,
           kiosk: store.settings?.kiosk,
           board: store.settings?.board,
+          branding: store.settings?.branding,
         },
       };
     }),
@@ -220,6 +222,7 @@ const storeRouter = router({
           menu: store.settings?.menu,
           kiosk: store.settings?.kiosk,
           board: store.settings?.board,
+          branding: store.settings?.branding,
         },
       };
     }),

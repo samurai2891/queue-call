@@ -131,6 +131,11 @@ export interface StoreSettings {
     // SMSリマインダー（予約前日に送信）
     smsReminder?: boolean;
   };
+  branding?: {
+    primaryColor?: string;    // プライマリカラー（HEX形式: #3b82f6）
+    secondaryColor?: string;  // セカンダリカラー（HEX形式）
+    accentColor?: string;     // アクセントカラー（HEX形式）
+  };
 }
 
 /**

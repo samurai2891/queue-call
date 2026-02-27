@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { BrandThemeProvider } from '@/components/BrandThemeProvider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -610,9 +611,13 @@ export default function Ticket() {
   const supportedLocales = (store?.supportedLocales || SUPPORTED_LOCALES) as Locale[];
   const defaultLocale = (store?.defaultLocale || 'ja') as Locale;
 
+  const branding = store?.settings?.branding as { primaryColor?: string; secondaryColor?: string; accentColor?: string } | undefined;
+
   return (
     <LocaleProvider defaultLocale={defaultLocale} supportedLocales={supportedLocales}>
-      <TicketContent />
+      <BrandThemeProvider branding={branding}>
+        <TicketContent />
+      </BrandThemeProvider>
     </LocaleProvider>
   );
 }

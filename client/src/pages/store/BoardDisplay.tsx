@@ -6,6 +6,7 @@ import { useSSE } from '@/hooks/useSSE';
 import { AlertCircle, Volume2, VolumeX, Clock, Users, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AnimatedPage } from '@/components/AnimatedPage';
+import { BrandThemeProvider } from '@/components/BrandThemeProvider';
 import type { Locale } from '@/contexts/LocaleContext';
 
 type CrowdLevel = 'empty' | 'low' | 'moderate' | 'busy' | 'crowded';
@@ -343,9 +344,13 @@ export default function BoardDisplay() {
   const supportedLocales = (store?.supportedLocales || SUPPORTED_LOCALES) as Locale[];
   const defaultLocale = (store?.defaultLocale || 'ja') as Locale;
 
+  const branding = store?.settings?.branding as { primaryColor?: string; secondaryColor?: string; accentColor?: string } | undefined;
+
   return (
     <LocaleProvider defaultLocale={defaultLocale} supportedLocales={supportedLocales}>
-      <BoardDisplayContent />
+      <BrandThemeProvider branding={branding}>
+        <BoardDisplayContent />
+      </BrandThemeProvider>
     </LocaleProvider>
   );
 }
