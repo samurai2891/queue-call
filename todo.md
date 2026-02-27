@@ -1135,3 +1135,14 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] デフォルトカラーのフォールバック処理（BrandThemeProvider）
 - [x] 多言語対応（翻訳キー追加 5言語）
 - [x] テスト追加（brand-theme.test.ts: 25件パス）
+
+### P3-3: 店舗ブランドロゴのアップロード・表示機能（完了）
+- [x] StoreSettingsにlogoUrl/logoKeyフィールド追加
+- [x] ロゴアップロードtRPC API実装（S3連携、presign→upload→saveLogo）
+- [x] ロゴ削除API実装（removeLogo）
+- [x] getBySlug/getBySlugForKiosk/getBySlugForBoard APIにbranding.logoUrl追加
+- [x] 管理画面ブランディングタブにロゴアップロードUI追加（プレビュー・削除ボタン付き）
+- [x] 顧客向け画面（StoreTop, JoinQueue, Ticket）のヘッダーにロゴ表示
+- [x] KioskDisplay（入力画面・成功画面）, BoardDisplay（ヘッダー）にロゴ表示
+- [x] 多言語対応（翻訳キー追加 5言語）
+- [x] テスト追加（store-logo.test.ts: 18件パス、全129件パス）

@@ -107,11 +107,18 @@ function StoreTopContent() {
 
       {/* Main Content */}
       <main className="flex-1 container flex flex-col items-center justify-center gap-8 py-8">
-        {/* Store Name — fade-up entrance */}
+        {/* Store Logo & Name — fade-up entrance */}
         <AnimatedPage variant="fade-up" delay={50}>
-          <div className="text-center">
+          <div className="text-center flex flex-col items-center gap-3">
+            {store.settings?.branding?.logoUrl && (
+              <img
+                src={store.settings.branding.logoUrl}
+                alt={store.name}
+                className="h-16 w-16 md:h-20 md:w-20 rounded-xl object-contain"
+              />
+            )}
             <h1 className="text-3xl md:text-4xl font-bold">{store.name}</h1>
-            <p className="text-muted-foreground mt-2">{t('store.welcome')}</p>
+            <p className="text-muted-foreground mt-1">{t('store.welcome')}</p>
           </div>
         </AnimatedPage>
 

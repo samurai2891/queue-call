@@ -344,6 +344,53 @@ const storeRouter = router({
       return { success: true };
     }),
 
+  // Save logo URL to store branding settings
+  saveLogo: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      logoUrl: z.string().url(),
+      logoKey: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      const currentSettings = store.settings || {};
+      const currentBranding = currentSettings.branding || {};
+      await db.updateStoreSettings(input.storeId, {
+        ...currentSettings,
+        branding: {
+          ...currentBranding,
+          logoUrl: input.logoUrl,
+          logoKey: input.logoKey,
+        },
+      });
+      return { success: true, logoUrl: input.logoUrl };
+    }),
+
+  // Remove logo from store branding settings
+  removeLogo: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      const currentSettings = store.settings || {};
+      const currentBranding = currentSettings.branding || {};
+      const { logoUrl, logoKey, ...restBranding } = currentBranding;
+      await db.updateStoreSettings(input.storeId, {
+        ...currentSettings,
+        branding: restBranding,
+      });
+      return { success: true };
+    }),
+
   // Update store basic info (protected)
   update: protectedProcedure
     .input(z.object({

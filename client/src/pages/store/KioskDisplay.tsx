@@ -173,7 +173,12 @@ function KioskDisplayContent() {
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-8 p-8">
         <AnimatedPage variant="fade-up" delay={50}>
-          <h1 className="text-4xl font-bold text-center">{store.name}</h1>
+          <div className="flex flex-col items-center gap-3">
+            {store.settings?.branding?.logoUrl && (
+              <img src={store.settings.branding.logoUrl} alt={store.name} className="h-20 w-20 rounded-2xl object-contain" />
+            )}
+            <h1 className="text-4xl font-bold text-center">{store.name}</h1>
+          </div>
         </AnimatedPage>
         
         <AnimatedPage variant="zoom-fade" delay={150}>
@@ -238,7 +243,12 @@ function KioskDisplayContent() {
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8 bg-success/5">
         <AnimatedPage variant="zoom-fade" delay={50}>
-          <CheckCircle className="h-24 w-24 text-success mx-auto" />
+          <div className="flex flex-col items-center gap-2">
+            {store.settings?.branding?.logoUrl && (
+              <img src={store.settings.branding.logoUrl} alt={store.name} className="h-14 w-14 rounded-xl object-contain" />
+            )}
+            <CheckCircle className="h-24 w-24 text-success mx-auto" />
+          </div>
         </AnimatedPage>
         
         <AnimatedPage variant="zoom-fade" delay={150}>

@@ -54,6 +54,7 @@ import {
   X,
   Palette,
   RotateCcw,
+  Upload,
 } from 'lucide-react';
 
 import { toast } from 'sonner';
@@ -806,6 +807,57 @@ function SettingsContent() {
   const updateCategoryMutation = trpc.menu.updateCategory.useMutation();
   const deleteCategoryMutation = trpc.menu.deleteCategory.useMutation();
 
+  // Logo mutations
+  const saveLogoMutation = trpc.store.saveLogo.useMutation({
+    onSuccess: () => {
+      toast.success(t('settings.logoUploadSuccess'));
+      refetchStore();
+      setIsUploadingLogo(false);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+      setIsUploadingLogo(false);
+    },
+  });
+
+  const removeLogoMutation = trpc.store.removeLogo.useMutation({
+    onSuccess: () => {
+      toast.success(t('settings.logoRemoveSuccess'));
+      refetchStore();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !store) return;
+
+    setIsUploadingLogo(true);
+    try {
+      const { publicUrl, key } = await uploadImage(file, 'logo', store.id);
+      saveLogoMutation.mutate({
+        storeId: store.id,
+        logoUrl: publicUrl,
+        logoKey: key,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('settings.logoUploadFailed');
+      toast.error(message);
+      setIsUploadingLogo(false);
+    }
+    // Reset file input
+    e.target.value = '';
+  };
+
+  const handleLogoRemove = () => {
+    if (!store) return;
+    removeLogoMutation.mutate({ storeId: store.id });
+  };
+
   const handleSave = () => {
     // バリデーション
     if (formData.autoSkipEnabled) {
@@ -876,6 +928,11 @@ function SettingsContent() {
         primaryColor: formData.brandPrimaryColor || undefined,
         secondaryColor: formData.brandSecondaryColor || undefined,
         accentColor: formData.brandAccentColor || undefined,
+        // Preserve existing logo data (managed separately via saveLogo/removeLogo)
+        ...(store?.settings?.branding?.logoUrl ? {
+          logoUrl: store.settings.branding.logoUrl,
+          logoKey: store.settings.branding.logoKey,
+        } : {}),
       },
     };
 
@@ -958,7 +1015,7 @@ function SettingsContent() {
     return slots;
   };
 
-  const uploadImage = async (file: File, kind: 'menu' | 'feed', storeId: number) => {
+  const uploadImage = async (file: File, kind: 'menu' | 'feed' | 'logo', storeId: number) => {
     if (!file.type) {
       throw new Error(t('settings.uploadTypeUnknown'));
 
@@ -994,7 +1051,7 @@ function SettingsContent() {
 
     }
 
-    const { uploadUrl, publicUrl } = await presignResponse.json();
+    const { uploadUrl, publicUrl, key } = await presignResponse.json();
     const uploadResponse = await fetch(uploadUrl, {
       method: 'PUT',
       headers: { 'Content-Type': file.type },
@@ -1010,7 +1067,7 @@ function SettingsContent() {
 
     }
 
-    return publicUrl as string;
+    return { publicUrl: publicUrl as string, key: key as string };
   };
 
   const getNextSortOrder = (items: Array<{ sortOrder?: number }>) => {
@@ -1191,7 +1248,8 @@ function SettingsContent() {
     try {
       let photoUrl: string | undefined;
       if (newMenuItem.photoFile) {
-        photoUrl = await uploadImage(newMenuItem.photoFile, 'menu', store.id);
+        const result = await uploadImage(newMenuItem.photoFile, 'menu', store.id);
+        photoUrl = result.publicUrl;
       }
 
       await createMenuItemMutation.mutateAsync({
@@ -1234,7 +1292,8 @@ function SettingsContent() {
     try {
       let photoUrl: string | undefined;
       if (draft.photoFile) {
-        photoUrl = await uploadImage(draft.photoFile, 'menu', store.id);
+        const result = await uploadImage(draft.photoFile, 'menu', store.id);
+        photoUrl = result.publicUrl;
       }
 
       await updateMenuItemMutation.mutateAsync({
@@ -1333,11 +1392,11 @@ function SettingsContent() {
 
     setIsCreatingFeedPost(true);
     try {
-      const photoUrl = await uploadImage(newFeedPost.photoFile, 'feed', store.id);
+      const uploadResult = await uploadImage(newFeedPost.photoFile, 'feed', store.id);
       await createFeedPostMutation.mutateAsync({
         storeId: store.id,
-        photoLargeUrl: photoUrl,
-        photoSmallUrl: photoUrl,
+        photoLargeUrl: uploadResult.publicUrl,
+        photoSmallUrl: uploadResult.publicUrl,
         titleJa: newFeedPost.titleJa.trim() || undefined,
         captionJa: newFeedPost.captionJa.trim() || undefined,
         price: parsePrice(newFeedPost.price),
@@ -1372,7 +1431,8 @@ function SettingsContent() {
     try {
       let photoUrl: string | undefined;
       if (draft.photoFile) {
-        photoUrl = await uploadImage(draft.photoFile, 'feed', store.id);
+        const result = await uploadImage(draft.photoFile, 'feed', store.id);
+        photoUrl = result.publicUrl;
       }
 
       await updateFeedPostMutation.mutateAsync({
@@ -2971,6 +3031,75 @@ function SettingsContent() {
                 <CardDescription>{t('settings.brandingDescription')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
+                {/* Store Logo */}
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium">{t('settings.logoTitle')}</Label>
+                    <p className="text-xs text-muted-foreground mt-1">{t('settings.logoDescription')}</p>
+                  </div>
+                  <div className="flex items-start gap-6">
+                    {/* Logo Preview */}
+                    <div className="flex-shrink-0">
+                      {store?.settings?.branding?.logoUrl ? (
+                        <div className="relative group">
+                          <img
+                            src={store.settings.branding.logoUrl}
+                            alt={t('settings.logoCurrent')}
+                            className="h-24 w-24 rounded-xl border-2 border-border object-contain bg-muted/30 p-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleLogoRemove}
+                            disabled={removeLogoMutation.isPending}
+                            className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/90"
+                            title={t('settings.logoRemove')}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex h-24 w-24 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/20">
+                          <Store className="h-8 w-8 text-muted-foreground/40" />
+                        </div>
+                      )}
+                    </div>
+                    {/* Upload Controls */}
+                    <div className="flex flex-col gap-2">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleLogoUpload}
+                          className="hidden"
+                          disabled={isUploadingLogo}
+                        />
+                        <div className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all hover:bg-muted/50 active:scale-95 ${isUploadingLogo ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                          {isUploadingLogo ? (
+                            <><Loader2 className="h-4 w-4 animate-spin" />{t('settings.logoUploading')}</>
+                          ) : (
+                            <><Upload className="h-4 w-4" />{t('settings.logoUpload')}</>
+                          )}
+                        </div>
+                      </label>
+                      <p className="text-xs text-muted-foreground">{t('settings.logoUploadHint')}</p>
+                      {store?.settings?.branding?.logoUrl && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-fit text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={handleLogoRemove}
+                          disabled={removeLogoMutation.isPending}
+                        >
+                          <Trash2 className="mr-1 h-3.5 w-3.5" />
+                          {t('settings.logoRemove')}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
                 {/* Presets */}
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">{t('settings.brandPresets')}</Label>

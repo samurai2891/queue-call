@@ -393,6 +393,11 @@ function TicketContent() {
           </Button>
           <ThemeToggle />
         </div>
+        <div className="flex items-center gap-2">
+          {store?.settings?.branding?.logoUrl && (
+            <img src={store.settings.branding.logoUrl} alt={store?.name || ''} className="h-7 w-7 rounded-lg object-contain" />
+          )}
+        </div>
         <LanguageSwitcher showLabel />
       </header>
 
@@ -611,7 +616,7 @@ export default function Ticket() {
   const supportedLocales = (store?.supportedLocales || SUPPORTED_LOCALES) as Locale[];
   const defaultLocale = (store?.defaultLocale || 'ja') as Locale;
 
-  const branding = store?.settings?.branding as { primaryColor?: string; secondaryColor?: string; accentColor?: string } | undefined;
+  const branding = store?.settings?.branding as { primaryColor?: string; secondaryColor?: string; accentColor?: string; logoUrl?: string; logoKey?: string } | undefined;
 
   return (
     <LocaleProvider defaultLocale={defaultLocale} supportedLocales={supportedLocales}>

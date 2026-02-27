@@ -118,7 +118,7 @@ function cleanupUploadTokens() {
 
 function normalizeKind(kind: string) {
   const normalized = kind.trim().toLowerCase();
-  const allowedKinds = new Set(["menu", "menu-item", "feed", "feed-post"]);
+  const allowedKinds = new Set(["menu", "menu-item", "feed", "feed-post", "logo"]);
   if (!allowedKinds.has(normalized)) {
     return null;
   }
