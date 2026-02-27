@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
+import { AnimatedPage, AnimatedCard } from '@/components/AnimatedPage';
 import { toast } from 'sonner';
 import { useSSE } from '@/hooks/useSSE';
 import { SmsRegistration } from '@/components/SmsRegistration';
@@ -211,11 +212,16 @@ function TicketContent() {
     return (
       <div className="min-h-screen flex flex-col">
         <header className="p-4 flex justify-between items-center">
-          <Skeleton className="h-10 w-10" />
-          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-10 rounded-md" />
+          <Skeleton className="h-10 w-24 rounded-md" />
         </header>
         <main className="flex-1 container flex flex-col items-center justify-center gap-8 py-8">
-          <Skeleton className="h-96 w-full max-w-md" />
+          <div className="w-full max-w-md space-y-4">
+            <Skeleton className="h-8 w-24 mx-auto rounded-full" />
+            <Skeleton className="h-24 w-32 mx-auto rounded-lg" />
+            <Skeleton className="h-40 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-lg" />
+          </div>
         </main>
       </div>
     );
@@ -243,7 +249,7 @@ function TicketContent() {
       <div className="min-h-screen flex flex-col called-fullscreen-bg">
         {/* Header - minimal */}
         <header className="p-3 flex justify-between items-center relative z-10">
-          <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10" onClick={() => navigate(`/s/${params.storeSlug}`)}>
+          <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10 active:scale-90 transition-transform" onClick={() => navigate(`/s/${params.storeSlug}`)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <LanguageSwitcher showLabel />
@@ -259,41 +265,51 @@ function TicketContent() {
             <div className="w-56 h-56 rounded-full bg-white/5 animate-ping-slower" />
           </div>
 
-          {/* ステータスラベル */}
-          <div className="mb-4 px-5 py-2 rounded-full bg-white/20 backdrop-blur-sm">
-            <p className="text-white font-bold text-lg tracking-wider flex items-center gap-2">
-              <Bell className="h-5 w-5 animate-bounce" />
-              {t('ticket.calledHeading')}
-            </p>
-          </div>
+          {/* ステータスラベル — animated entrance */}
+          <AnimatedPage variant="zoom-fade" delay={100}>
+            <div className="mb-4 px-5 py-2 rounded-full bg-white/20 backdrop-blur-sm">
+              <p className="text-white font-bold text-lg tracking-wider flex items-center gap-2">
+                <Bell className="h-5 w-5 animate-bounce" />
+                {t('ticket.calledHeading')}
+              </p>
+            </div>
+          </AnimatedPage>
 
           {/* 番号 — 超巨大 */}
-          <p className="text-[8rem] sm:text-[10rem] font-black text-white tabular-nums leading-none drop-shadow-lg relative z-10">
-            {ticket.number}
-          </p>
+          <AnimatedPage variant="zoom-fade" delay={200}>
+            <p className="text-[8rem] sm:text-[10rem] font-black text-white tabular-nums leading-none drop-shadow-lg relative z-10">
+              {ticket.number}
+            </p>
+          </AnimatedPage>
 
           {/* お店にお戻りください */}
-          <p className="text-white/90 text-xl font-semibold mt-4 mb-8">
-            {t('ticket.pleaseReturn')}
-          </p>
+          <AnimatedPage variant="fade-up" delay={350}>
+            <p className="text-white/90 text-xl font-semibold mt-4 mb-8">
+              {t('ticket.pleaseReturn')}
+            </p>
+          </AnimatedPage>
 
           {/* 到着確認ボタン — 巨大化 */}
-          <Button
-            size="lg"
-            className="w-full max-w-xs h-16 text-xl font-bold bg-white text-emerald-700 hover:bg-white/90 shadow-2xl rounded-2xl"
-            onClick={handleOpenPinDialog}
-          >
-            <KeyRound className="mr-3 h-6 w-6" />
-            {t('ticket.checkinWithPin')}
-          </Button>
+          <AnimatedPage variant="fade-up" delay={450}>
+            <Button
+              size="lg"
+              className="w-full max-w-xs h-16 text-xl font-bold bg-white text-emerald-700 hover:bg-white/90 shadow-2xl rounded-2xl active:scale-[0.97] transition-transform"
+              onClick={handleOpenPinDialog}
+            >
+              <KeyRound className="mr-3 h-6 w-6" />
+              {t('ticket.checkinWithPin')}
+            </Button>
+          </AnimatedPage>
 
           {/* 期限表示 */}
           {ticket.checkinDeadlineAt && (
-            <div className="mt-4 px-4 py-2 rounded-lg bg-white/15 backdrop-blur-sm">
-              <p className="text-white/90 text-sm">
-                {t('ticket.deadlineLabel')}: {new Date(ticket.checkinDeadlineAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </p>
-            </div>
+            <AnimatedPage variant="fade" delay={550}>
+              <div className="mt-4 px-4 py-2 rounded-lg bg-white/15 backdrop-blur-sm">
+                <p className="text-white/90 text-sm">
+                  {new Date(ticket.checkinDeadlineAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + t('ticket.checkinDeadline')}
+                </p>
+              </div>
+            </AnimatedPage>
           )}
 
           {/* キャンセルリンク — 控えめ */}
@@ -369,7 +385,7 @@ function TicketContent() {
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
       <header className="p-4 flex justify-between items-center">
-        <Button variant="ghost" size="icon" onClick={() => navigate(`/s/${params.storeSlug}`)}>
+        <Button variant="ghost" size="icon" className="active:scale-90 transition-transform" onClick={() => navigate(`/s/${params.storeSlug}`)}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <LanguageSwitcher showLabel />
@@ -377,171 +393,203 @@ function TicketContent() {
 
       {/* Main Content */}
       <main className="flex-1 container flex flex-col items-center justify-center py-8">
-        <Card className="w-full max-w-md ticket-card">
-          <CardContent className="p-6 space-y-6">
-            {/* Status Badge */}
-            <div className="flex justify-center">
-              {getStatusBadge()}
-            </div>
-
-            {/* Your Number */}
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">{t('ticket.yourNumber')}</p>
-              <p className="text-7xl font-bold tabular-nums text-primary">
-                {ticket.number}
-              </p>
-            </div>
-
-            {/* Queue Info */}
-            {isActive && !isCalled && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <p className="text-sm text-muted-foreground mb-1">{t('ticket.currentlyCalling')}</p>
-                    <p className="text-3xl font-bold tabular-nums">{currentNumber || '-'}</p>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <p className="text-sm text-muted-foreground mb-1">{t('ticket.groupsAhead')}</p>
-                    <p className="text-3xl font-bold tabular-nums">
-                      {groupsAhead}
-                      <span className="text-lg text-muted-foreground ml-1">{t('ticket.groupsAheadSuffix')}</span>
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Estimated Wait Time */}
-                {ticket.estimatedWaitMinutes !== null && ticket.estimatedWaitMinutes !== undefined && (
-                  <div className="p-4 bg-primary/5 rounded-lg text-center border border-primary/20">
-                    <div className="flex items-center justify-center gap-2 mb-1">
-                      <Clock className="h-4 w-4 text-primary" />
-                      <p className="text-sm text-muted-foreground">{t('ticket.estimatedWait')}</p>
-                    </div>
-                    <p className="text-2xl font-bold text-primary">
-                      {ticket.estimatedWaitMinutes === 0 
-                        ? t('ticket.estimatedWaitNow')
-                        : t('ticket.estimatedWaitMinutes').replace('{minutes}', String(ticket.estimatedWaitMinutes))
-                      }
-                    </p>
-                  </div>
-                )}
-
-                {/* Wait Time Alert Setting */}
-                <div className="p-4 bg-muted/30 rounded-lg border">
-                  <div className="flex items-center gap-2 mb-3">
-                    <BellRing className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm font-medium">{t('ticket.waitAlertTitle')}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    {t('ticket.waitAlertDescription')}
-                  </p>
-                  <Select
-                    value={waitAlertMinutes?.toString() || 'off'}
-                    onValueChange={(value) => {
-                      const minutes = value === 'off' ? null : parseInt(value, 10);
-                      setWaitAlertMinutes(minutes);
-                      if (params.token) {
-                        setWaitAlertMutation.mutate({ token: params.token, alertMinutes: minutes });
-                      }
-                    }}
-                    disabled={setWaitAlertMutation.isPending}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder={t('ticket.waitAlertOff')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="off">{t('ticket.waitAlertOff')}</SelectItem>
-                      <SelectItem value="5">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '5')}</SelectItem>
-                      <SelectItem value="10">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '10')}</SelectItem>
-                      <SelectItem value="15">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '15')}</SelectItem>
-                      <SelectItem value="20">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '20')}</SelectItem>
-                      <SelectItem value="30">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '30')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {waitAlertMinutes && ticket.waitAlertSentAt && (
-                    <p className="text-xs text-success mt-2 flex items-center gap-1">
-                      <CheckCircle className="h-3 w-3" />
-                      {t('ticket.waitAlertSent')}
-                    </p>
-                  )}
-                </div>
+        <AnimatedCard delay={100} hoverEffect={false} className="w-full max-w-md">
+          <Card className="w-full ticket-card">
+            <CardContent className="p-6 space-y-6">
+              {/* Status Badge */}
+              <div className="flex justify-center">
+                {getStatusBadge()}
               </div>
-            )}
 
-            {/* Ticket Details */}
-            <div className="text-center text-sm text-muted-foreground space-y-1">
-              <p>{ticket.partySize} {t('common.people')}</p>
-              {ticket.note && <p className="italic">"{ticket.note}"</p>}
-            </div>
-
-            {/* Completed/Expired Message */}
-            {!isActive && (
-              <div className="text-center space-y-4">
-                <p className="text-muted-foreground">
-                  {status === 'DONE' ? t('ticket.completedMessage') : 
-                   status === 'CANCELED' ? t('ticket.canceledMessage') :
-                   status === 'EXPIRED' ? t('ticket.expiredMessage') :
-                   status === 'SKIPPED' ? t('ticket.skippedMessage') : ''}
+              {/* Your Number */}
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-2">{t('ticket.yourNumber')}</p>
+                <p className="text-7xl font-bold tabular-nums text-primary">
+                  {ticket.number}
                 </p>
-                <Button onClick={() => navigate(`/s/${params.storeSlug}`)}>
-                  {t('ticket.backToStore')}
-                </Button>
               </div>
-            )}
 
-            {/* Actions (WAITING only) */}
-            {isActive && !isCalled && (
-              <div className="space-y-3">
-                <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="lg" className="w-full">
-                      <XCircle className="mr-2 h-5 w-5" />
-                      {t('ticket.cancelButton')}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {t('ticket.cancelConfirm')}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>{t('common.no')}</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleCancel}>
-                        {t('common.yes')}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+              {/* Queue Info */}
+              {isActive && !isCalled && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-1">{t('ticket.currentlyCalling')}</p>
+                      <p className="text-3xl font-bold tabular-nums">{currentNumber || '-'}</p>
+                    </div>
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-1">{t('ticket.groupsAhead')}</p>
+                      <p className="text-3xl font-bold tabular-nums">
+                        {groupsAhead}
+                        <span className="text-lg text-muted-foreground ml-1">{t('ticket.groupsAheadSuffix')}</span>
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Estimated Wait Time */}
+                  {ticket.estimatedWaitMinutes !== null && ticket.estimatedWaitMinutes !== undefined && (
+                    <div className="p-4 bg-primary/5 rounded-lg text-center border border-primary/20">
+                      <div className="flex items-center justify-center gap-2 mb-1">
+                        <Clock className="h-4 w-4 text-primary" />
+                        <p className="text-sm text-muted-foreground">{t('ticket.estimatedWait')}</p>
+                      </div>
+                      <p className="text-2xl font-bold text-primary">
+                        {ticket.estimatedWaitMinutes === 0 
+                          ? t('ticket.estimatedWaitNow')
+                          : t('ticket.estimatedWaitMinutes').replace('{minutes}', String(ticket.estimatedWaitMinutes))
+                        }
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Wait Time Alert Setting */}
+                  <div className="p-4 bg-muted/30 rounded-lg border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <BellRing className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-medium">{t('ticket.waitAlertTitle')}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      {t('ticket.waitAlertDescription')}
+                    </p>
+                    <Select
+                      value={waitAlertMinutes?.toString() || 'off'}
+                      onValueChange={(value) => {
+                        const minutes = value === 'off' ? null : parseInt(value, 10);
+                        setWaitAlertMinutes(minutes);
+                        if (params.token) {
+                          setWaitAlertMutation.mutate({ token: params.token, alertMinutes: minutes });
+                        }
+                      }}
+                      disabled={setWaitAlertMutation.isPending}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={t('ticket.waitAlertOff')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="off">{t('ticket.waitAlertOff')}</SelectItem>
+                        <SelectItem value="5">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '5')}</SelectItem>
+                        <SelectItem value="10">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '10')}</SelectItem>
+                        <SelectItem value="15">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '15')}</SelectItem>
+                        <SelectItem value="20">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '20')}</SelectItem>
+                        <SelectItem value="30">{t('ticket.waitAlertMinutesOption').replace('{minutes}', '30')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {waitAlertMinutes && ticket.waitAlertSentAt && (
+                      <p className="text-xs text-success mt-2 flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        {t('ticket.waitAlertSent')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Ticket Details */}
+              <div className="text-center text-sm text-muted-foreground space-y-1">
+                <p>{ticket.partySize} {t('common.people')}</p>
+                {ticket.note && <p className="italic">"{ticket.note}"</p>}
               </div>
-            )}
-          </CardContent>
-        </Card>
+
+              {/* Completed/Expired Message */}
+              {!isActive && (
+                <div className="text-center space-y-4">
+                  <p className="text-muted-foreground">
+                    {status === 'DONE' ? t('ticket.completedMessage') : 
+                     status === 'CANCELED' ? t('ticket.canceledMessage') :
+                     status === 'EXPIRED' ? t('ticket.expiredMessage') :
+                     status === 'SKIPPED' ? t('ticket.skippedMessage') : ''}
+                  </p>
+                  <Button className="active:scale-[0.97] transition-transform" onClick={() => navigate(`/s/${params.storeSlug}`)}>
+                    {t('ticket.backToStore')}
+                  </Button>
+                </div>
+              )}
+
+              {/* Actions (WAITING only) */}
+              {isActive && !isCalled && (
+                <div className="space-y-3">
+                  <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="lg" className="w-full active:scale-[0.97] transition-transform">
+                        <XCircle className="mr-2 h-5 w-5" />
+                        {t('ticket.cancelButton')}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t('ticket.cancelConfirm')}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t('common.no')}</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleCancel}>
+                          {t('common.yes')}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
         {/* SMS Registration */}
         {isActive && ticket && (
-          <div className="w-full max-w-md mt-4">
-            <SmsRegistration ticketId={ticket.id} />
-          </div>
+          <AnimatedPage variant="fade-up" delay={250}>
+            <div className="w-full max-w-md mt-4">
+              <SmsRegistration ticketId={ticket.id} />
+            </div>
+          </AnimatedPage>
         )}
 
-        {/* Notification Settings Link */}
-        {isActive && (
-          <Button
-            variant="link"
-            className="mt-4"
-            onClick={() => navigate(`/s/${params.storeSlug}/ticket/${params.token}/notifications`)}
-          >
-            <Bell className="mr-2 h-4 w-4" />
-            {t('notification.title')}
-          </Button>
+        {/* Inline Notification Enable Button */}
+        {isActive && !isCalled && (
+          <AnimatedPage variant="fade-up" delay={350}>
+            <div className="w-full max-w-md mt-4">
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full h-14 text-base active:scale-[0.97] transition-transform"
+                onClick={async () => {
+                  if (!('Notification' in window)) {
+                    toast.error(t('notification.pushUnsupported'));
+                    return;
+                  }
+                  if (Notification.permission === 'granted') {
+                    toast.success(t('notification.pushEnabled'));
+                    return;
+                  }
+                  if (Notification.permission === 'denied') {
+                    toast.error(t('notification.pushDenied'));
+                    return;
+                  }
+                  const result = await Notification.requestPermission();
+                  if (result === 'granted') {
+                    toast.success(t('notification.pushEnabled'));
+                  } else {
+                    toast.error(t('notification.pushDenied'));
+                  }
+                }}
+              >
+                <Bell className="mr-2 h-5 w-5" />
+                {typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
+                  ? t('notification.pushEnabled')
+                  : t('ticket.enableNotifications')}
+              </Button>
+            </div>
+          </AnimatedPage>
         )}
 
         {/* PWA Install Card */}
         {isActive && (
-          <div className="w-full max-w-md mt-6">
-            <PwaInstallBanner variant="card" />
-          </div>
+          <AnimatedPage variant="fade-up" delay={450}>
+            <div className="w-full max-w-md mt-6">
+              <PwaInstallBanner variant="card" />
+            </div>
+          </AnimatedPage>
         )}
       </main>
     </div>

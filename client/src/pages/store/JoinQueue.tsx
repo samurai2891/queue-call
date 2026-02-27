@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Minus, Plus, AlertCircle, Loader2, Users, Clock, Activity } from 'lucide-react';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
+import { AnimatedPage, AnimatedCard } from '@/components/AnimatedPage';
 import { toast } from 'sonner';
 import { RATE_LIMITED_ERR_MSG } from '@shared/const';
 import type { Locale } from '@/contexts/LocaleContext';
@@ -91,11 +92,13 @@ function JoinQueueContent() {
     return (
       <div className="min-h-screen flex flex-col">
         <header className="p-4 flex justify-between items-center">
-          <Skeleton className="h-10 w-10" />
-          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-10 rounded-md" />
+          <Skeleton className="h-6 w-24" />
+          <Skeleton className="h-10 w-10 rounded-md" />
         </header>
-        <main className="flex-1 container flex flex-col items-center justify-center gap-8 py-8">
-          <Skeleton className="h-96 w-full max-w-md" />
+        <main className="flex-1 container flex flex-col items-center justify-center gap-4 py-8">
+          <Skeleton className="h-24 w-full max-w-md rounded-xl" />
+          <Skeleton className="h-80 w-full max-w-md rounded-xl" />
         </main>
       </div>
     );
@@ -125,11 +128,15 @@ function JoinQueueContent() {
           <LanguageSwitcher showLabel />
         </header>
         <main className="flex-1 container flex flex-col items-center justify-center gap-4 py-8">
-          <AlertCircle className="h-16 w-16 text-warning" />
-          <h1 className="text-2xl font-bold">{t('store.intakePaused')}</h1>
-          <Button variant="outline" onClick={() => navigate(`/s/${params.storeSlug}`)}>
-            {t('common.back')}
-          </Button>
+          <AnimatedPage variant="zoom-fade" delay={100}>
+            <div className="flex flex-col items-center gap-4">
+              <AlertCircle className="h-16 w-16 text-warning" />
+              <h1 className="text-2xl font-bold">{t('store.intakePaused')}</h1>
+              <Button variant="outline" onClick={() => navigate(`/s/${params.storeSlug}`)}>
+                {t('common.back')}
+              </Button>
+            </div>
+          </AnimatedPage>
         </main>
       </div>
     );
@@ -141,7 +148,7 @@ function JoinQueueContent() {
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
       <header className="p-4 flex justify-between items-center">
-        <Button variant="ghost" size="icon" onClick={() => navigate(`/s/${params.storeSlug}`)}>
+        <Button variant="ghost" size="icon" className="active:scale-90 transition-transform" onClick={() => navigate(`/s/${params.storeSlug}`)}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <h1 className="text-lg font-semibold">{store.name}</h1>
@@ -151,112 +158,116 @@ function JoinQueueContent() {
       {/* Main Content */}
       <main className="flex-1 container flex flex-col items-center py-4 px-4 gap-4">
         
-        {/* 待ち状況カード */}
+        {/* 待ち状況カード — animated entrance */}
         {queueStatus && (
-          <Card className="w-full max-w-md border shadow-sm">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-3 gap-3 text-center">
-                {/* 待ち組数 */}
-                <div className="flex flex-col items-center gap-1">
-                  <Users className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-2xl font-bold tabular-nums">{queueStatus.waitingCount}</span>
-                  <span className="text-xs text-muted-foreground">{t('join.waitingGroups')}</span>
-                </div>
-                
-                {/* 予想待ち時間 */}
-                {queueStatus.showEstimatedWaitTime && queueStatus.estimatedWaitMinutes !== null && (
+          <AnimatedCard delay={100} hoverEffect={false} className="w-full max-w-md">
+            <Card className="w-full border shadow-sm">
+              <CardContent className="p-4">
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  {/* 待ち組数 */}
                   <div className="flex flex-col items-center gap-1">
-                    <Clock className="h-5 w-5 text-muted-foreground" />
-                    <span className="text-2xl font-bold tabular-nums">
-                      {queueStatus.estimatedWaitMinutes > 0 ? `~${queueStatus.estimatedWaitMinutes}` : '-'}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{t('join.estimatedMinutes')}</span>
+                    <Users className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-2xl font-bold tabular-nums">{queueStatus.waitingCount}</span>
+                    <span className="text-xs text-muted-foreground">{t('join.waitingGroups')}</span>
                   </div>
-                )}
-                
-                {/* 混雑レベル */}
-                {queueStatus.showCrowdLevel && crowdInfo && (
-                  <div className="flex flex-col items-center gap-1">
-                    <Activity className="h-5 w-5 text-muted-foreground" />
-                    <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-sm font-medium border ${crowdInfo.bg} ${crowdInfo.color}`}>
-                      <span className={`w-2 h-2 rounded-full ${crowdInfo.dot} animate-pulse`} />
-                      {t(`store.crowdLevel.${queueStatus.crowdLevel}` as any)}
+                  
+                  {/* 予想待ち時間 */}
+                  {queueStatus.showEstimatedWaitTime && queueStatus.estimatedWaitMinutes !== null && (
+                    <div className="flex flex-col items-center gap-1">
+                      <Clock className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-2xl font-bold tabular-nums">
+                        {queueStatus.estimatedWaitMinutes > 0 ? `~${queueStatus.estimatedWaitMinutes}` : '-'}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{t('join.estimatedMinutes')}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground">{t('join.crowdStatus')}</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  )}
+                  
+                  {/* 混雑レベル */}
+                  {queueStatus.showCrowdLevel && crowdInfo && (
+                    <div className="flex flex-col items-center gap-1">
+                      <Activity className="h-5 w-5 text-muted-foreground" />
+                      <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-sm font-medium border ${crowdInfo.bg} ${crowdInfo.color}`}>
+                        <span className={`w-2 h-2 rounded-full ${crowdInfo.dot} animate-pulse`} />
+                        {t(`store.crowdLevel.${queueStatus.crowdLevel}` as any)}
+                      </div>
+                      <span className="text-xs text-muted-foreground">{t('join.crowdStatus')}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
         )}
 
-        {/* 発券フォーム */}
-        <Card className="w-full max-w-md shadow-sm">
-          <CardContent className="p-5">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Party Size - 拡大版 */}
-              <div className="space-y-4">
-                <Label className="text-base font-medium">{t('join.partySize')}</Label>
-                <div className="flex items-center justify-center gap-5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-16 w-16 rounded-full text-xl shrink-0 active:scale-95 transition-transform"
-                    onClick={decrementPartySize}
-                    disabled={partySize <= 1}
-                  >
-                    <Minus className="h-7 w-7" />
-                  </Button>
-                  <div className="text-center min-w-[120px]">
-                    <span className="text-6xl font-bold tabular-nums leading-none">{partySize}</span>
-                    <span className="text-lg text-muted-foreground ml-1">{t('common.people')}</span>
+        {/* 発券フォーム — animated entrance */}
+        <AnimatedCard delay={200} hoverEffect={false} className="w-full max-w-md">
+          <Card className="w-full shadow-sm">
+            <CardContent className="p-5">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Party Size - 拡大版 */}
+                <div className="space-y-4">
+                  <Label className="text-base font-medium">{t('join.partySize')}</Label>
+                  <div className="flex items-center justify-center gap-5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-16 w-16 rounded-full text-xl shrink-0 active:scale-90 transition-transform"
+                      onClick={decrementPartySize}
+                      disabled={partySize <= 1}
+                    >
+                      <Minus className="h-7 w-7" />
+                    </Button>
+                    <div className="text-center min-w-[120px]">
+                      <span className="text-6xl font-bold tabular-nums leading-none transition-all duration-200">{partySize}</span>
+                      <span className="text-lg text-muted-foreground ml-1">{t('common.people')}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-16 w-16 rounded-full text-xl shrink-0 active:scale-90 transition-transform"
+                      onClick={incrementPartySize}
+                      disabled={partySize >= (store?.settings?.kiosk?.maxPartySize || 10)}
+                    >
+                      <Plus className="h-7 w-7" />
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-16 w-16 rounded-full text-xl shrink-0 active:scale-95 transition-transform"
-                    onClick={incrementPartySize}
-                    disabled={partySize >= (store?.settings?.kiosk?.maxPartySize || 10)}
-                  >
-                    <Plus className="h-7 w-7" />
-                  </Button>
                 </div>
-              </div>
 
-              {/* Note */}
-              <div className="space-y-2">
-                <Label htmlFor="note">{t('join.note')}</Label>
-                <Textarea
-                  id="note"
-                  placeholder={t('join.notePlaceholder')}
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  rows={3}
-                  maxLength={500}
-                />
-              </div>
+                {/* Note */}
+                <div className="space-y-2">
+                  <Label htmlFor="note">{t('join.note')}</Label>
+                  <Textarea
+                    id="note"
+                    placeholder={t('join.notePlaceholder')}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={3}
+                    maxLength={500}
+                  />
+                </div>
 
-              {/* Submit Button - 視覚的に強化 */}
-              <Button
-                type="submit"
-                size="lg"
-                className="w-full h-16 text-xl font-bold active:scale-[0.98] transition-transform"
-                disabled={createTicketMutation.isPending}
-              >
-                {createTicketMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                    {t('join.submitting')}
-                  </>
-                ) : (
-                  t('join.submit')
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+                {/* Submit Button - 視覚的に強化 */}
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full h-16 text-xl font-bold active:scale-[0.97] transition-transform"
+                  disabled={createTicketMutation.isPending}
+                >
+                  {createTicketMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                      {t('join.submitting')}
+                    </>
+                  ) : (
+                    t('join.submit')
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
       </main>
 
       {/* PWA Install Banner */}

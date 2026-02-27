@@ -132,6 +132,7 @@ export const translations = {
     'notification.verify': '認証する',
     'notification.verified': '認証済み',
     'notification.enablePush': 'プッシュ通知を有効にする',
+    'ticket.enableNotifications': '通知を受け取る',
     'notification.pushEnabled': 'プッシュ通知が有効です',
     'notification.pushUnsupported': 'このブラウザはプッシュ通知に対応していません',
     'notification.pushDenied': '通知がブロックされています。ブラウザ設定から許可してください',
@@ -195,6 +196,13 @@ export const translations = {
     'kiosk.nextCustomer': '次のお客様',
     'kiosk.errorMessage': 'エラーが発生しました',
     'kiosk.tryAgain': 'もう一度試す',
+    'kiosk.scanForDetails': 'QRコードを読み取ると、スマホで待ち状況を確認できます',
+    'kiosk.ticketUrl': 'チケットURL',
+    'staff.pinKeypad': 'テンキー',
+    'staff.pinDelete': '削除',
+    'ticket.enableNotification': '通知をONにする',
+    'ticket.notificationEnabled': '通知ON',
+    'ticket.notificationBlocked': '通知がブロックされています。ブラウザの設定から許可してください。',
     
     // Board
     'board.title': '呼び出し中',
@@ -216,6 +224,7 @@ export const translations = {
     'staff.pinLabel': 'PIN',
     'staff.pinPlaceholder': 'PINを入力',
     'staff.wrongPin': 'PINが正しくありません',
+    'staff.numpadClear': 'クリア',
     'staff.roleManager': 'マネージャー',
     'staff.roleStaff': 'スタッフ',
 
@@ -938,6 +947,7 @@ export const translations = {
     'notification.verify': 'Verify',
     'notification.verified': 'Verified',
     'notification.enablePush': 'Enable Push Notifications',
+    'ticket.enableNotifications': 'Enable Notifications',
     'notification.pushEnabled': 'Push notifications enabled',
     'notification.pushUnsupported': 'Push notifications are not supported in this browser',
     'notification.pushDenied': 'Notifications are blocked. Enable them in browser settings',
@@ -1001,6 +1011,13 @@ export const translations = {
     'kiosk.nextCustomer': 'Next Customer',
     'kiosk.errorMessage': 'An error occurred',
     'kiosk.tryAgain': 'Try Again',
+    'kiosk.scanForDetails': 'Scan QR code to check your queue status on your phone',
+    'kiosk.ticketUrl': 'Ticket URL',
+    'staff.pinKeypad': 'Keypad',
+    'staff.pinDelete': 'Delete',
+    'ticket.enableNotification': 'Enable Notifications',
+    'ticket.notificationEnabled': 'Notifications ON',
+    'ticket.notificationBlocked': 'Notifications are blocked. Please enable them in your browser settings.',
     
     // Board
     'board.title': 'Now Calling',
@@ -1025,6 +1042,7 @@ export const translations = {
     'staff.roleStaff': 'Staff',
 
     'staff.wrongPin': 'Incorrect PIN',
+    'staff.numpadClear': 'Clear',
     'staff.logout': 'Logout',
     'staff.waitingList': 'Waiting List',
     'staff.noWaiting': 'No one waiting',
@@ -1744,6 +1762,7 @@ export const translations = {
     'notification.verify': '인증',
     'notification.verified': '인증됨',
     'notification.enablePush': '푸시 알림 활성화',
+    'ticket.enableNotifications': '알림 받기',
     'notification.pushEnabled': '푸시 알림이 활성화되었습니다',
     'notification.pushUnsupported': '이 브라우저는 푸시 알림을 지원하지 않습니다',
     'notification.pushDenied': '알림이 차단되었습니다. 브라우저 설정에서 허용해 주세요',
@@ -1808,6 +1827,13 @@ export const translations = {
     'kiosk.errorMessage': '오류가 발생했습니다',
 
     'kiosk.tryAgain': '다시 시도',
+    'kiosk.scanForDetails': 'QR 코드를 스캔하면 스마트폰에서 대기 상태를 확인할 수 있습니다',
+    'kiosk.ticketUrl': '티켓 URL',
+    'staff.pinKeypad': '키패드',
+    'staff.pinDelete': '삭제',
+    'ticket.enableNotification': '알림 켜기',
+    'ticket.notificationEnabled': '알림 ON',
+    'ticket.notificationBlocked': '알림이 차단되어 있습니다. 브라우저 설정에서 허용해주세요.',
     
     // Board
     'board.title': '호출 중',
@@ -1832,6 +1858,7 @@ export const translations = {
     'staff.roleStaff': '직원',
 
     'staff.wrongPin': 'PIN이 올바르지 않습니다',
+    'staff.numpadClear': '지우기',
     'staff.logout': '로그아웃',
     'staff.waitingList': '대기 목록',
     'staff.noWaiting': '대기 중인 분이 없습니다',
@@ -2551,6 +2578,7 @@ export const translations = {
     'notification.verify': '验证',
     'notification.verified': '已验证',
     'notification.enablePush': '启用推送通知',
+    'ticket.enableNotifications': '接收通知',
     'notification.pushEnabled': '推送通知已启用',
     'notification.pushUnsupported': '此浏览器不支持推送通知',
     'notification.pushDenied': '通知被阻止，请在浏览器设置中允许',
@@ -2615,6 +2643,13 @@ export const translations = {
     'kiosk.errorMessage': '发生错误',
 
     'kiosk.tryAgain': '重试',
+    'kiosk.scanForDetails': '扫描二维码可在手机上查看排队状态',
+    'kiosk.ticketUrl': '票据链接',
+    'staff.pinKeypad': '数字键盘',
+    'staff.pinDelete': '删除',
+    'ticket.enableNotification': '开启通知',
+    'ticket.notificationEnabled': '通知已开启',
+    'ticket.notificationBlocked': '通知已被阻止，请在浏览器设置中允许。',
     
     // Board
     'board.title': '叫号中',
@@ -2639,6 +2674,7 @@ export const translations = {
     'staff.roleStaff': '员工',
 
     'staff.wrongPin': 'PIN不正确',
+    'staff.numpadClear': '清除',
     'staff.logout': '退出',
     'staff.waitingList': '等待列表',
     'staff.noWaiting': '暂无等待',
@@ -3358,6 +3394,7 @@ export const translations = {
     'notification.verify': '驗證',
     'notification.verified': '已驗證',
     'notification.enablePush': '啟用推播通知',
+    'ticket.enableNotifications': '接收通知',
     'notification.pushEnabled': '推播通知已啟用',
     'notification.pushUnsupported': '此瀏覽器不支援推播通知',
     'notification.pushDenied': '通知已被封鎖，請在瀏覽器設定中允許',
@@ -3422,6 +3459,13 @@ export const translations = {
     'kiosk.errorMessage': '發生錯誤',
 
     'kiosk.tryAgain': '重試',
+    'kiosk.scanForDetails': '掃描QR碼可在手機上查看排隊狀態',
+    'kiosk.ticketUrl': '票據連結',
+    'staff.pinKeypad': '數字鍵盤',
+    'staff.pinDelete': '刪除',
+    'ticket.enableNotification': '開啟通知',
+    'ticket.notificationEnabled': '通知已開啟',
+    'ticket.notificationBlocked': '通知已被封鎖，請在瀏覽器設定中允許。',
     
     // Board
     'board.title': '叫號中',
@@ -3446,6 +3490,7 @@ export const translations = {
     'staff.roleStaff': '員工',
 
     'staff.wrongPin': 'PIN不正確',
+    'staff.numpadClear': '清除',
     'staff.logout': '登出',
     'staff.waitingList': '等待列表',
     'staff.noWaiting': '暫無等待',

@@ -1,10 +1,11 @@
 import { useParams, useLocation } from 'wouter';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Minus, Plus, Printer, CheckCircle, RotateCcw, AlertCircle, Globe } from 'lucide-react';
+import { Minus, Plus, Printer, CheckCircle, RotateCcw, AlertCircle, Globe, QrCode } from 'lucide-react';
+import { AnimatedPage } from '@/components/AnimatedPage';
 import { RATE_LIMITED_ERR_MSG } from '@shared/const';
 import type { Locale } from '@/contexts/LocaleContext';
 
@@ -87,6 +88,14 @@ function KioskDisplayContent() {
     if (partySize < maxPartySize) setPartySize(partySize + 1);
   };
 
+  // Generate QR code URL for the ticket page
+  const ticketQrCodeUrl = useMemo(() => {
+    if (!issuedTicket || !params.storeSlug) return '';
+    const origin = window.location.origin;
+    const ticketUrl = `${origin}/s/${params.storeSlug}/ticket/${issuedTicket.token}`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(ticketUrl)}&margin=8`;
+  }, [issuedTicket, params.storeSlug]);
+
   if (storeLoading) {
     return (
       <div className="kiosk-mode flex items-center justify-center">
@@ -122,7 +131,7 @@ function KioskDisplayContent() {
     );
   }
 
-  // Language Selection Screen
+  // Language Selection Screen — animated entrance
   if (state === 'language') {
     const supportedLocales = (store.supportedLocales || SUPPORTED_LOCALES) as Locale[];
     const localeLabels: Record<Locale, string> = {
@@ -135,141 +144,186 @@ function KioskDisplayContent() {
 
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-8 p-8">
-        <Globe className="h-24 w-24 text-primary" />
-        <h1 className="text-4xl font-bold text-center">{t('kiosk.selectLanguage')}</h1>
+        <AnimatedPage variant="zoom-fade" delay={50}>
+          <div className="flex flex-col items-center gap-4">
+            <Globe className="h-24 w-24 text-primary" />
+            <h1 className="text-4xl font-bold text-center">{t('kiosk.selectLanguage')}</h1>
+          </div>
+        </AnimatedPage>
         <div className="grid grid-cols-1 gap-4 w-full max-w-md">
-          {supportedLocales.map((loc) => (
-            <Button
-              key={loc}
-              size="lg"
-              className="kiosk-button"
-              onClick={() => handleLanguageSelect(loc)}
-            >
-              {localeLabels[loc]}
-            </Button>
+          {supportedLocales.map((loc, i) => (
+            <AnimatedPage key={loc} variant="fade-up" delay={150 + i * 80}>
+              <Button
+                size="lg"
+                className="kiosk-button w-full active:scale-[0.97] transition-transform"
+                onClick={() => handleLanguageSelect(loc)}
+              >
+                {localeLabels[loc]}
+              </Button>
+            </AnimatedPage>
           ))}
         </div>
       </div>
     );
   }
 
-  // Party Size Input Screen
+  // Party Size Input Screen — animated entrance
   if (state === 'input') {
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-8 p-8">
-        <h1 className="text-4xl font-bold text-center">{store.name}</h1>
+        <AnimatedPage variant="fade-up" delay={50}>
+          <h1 className="text-4xl font-bold text-center">{store.name}</h1>
+        </AnimatedPage>
         
-        <Card className="w-full max-w-lg">
-          <CardContent className="p-8 space-y-8">
-            <div className="text-center">
-              <p className="text-2xl text-muted-foreground mb-4">{t('join.partySize')}</p>
-              <div className="flex items-center justify-center gap-6">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-20 w-20 rounded-full text-3xl"
-                  onClick={decrementPartySize}
-                  disabled={partySize <= 1}
-                >
-                  <Minus className="h-10 w-10" />
-                </Button>
-                <div className="text-center min-w-[150px]">
-                  <span className="text-8xl font-bold tabular-nums">{partySize}</span>
-                  <span className="text-3xl text-muted-foreground ml-2">{t('common.people')}</span>
+        <AnimatedPage variant="zoom-fade" delay={150}>
+          <Card className="w-full max-w-lg">
+            <CardContent className="p-8 space-y-8">
+              <div className="text-center">
+                <p className="text-2xl text-muted-foreground mb-4">{t('join.partySize')}</p>
+                <div className="flex items-center justify-center gap-6">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-20 w-20 rounded-full text-3xl active:scale-90 transition-transform"
+                    onClick={decrementPartySize}
+                    disabled={partySize <= 1}
+                  >
+                    <Minus className="h-10 w-10" />
+                  </Button>
+                  <div className="text-center min-w-[150px]">
+                    <span className="text-8xl font-bold tabular-nums transition-all duration-200">{partySize}</span>
+                    <span className="text-3xl text-muted-foreground ml-2">{t('common.people')}</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-20 w-20 rounded-full text-3xl active:scale-90 transition-transform"
+                    onClick={incrementPartySize}
+                    disabled={partySize >= maxPartySize}
+                  >
+                    <Plus className="h-10 w-10" />
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-20 w-20 rounded-full text-3xl"
-                  onClick={incrementPartySize}
-                  disabled={partySize >= maxPartySize}
-                >
-                  <Plus className="h-10 w-10" />
-                </Button>
               </div>
-            </div>
 
-            <Button
-              size="lg"
-              className="w-full h-24 text-3xl"
-              onClick={handleSubmit}
-              disabled={createTicketMutation.isPending}
-            >
-              <Printer className="mr-3 h-8 w-8" />
-              {t('kiosk.issueTicket')}
-            </Button>
+              <Button
+                size="lg"
+                className="w-full h-24 text-3xl active:scale-[0.97] transition-transform"
+                onClick={handleSubmit}
+                disabled={createTicketMutation.isPending}
+              >
+                <Printer className="mr-3 h-8 w-8" />
+                {t('kiosk.issueTicket')}
+              </Button>
 
-            <Button
-              variant="ghost"
-              size="lg"
-              className="w-full"
-              onClick={resetKiosk}
-            >
-              <RotateCcw className="mr-2 h-5 w-5" />
-              {t('kiosk.changeLanguage')}
-            </Button>
-          </CardContent>
-        </Card>
+              <Button
+                variant="ghost"
+                size="lg"
+                className="w-full"
+                onClick={resetKiosk}
+              >
+                <RotateCcw className="mr-2 h-5 w-5" />
+                {t('kiosk.changeLanguage')}
+              </Button>
+            </CardContent>
+          </Card>
+        </AnimatedPage>
       </div>
     );
   }
 
-  // Success Screen
+  // ========== P2-10: Success Screen with QR Code — animated ==========
   if (state === 'success' && issuedTicket) {
     return (
-      <div className="kiosk-mode flex flex-col items-center justify-center gap-8 p-8 bg-success/5">
-        <CheckCircle className="h-32 w-32 text-success" />
+      <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8 bg-success/5">
+        <AnimatedPage variant="zoom-fade" delay={50}>
+          <CheckCircle className="h-24 w-24 text-success mx-auto" />
+        </AnimatedPage>
         
-        <div className="text-center">
-          <p className="text-3xl text-muted-foreground mb-4">{t('kiosk.yourNumber')}</p>
-          <p className="text-[12rem] font-bold tabular-nums text-success leading-none">
-            {issuedTicket.number}
+        <AnimatedPage variant="zoom-fade" delay={150}>
+          <div className="text-center">
+            <p className="text-3xl text-muted-foreground mb-2">{t('kiosk.yourNumber')}</p>
+            <p className="text-[10rem] font-bold tabular-nums text-success leading-none">
+              {issuedTicket.number}
+            </p>
+          </div>
+        </AnimatedPage>
+
+        {/* QR Code for ticket status — animated entrance */}
+        <AnimatedPage variant="fade-up" delay={350}>
+          <div className="flex flex-col items-center gap-3">
+            <div className="bg-white p-3 rounded-xl shadow-md">
+              <img 
+                src={ticketQrCodeUrl} 
+                alt="Ticket QR Code" 
+                className="w-40 h-40"
+                loading="eager"
+              />
+            </div>
+            <p className="text-lg text-muted-foreground text-center max-w-md">
+              <QrCode className="inline h-5 w-5 mr-1 -mt-0.5" />
+              {t('kiosk.scanForDetails')}
+            </p>
+          </div>
+        </AnimatedPage>
+
+        <AnimatedPage variant="fade" delay={500}>
+          <p className="text-xl text-muted-foreground text-center">
+            {t('kiosk.waitMessage')}
           </p>
-        </div>
+        </AnimatedPage>
 
-        <p className="text-2xl text-muted-foreground text-center">
-          {t('kiosk.waitMessage')}
-        </p>
+        <AnimatedPage variant="fade" delay={600}>
+          <div className="text-center text-muted-foreground">
+            <p>{t('kiosk.autoReset').replace('{seconds}', autoResetSeconds.toString())}</p>
+          </div>
+        </AnimatedPage>
 
-        <div className="text-center text-muted-foreground">
-          <p>{t('kiosk.autoReset').replace('{seconds}', autoResetSeconds.toString())}</p>
-        </div>
-
-        <Button
-          variant="outline"
-          size="lg"
-          className="mt-4"
-          onClick={resetKiosk}
-        >
-          <RotateCcw className="mr-2 h-5 w-5" />
-          {t('kiosk.newCustomer')}
-        </Button>
+        <AnimatedPage variant="fade-up" delay={650}>
+          <Button
+            variant="outline"
+            size="lg"
+            className="mt-2 active:scale-[0.97] transition-transform"
+            onClick={resetKiosk}
+          >
+            <RotateCcw className="mr-2 h-5 w-5" />
+            {t('kiosk.newCustomer')}
+          </Button>
+        </AnimatedPage>
       </div>
     );
   }
 
-  // Error Screen
+  // Error Screen — animated
   if (state === 'error') {
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-8 p-8 bg-destructive/5">
-        <AlertCircle className="h-32 w-32 text-destructive" />
+        <AnimatedPage variant="zoom-fade" delay={50}>
+          <AlertCircle className="h-32 w-32 text-destructive mx-auto" />
+        </AnimatedPage>
         
-        <h1 className="text-4xl font-bold text-destructive text-center">
-          {t('common.error')}
-        </h1>
+        <AnimatedPage variant="fade-up" delay={150}>
+          <h1 className="text-4xl font-bold text-destructive text-center">
+            {t('common.error')}
+          </h1>
+        </AnimatedPage>
 
-        <p className="text-2xl text-muted-foreground text-center">
-          {errorMessage || t('common.error')}
-        </p>
+        <AnimatedPage variant="fade-up" delay={250}>
+          <p className="text-2xl text-muted-foreground text-center">
+            {errorMessage || t('common.error')}
+          </p>
+        </AnimatedPage>
 
-        <Button
-          size="lg"
-          className="kiosk-button"
-          onClick={resetKiosk}
-        >
-          <RotateCcw className="mr-2 h-6 w-6" />
-          {t('kiosk.tryAgain')}
-        </Button>
+        <AnimatedPage variant="fade-up" delay={350}>
+          <Button
+            size="lg"
+            className="kiosk-button active:scale-[0.97] transition-transform"
+            onClick={resetKiosk}
+          >
+            <RotateCcw className="mr-2 h-6 w-6" />
+            {t('kiosk.tryAgain')}
+          </Button>
+        </AnimatedPage>
       </div>
     );
   }

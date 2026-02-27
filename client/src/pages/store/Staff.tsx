@@ -45,6 +45,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSSE } from '@/hooks/useSSE';
+import { AnimatedPage, AnimatedCard } from '@/components/AnimatedPage';
 import { RATE_LIMITED_ERR_MSG } from '@shared/const';
 import type { Locale } from '@/contexts/LocaleContext';
 
@@ -398,51 +399,109 @@ function StaffContent() {
     );
   }
 
-  // Login Screen
+  // Login Screen — Numpad UI
   if (!sessionToken || !session) {
+    const handleNumpadPress = (digit: string) => {
+      if (pin.length < 8) {
+        setPin(prev => prev + digit);
+      }
+    };
+    const handleNumpadDelete = () => {
+      setPin(prev => prev.slice(0, -1));
+    };
+    const handleNumpadClear = () => {
+      setPin('');
+    };
+
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
         <header className="p-4 flex justify-between items-center">
-          <Button variant="ghost" size="icon" onClick={() => navigate(`/s/${params.storeSlug}`)}>
+          <Button variant="ghost" size="icon" className="active:scale-90 transition-transform" onClick={() => navigate(`/s/${params.storeSlug}`)}>
             <XCircle className="h-5 w-5" />
           </Button>
           <LanguageSwitcher showLabel />
         </header>
-        <main className="flex-1 container flex flex-col items-center justify-center py-8">
-          <Card className="w-full max-w-sm">
-            <CardHeader>
-              <CardTitle className="text-center">{t('staff.login')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                    <Label htmlFor="pin">{t('staff.pinLabel')}</Label>
+        <main className="flex-1 container flex flex-col items-center justify-center py-4">
+          <AnimatedCard delay={100} hoverEffect={false} className="w-full max-w-sm">
+            <Card className="w-full">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-center">{t('staff.login')}</CardTitle>
+                <CardDescription className="text-center">{t('staff.pinLabel')}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleLogin} className="space-y-4">
+                  {/* PIN dots display */}
+                  <div className="flex items-center justify-center gap-3 py-4">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`h-4 w-4 rounded-full transition-all duration-200 ${
+                          i < pin.length
+                            ? 'bg-primary scale-110'
+                            : 'bg-muted border-2 border-muted-foreground/20'
+                        }`}
+                      />
+                    ))}
+                  </div>
 
-                  <Input
-                    id="pin"
-                    type="password"
-                    inputMode="numeric"
-                    placeholder={t('staff.pinPlaceholder')}
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    className="text-center text-2xl tracking-widest"
-                    maxLength={8}
-                    required
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isLoggingIn || !pin}
-                >
-                  {isLoggingIn ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  {t('staff.login')}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+                  {/* Hidden input for form submission */}
+                  <input type="hidden" value={pin} />
+
+                  {/* Numpad grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+                      <Button
+                        key={digit}
+                        type="button"
+                        variant="outline"
+                        className="h-14 text-2xl font-semibold hover:bg-accent active:scale-90 transition-transform"
+                        onClick={() => handleNumpadPress(digit)}
+                      >
+                        {digit}
+                      </Button>
+                    ))}
+                    {/* Bottom row: Clear, 0, Delete */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-14 text-sm font-medium text-muted-foreground hover:text-foreground active:scale-95 transition-transform"
+                      onClick={handleNumpadClear}
+                    >
+                      {t('staff.numpadClear')}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-14 text-2xl font-semibold hover:bg-accent active:scale-90 transition-transform"
+                      onClick={() => handleNumpadPress('0')}
+                    >
+                      0
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-14 text-lg font-medium text-muted-foreground hover:text-foreground active:scale-95 transition-transform"
+                      onClick={handleNumpadDelete}
+                    >
+                      ⌫
+                    </Button>
+                  </div>
+
+                  {/* Login button */}
+                  <Button
+                    type="submit"
+                    className="w-full h-14 text-lg active:scale-[0.97] transition-transform"
+                    disabled={isLoggingIn || !pin}
+                  >
+                    {isLoggingIn ? (
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    ) : null}
+                    {t('staff.login')}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
         </main>
       </div>
     );

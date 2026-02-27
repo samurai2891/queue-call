@@ -5,16 +5,17 @@ import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleC
 import { useSSE } from '@/hooks/useSSE';
 import { AlertCircle, Volume2, VolumeX, Clock, Users, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AnimatedPage } from '@/components/AnimatedPage';
 import type { Locale } from '@/contexts/LocaleContext';
 
 type CrowdLevel = 'empty' | 'low' | 'moderate' | 'busy' | 'crowded';
 
-const crowdLevelConfig: Record<CrowdLevel, { color: string; bgColor: string; icon: string }> = {
-  empty: { color: 'text-green-600', bgColor: 'bg-green-100', icon: '○' },
-  low: { color: 'text-green-500', bgColor: 'bg-green-50', icon: '◎' },
-  moderate: { color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '△' },
-  busy: { color: 'text-orange-600', bgColor: 'bg-orange-100', icon: '▲' },
-  crowded: { color: 'text-red-600', bgColor: 'bg-red-100', icon: '×' },
+const crowdLevelConfig: Record<CrowdLevel, { color: string; dot: string; icon: string }> = {
+  empty: { color: 'text-emerald-400', dot: 'bg-emerald-400', icon: '○' },
+  low: { color: 'text-green-400', dot: 'bg-green-400', icon: '◎' },
+  moderate: { color: 'text-yellow-400', dot: 'bg-yellow-400', icon: '△' },
+  busy: { color: 'text-orange-400', dot: 'bg-orange-400', icon: '▲' },
+  crowded: { color: 'text-red-400', dot: 'bg-red-400', icon: '×' },
 };
 
 function CrowdLevelBadgeBoard({ level }: { level: CrowdLevel }) {
@@ -23,12 +24,9 @@ function CrowdLevelBadgeBoard({ level }: { level: CrowdLevel }) {
   const labelKey = `store.crowdLevel.${level}` as const;
   
   return (
-    <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${config.bgColor}`}>
-      <Users className={`h-5 w-5 ${config.color}`} />
-      <span className={`text-lg ${config.icon === '×' ? 'text-2xl' : 'text-xl'} ${config.color}`}>
-        {config.icon}
-      </span>
-      <span className={`font-semibold text-lg ${config.color}`}>
+    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-sm">
+      <div className={`h-2.5 w-2.5 rounded-full ${config.dot} animate-pulse`} />
+      <span className={`text-lg font-semibold ${config.color}`}>
         {t(labelKey)}
       </span>
     </div>
@@ -116,7 +114,6 @@ function BoardDisplayContent() {
           playCallSound();
         }
         setLastCalledNumber(newNumber);
-        // Trigger number change animation
         setNumberChanged(true);
         setTimeout(() => setNumberChanged(false), 1500);
       }
@@ -167,28 +164,28 @@ function BoardDisplayContent() {
 
   if (storeLoading) {
     return (
-      <div className="kiosk-mode flex items-center justify-center bg-gradient-to-b from-primary/10 to-background">
-        <div className="animate-pulse text-4xl">{t('common.loading')}</div>
+      <div className="kiosk-mode flex items-center justify-center board-dark-bg">
+        <div className="animate-pulse text-4xl text-white/60">{t('common.loading')}</div>
       </div>
     );
   }
 
   if (storeError || !store) {
     return (
-      <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8">
-        <AlertCircle className="h-24 w-24 text-destructive" />
-        <h1 className="text-4xl font-bold">{t('common.error')}</h1>
+      <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8 board-dark-bg">
+        <AlertCircle className="h-24 w-24 text-red-400" />
+        <h1 className="text-4xl font-bold text-white">{t('common.error')}</h1>
       </div>
     );
   }
 
   return (
-    <div className="kiosk-mode flex flex-col bg-gradient-to-b from-primary/5 to-background">
-      {/* Header */}
-      <header className="p-4 md:p-6 border-b flex items-center justify-between">
+    <div className="kiosk-mode flex flex-col board-dark-bg">
+      {/* Header — minimal, translucent */}
+      <header className="p-4 md:p-6 flex items-center justify-between border-b border-white/10">
         <div className="w-12 md:w-16" />
         <div className="flex flex-col items-center gap-2">
-          <h1 className="text-3xl md:text-4xl font-bold">{store.name}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-white/90 tracking-wide">{store.name}</h1>
           {showCrowdLevel && (
             <CrowdLevelBadgeBoard level={crowdLevel as CrowdLevel} />
           )}
@@ -196,12 +193,12 @@ function BoardDisplayContent() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 md:h-12 md:w-12"
+          className="h-10 w-10 md:h-12 md:w-12 text-white/60 hover:text-white hover:bg-white/10 active:scale-90 transition-transform"
           onClick={() => setIsMuted(!isMuted)}
           aria-label={isMuted ? t('board.unmute') : t('board.mute')}
         >
           {isMuted ? (
-            <VolumeX className="h-5 w-5 md:h-6 md:w-6 text-muted-foreground" />
+            <VolumeX className="h-5 w-5 md:h-6 md:w-6" />
           ) : (
             <Volume2 className="h-5 w-5 md:h-6 md:w-6" />
           )}
@@ -211,113 +208,122 @@ function BoardDisplayContent() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
         {currentNumber > 0 ? (
-          /* ========== P0-3: 呼び出し中 — 番号を巨大化 ========== */
+          /* ========== 呼び出し中 — ダークサイネージ ========== */
           <div className="w-full flex flex-col items-center">
-            {/* Now Calling Section — 画面の主役 */}
-            <div className="text-center mb-6 md:mb-8">
-              <p className="text-xl md:text-2xl lg:text-3xl text-muted-foreground mb-2 md:mb-4 flex items-center justify-center gap-3">
-                <Volume2 className="h-5 w-5 md:h-7 md:w-7 animate-pulse text-primary" />
+            {/* Now Calling Label */}
+            <div className="text-center mb-4 md:mb-6">
+              <p className="text-xl md:text-2xl lg:text-3xl text-white/50 mb-2 md:mb-4 flex items-center justify-center gap-3 uppercase tracking-widest">
+                <Volume2 className="h-5 w-5 md:h-7 md:w-7 animate-pulse text-amber-400" />
                 {t('board.nowCalling')}
               </p>
               
-              {/* 番号 — 超巨大表示 */}
-              <div className={`board-number-hero ${numberChanged ? 'board-number-flash' : ''}`}>
+              {/* 番号 — 超巨大、明るい色 + flash animation */}
+              <div className={`board-number-hero-dark ${numberChanged ? 'board-number-flash' : ''}`}>
                 {currentNumber}
               </div>
             </div>
 
-            {/* PIN Display — 番号の下にコンパクトに */}
+            {/* PIN Display — animated entrance */}
             {currentPin && (
-              <div className="bg-card border-2 border-primary/30 rounded-2xl px-6 md:px-10 py-4 md:py-6 mb-6 md:mb-8">
-                <p className="text-base md:text-lg text-muted-foreground mb-1 text-center">
-                  {t('board.checkinPin')}
-                </p>
-                <div className="text-4xl md:text-6xl font-bold tracking-[0.3em] text-foreground text-center">
-                  {currentPin}
-                </div>
-                {pinCountdown && (
-                  <div className="flex items-center justify-center gap-2 mt-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>{t('board.pinUpdatesIn').replace('{time}', pinCountdown)}</span>
+              <AnimatedPage variant="zoom-fade" delay={100}>
+                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-6 md:px-10 py-4 md:py-6 mb-6 md:mb-8">
+                  <p className="text-base md:text-lg text-white/50 mb-1 text-center uppercase tracking-wider">
+                    {t('board.checkinPin')}
+                  </p>
+                  <div className="text-4xl md:text-6xl font-bold tracking-[0.3em] text-amber-400 text-center">
+                    {currentPin}
                   </div>
-                )}
-              </div>
+                  {pinCountdown && (
+                    <div className="flex items-center justify-center gap-2 mt-2 text-sm text-white/40">
+                      <Clock className="h-4 w-4" />
+                      <span>{t('board.pinUpdatesIn').replace('{time}', pinCountdown)}</span>
+                    </div>
+                  )}
+                </div>
+              </AnimatedPage>
             )}
 
-            {/* Waiting Numbers Grid */}
+            {/* Waiting Numbers Grid — staggered entrance */}
             {waitingNumbers.length > 0 && (
               <div className="w-full max-w-3xl">
-                <p className="text-lg md:text-xl text-muted-foreground mb-3 text-center">
+                <p className="text-lg md:text-xl text-white/40 mb-3 text-center uppercase tracking-wider">
                   {t('board.waitingNumbers')}
                 </p>
                 <div className="grid grid-cols-5 gap-2 md:gap-3">
                   {waitingNumbers.slice(0, 10).map((num, index) => (
-                    <div
-                      key={num}
-                      className="bg-card border rounded-xl p-2 md:p-3 text-center"
-                      style={{ opacity: 1 - index * 0.05 }}
-                    >
-                      <span className="text-xl md:text-3xl font-bold tabular-nums text-muted-foreground">
-                        {num}
-                      </span>
-                    </div>
+                    <AnimatedPage key={num} variant="fade-up" delay={200 + index * 50}>
+                      <div
+                        className="bg-white/5 border border-white/10 rounded-xl p-2 md:p-3 text-center hover:bg-white/10 transition-colors duration-300"
+                        style={{ opacity: 1 - index * 0.06 }}
+                      >
+                        <span className="text-xl md:text-3xl font-bold tabular-nums text-white/60">
+                          {num}
+                        </span>
+                      </div>
+                    </AnimatedPage>
                   ))}
                 </div>
               </div>
             )}
           </div>
         ) : (
-          /* ========== P0-2: 空状態 — QRコード + 受付案内 ========== */
+          /* ========== 空状態 — QRコード + 受付案内（ダーク）— animated ========== */
           <div className="text-center flex flex-col items-center gap-6 md:gap-8">
-            {/* QRコード */}
+            {/* QRコード — 白背景で視認性確保 */}
             {qrCodeUrl && (
-              <div className="bg-white p-4 md:p-6 rounded-2xl shadow-lg">
-                <img 
-                  src={qrCodeUrl} 
-                  alt="QR Code" 
-                  className="w-48 h-48 md:w-64 md:h-64"
-                  loading="eager"
-                />
-              </div>
+              <AnimatedPage variant="zoom-fade" delay={100}>
+                <div className="bg-white p-4 md:p-6 rounded-2xl shadow-2xl shadow-white/10">
+                  <img 
+                    src={qrCodeUrl} 
+                    alt="QR Code" 
+                    className="w-48 h-48 md:w-64 md:h-64"
+                    loading="eager"
+                  />
+                </div>
+              </AnimatedPage>
             )}
 
             {/* 案内テキスト */}
-            <div className="space-y-2">
-              <p className="text-2xl md:text-4xl font-bold text-foreground">
-                {t('board.scanInstruction')}
-              </p>
-              <p className="text-lg md:text-2xl text-muted-foreground">
-                {t('board.scanToJoin')}
-              </p>
-            </div>
+            <AnimatedPage variant="fade-up" delay={250}>
+              <div className="space-y-3">
+                <p className="text-2xl md:text-4xl font-bold text-white">
+                  {t('board.scanInstruction')}
+                </p>
+                <p className="text-lg md:text-2xl text-white/50">
+                  {t('board.scanToJoin')}
+                </p>
+              </div>
+            </AnimatedPage>
 
             {/* 補足メッセージ */}
-            <p className="text-base md:text-lg text-muted-foreground/70">
-              {t('board.readyToServe')}
-            </p>
+            <AnimatedPage variant="fade" delay={400}>
+              <p className="text-base md:text-lg text-white/30">
+                {t('board.readyToServe')}
+              </p>
+            </AnimatedPage>
           </div>
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="p-3 md:p-4 text-center text-muted-foreground border-t">
+      {/* Footer — minimal */}
+      <footer className="p-3 md:p-4 text-center border-t border-white/10">
         <div className="flex items-center justify-center gap-4 flex-wrap">
-          <p className="text-xs md:text-sm">{t('common.poweredBy')}</p>
+          <p className="text-xs md:text-sm text-white/30">{t('common.poweredBy')}</p>
           {usePolling && (
-            <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-500">
-              <div className="h-2 w-2 rounded-full bg-yellow-600 dark:bg-yellow-500 animate-pulse" />
+            <div className="flex items-center gap-2 text-xs text-yellow-400/80">
+              <div className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
               {t('connection.pollingMode')}
             </div>
           )}
           {!isConnected && !usePolling && sseError && (
-            <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-500">
-              <div className="h-2 w-2 rounded-full bg-red-600 dark:bg-red-500" />
+            <div className="flex items-center gap-2 text-xs text-red-400/80">
+              <div className="h-2 w-2 rounded-full bg-red-400" />
               {t('connection.disconnected')}
             </div>
           )}
           {isConnected && (
-            <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-500">
-              <div className="h-2 w-2 rounded-full bg-green-600 dark:bg-green-500" />
+            <div className="flex items-center gap-2 text-xs text-emerald-400/80">
+              <div className="h-2 w-2 rounded-full bg-emerald-400" />
               {t('connection.connected')}
             </div>
           )}

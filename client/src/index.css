@@ -308,6 +308,34 @@
     }
   }
 
+  /* P2-12: Dark signage board */
+  .board-dark-bg {
+    background: linear-gradient(170deg, #0a0e1a 0%, #111827 40%, #0f172a 100%);
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .board-number-hero-dark {
+    font-size: 10rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    line-height: 1;
+    color: #f0f9ff;
+    text-shadow: 0 0 40px rgba(56, 189, 248, 0.4), 0 0 80px rgba(56, 189, 248, 0.15);
+    transition: transform 0.3s ease;
+  }
+  @media (min-width: 768px) {
+    .board-number-hero-dark {
+      font-size: 14rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .board-number-hero-dark {
+      font-size: 18rem;
+    }
+  }
+
   .board-number-flash {
     animation: number-flash 1.5s ease;
   }
@@ -319,5 +347,52 @@
     45% { transform: scale(1.05); }
     60% { transform: scale(1); }
     100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* P2-11: Global micro-interactions */
+  .btn-press {
+    transition: transform 0.15s ease;
+  }
+  .btn-press:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* Smooth page transitions for route changes */
+  .page-enter {
+    animation: page-fade-in 0.35s ease-out;
+  }
+
+  @keyframes page-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Ticket card status change pulse */
+  .status-change-pulse {
+    animation: status-pulse 0.6s ease;
+  }
+
+  @keyframes status-pulse {
+    0% { box-shadow: 0 0 0 0 oklch(0.55 0.18 250 / 0.4); }
+    70% { box-shadow: 0 0 0 10px oklch(0.55 0.18 250 / 0); }
+    100% { box-shadow: 0 0 0 0 oklch(0.55 0.18 250 / 0); }
+  }
+
+  /* Skeleton shimmer */
+  .skeleton-shimmer {
+    background: linear-gradient(90deg, transparent 0%, oklch(0.9 0.01 250 / 0.4) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 }
