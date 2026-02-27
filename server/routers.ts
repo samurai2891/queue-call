@@ -592,10 +592,13 @@ const ticketRouter = router({
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Intake is paused' });
       }
 
-      // 営業時間チェック
-      const bhCheck = checkBusinessHours(store.settings?.businessHours);
-      if (!bhCheck.isOpen) {
-        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Outside business hours' });
+      // 営業時間チェック（オーバーライド有効時はスキップ）
+      const bhOverride = store.settings?.businessHours?.override === true;
+      if (!bhOverride) {
+        const bhCheck = checkBusinessHours(store.settings?.businessHours);
+        if (!bhCheck.isOpen) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Outside business hours' });
+        }
       }
 
       const ipAddress = getRequestIp(ctx.req);
@@ -802,10 +805,13 @@ const ticketRouter = router({
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Intake is paused' });
       }
 
-      // 営業時間チェック
-      const bhCheck = checkBusinessHours(store.settings?.businessHours);
-      if (!bhCheck.isOpen) {
-        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Outside business hours' });
+      // 営業時間チェック（オーバーライド有効時はスキップ）
+      const bhOverrideManual = store.settings?.businessHours?.override === true;
+      if (!bhOverrideManual) {
+        const bhCheck = checkBusinessHours(store.settings?.businessHours);
+        if (!bhCheck.isOpen) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Outside business hours' });
+        }
       }
 
       const ticket = await db.createTicket({
@@ -1255,6 +1261,44 @@ const ticketRouter = router({
       broadcastIntakeStatus(input.storeId, input.status);
 
       return { success: true };
+    }),
+
+  // Toggle business hours override (allow intake outside business hours)
+  toggleBusinessHoursOverride: publicProcedure
+    .input(z.object({
+      sessionToken: z.string(),
+      storeId: z.number(),
+      override: z.boolean(),
+    }))
+    .mutation(async ({ input }) => {
+      const session = await db.getStaffSession(input.sessionToken);
+      if (!session || session.storeId !== input.storeId) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
+      }
+
+      const store = await db.getStoreById(input.storeId);
+      if (!store) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+
+      const updatedBusinessHours = {
+        ...store.settings?.businessHours,
+        override: input.override,
+      };
+
+      await db.updateStoreSettings(input.storeId, {
+        businessHours: updatedBusinessHours,
+      });
+
+      // Broadcast queue update so customer screens refresh
+      const waitingCount = await db.getWaitingCount(input.storeId);
+      const calledTicket = await db.getCalledTicket(input.storeId);
+      broadcastQueueUpdate(input.storeId, {
+        currentNumber: calledTicket?.number || 0,
+        waitingCount,
+      });
+
+      return { success: true, override: input.override };
     }),
 
   // Checkin (public) - 後方互換性のため残す

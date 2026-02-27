@@ -210,4 +210,44 @@ describe('Business Hours', () => {
       expect(getDayName(0, 'fr')).toBe('日');
     });
   });
+
+  describe('Business Hours Override', () => {
+    it('override flag should not affect checkBusinessHours (it is checked at API level)', () => {
+      // checkBusinessHours does not check override; it only checks time-based rules
+      // The override is handled at the API layer in routers.ts
+      const testDate = new Date('2026-02-27T13:00:00Z'); // Friday 22:00 JST (after close)
+      const config: BusinessHoursConfig = {
+        enabled: true,
+        timezone: 'Asia/Tokyo',
+        override: true, // override is set but checkBusinessHours ignores it
+        schedule: {
+          '5': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+        },
+      };
+      const result = checkBusinessHours(config, testDate);
+      // checkBusinessHours still returns closed because it only checks time
+      expect(result.isOpen).toBe(false);
+      expect(result.reason).toBe('after_close');
+    });
+
+    it('override flag should be part of BusinessHoursConfig type', () => {
+      const config: BusinessHoursConfig = {
+        enabled: true,
+        timezone: 'Asia/Tokyo',
+        override: false,
+        schedule: {
+          '0': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+        },
+      };
+      expect(config.override).toBe(false);
+    });
+
+    it('override defaults to undefined when not set', () => {
+      const config: BusinessHoursConfig = {
+        enabled: true,
+        timezone: 'Asia/Tokyo',
+      };
+      expect(config.override).toBeUndefined();
+    });
+  });
 });

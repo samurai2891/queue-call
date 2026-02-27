@@ -47,6 +47,7 @@ import { toast } from 'sonner';
 import { useSSE } from '@/hooks/useSSE';
 import { AnimatedPage, AnimatedCard } from '@/components/AnimatedPage';
 import { RATE_LIMITED_ERR_MSG } from '@shared/const';
+import { checkBusinessHours } from '../../../../shared/businessHours';
 import type { Locale } from '@/contexts/LocaleContext';
 
 
@@ -91,6 +92,7 @@ function StaffContent() {
   const [manualPartySize, setManualPartySize] = useState(2);
   const [manualNote, setManualNote] = useState('');
   const [showManualForm, setShowManualForm] = useState(false);
+  const [businessHoursOverride, setBusinessHoursOverride] = useState(false);
 
 
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
@@ -134,6 +136,7 @@ function StaffContent() {
   useEffect(() => {
     if (store) {
       setIntakeStatus(store.intakeStatus as 'open' | 'paused');
+      setBusinessHoursOverride(store.settings?.businessHours?.override === true);
     }
   }, [store]);
 
@@ -270,6 +273,20 @@ function StaffContent() {
     },
   });
 
+  const toggleOverrideMutation = trpc.staff.toggleBusinessHoursOverride.useMutation({
+    onSuccess: (data) => {
+      setBusinessHoursOverride(data.override);
+      toast.success(
+        data.override
+          ? t('staff.businessHoursOverrideOn')
+          : t('staff.businessHoursOverrideOff')
+      );
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+    },
+  });
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!store || !pin) return;
@@ -364,6 +381,16 @@ function StaffContent() {
     const newStatus = intakeStatus === 'open' ? 'paused' : 'open';
     toggleIntakeMutation.mutate({ sessionToken, storeId: store.id, status: newStatus });
   };
+
+  const handleToggleOverride = (checked: boolean) => {
+    if (!sessionToken || !store) return;
+    toggleOverrideMutation.mutate({ sessionToken, storeId: store.id, override: checked });
+  };
+
+  // Business hours status
+  const businessHoursEnabled = store?.settings?.businessHours?.enabled === true;
+  const businessHoursStatus = businessHoursEnabled ? checkBusinessHours(store?.settings?.businessHours as any) : null;
+  const isOutsideBusinessHours = businessHoursStatus ? !businessHoursStatus.isOpen : false;
 
   const getStatusBadge = (status: TicketStatus) => {
     const variants: Record<TicketStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
@@ -602,6 +629,39 @@ function StaffContent() {
             )}
           </Button>
         </div>
+
+        {/* Business Hours Override — 営業時間外受付許可 */}
+        {businessHoursEnabled && isOutsideBusinessHours && (
+          <div className="flex items-center justify-between p-3 bg-card rounded-lg border border-warning/50">
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-warning" />
+                <span className="text-sm font-medium">{t('staff.businessHoursOverride')}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {businessHoursOverride
+                  ? t('staff.businessHoursOverrideOnDesc')
+                  : t('staff.businessHoursOverrideOffDesc')}
+              </p>
+            </div>
+            <Switch
+              checked={businessHoursOverride}
+              onCheckedChange={handleToggleOverride}
+              disabled={toggleOverrideMutation.isPending}
+            />
+          </div>
+        )}
+
+        {/* Business Hours Override Active Banner */}
+        {businessHoursEnabled && businessHoursOverride && (
+          <Alert className="border-warning/50 bg-warning/5">
+            <AlertCircle className="h-4 w-4 text-warning" />
+            <AlertTitle className="text-warning">{t('staff.businessHoursOverrideActive')}</AlertTitle>
+            <AlertDescription className="text-xs">
+              {t('staff.businessHoursOverrideActiveDesc')}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Manual Add — 折りたたみ */}
         <div className="bg-card rounded-lg border">

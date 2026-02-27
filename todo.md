@@ -1169,3 +1169,12 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] KioskDisplay画面で時間外は閉店メッセージ画面を表示
 - [x] 多言語対応（翻訳キー追加 5言語）
 - [x] テスト追加（business-hours.test.ts: 19件パス、全172件パス）
+
+### P3-5b: スタッフ画面への営業時間外受付許可トグル（完了）
+- [x] StoreSettingsにbusinessHoursOverride（営業時間外受付許可フラグ）を追加
+- [x] 営業時間外受付許可の更新API追加（toggleBusinessHoursOverride、スタッフ権限）
+- [x] 営業時間チェックロジックにオーバーライド判定を追加（ticket.create, staffTicket.createManual）
+- [x] Staff画面に「営業時間外受付許可」トグルUI追加（営業時間外のみ表示、バナー付き）
+- [x] 顧客向け画面（StoreTop, JoinQueue, KioskDisplay）でオーバーライド時は受付可能に（API層で制御）
+- [x] 多言語対応（翻訳キー追加 5言語×7キー=35エントリ）
+- [x] テスト追加（business-hours.test.ts: 22件パス、全175件パス、TSエラーゼロ）

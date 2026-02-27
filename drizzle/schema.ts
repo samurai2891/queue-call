@@ -147,6 +147,7 @@ export interface StoreSettings {
   businessHours?: {
     enabled?: boolean;         // 営業時間制御の有効/無効
     timezone?: string;         // タイムゾーン（例: "Asia/Tokyo"）
+    override?: boolean;        // 営業時間外受付許可（スタッフが手動でON/OFF）
     schedule?: {
       [dayOfWeek: string]: {   // "0"=日曜〜"6"=土曜
         isOpen: boolean;       // その曜日が営業日か

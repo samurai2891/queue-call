@@ -12,6 +12,7 @@ export interface DaySchedule {
 export interface BusinessHoursConfig {
   enabled?: boolean;
   timezone?: string;
+  override?: boolean;  // 営業時間外受付許可（スタッフが手動でON/OFF）
   schedule?: {
     [dayOfWeek: string]: DaySchedule;
   };
