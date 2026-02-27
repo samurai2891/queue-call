@@ -1,5 +1,5 @@
 import { useParams, useLocation } from 'wouter';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
@@ -15,6 +15,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { BrandThemeProvider } from '@/components/BrandThemeProvider';
 import { toast } from 'sonner';
 import { RATE_LIMITED_ERR_MSG } from '@shared/const';
+import { checkBusinessHours, getTodayBusinessHoursText } from '../../../../shared/businessHours';
 import type { Locale } from '@/contexts/LocaleContext';
 
 
@@ -120,7 +121,18 @@ function JoinQueueContent() {
 
   const isPaused = store.intakeStatus === 'paused';
 
-  if (isPaused) {
+  // Business hours check
+  const businessHoursStatus = useMemo(() => {
+    return checkBusinessHours(store.settings?.businessHours as any);
+  }, [store.settings?.businessHours]);
+
+  const todayHoursText = useMemo(() => {
+    return getTodayBusinessHoursText(store.settings?.businessHours as any);
+  }, [store.settings?.businessHours]);
+
+  const isOutsideBusinessHours = !businessHoursStatus.isOpen;
+
+  if (isPaused || isOutsideBusinessHours) {
     return (
       <div className="min-h-screen flex flex-col">
         <header className="p-4 flex justify-between items-center">
@@ -132,8 +144,27 @@ function JoinQueueContent() {
         <main className="flex-1 container flex flex-col items-center justify-center gap-4 py-8">
           <AnimatedPage variant="zoom-fade" delay={100}>
             <div className="flex flex-col items-center gap-4">
-              <AlertCircle className="h-16 w-16 text-warning" />
-              <h1 className="text-2xl font-bold">{t('store.intakePaused')}</h1>
+              {isOutsideBusinessHours ? (
+                <>
+                  <Clock className="h-16 w-16 text-destructive" />
+                  <h1 className="text-2xl font-bold">{t('store.outsideBusinessHours')}</h1>
+                  <p className="text-muted-foreground text-center max-w-sm">
+                    {businessHoursStatus.reason === 'closed_day'
+                      ? t('store.closedDayMessage')
+                      : t('store.closedMessage')}
+                  </p>
+                  {todayHoursText && (
+                    <p className="text-sm text-muted-foreground">
+                      {t('store.businessHoursToday')}: {todayHoursText}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-16 w-16 text-warning" />
+                  <h1 className="text-2xl font-bold">{t('store.intakePaused')}</h1>
+                </>
+              )}
               <Button variant="outline" onClick={() => navigate(`/s/${params.storeSlug}`)}>
                 {t('common.back')}
               </Button>

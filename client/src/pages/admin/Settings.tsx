@@ -571,6 +571,19 @@ function SettingsContent() {
     joinNotice: '',
     ticketMessage: '',
     kioskMessage: '',
+    
+    // Business Hours
+    businessHoursEnabled: false,
+    businessHoursTimezone: 'Asia/Tokyo',
+    businessHoursSchedule: {
+      '0': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+      '1': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+      '2': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+      '3': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+      '4': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+      '5': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+      '6': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+    } as Record<string, { isOpen: boolean; openTime: string; closeTime: string }>,
   });
 
   const [newMenuItem, setNewMenuItem] = useState<MenuItemDraft>({
@@ -775,6 +788,19 @@ function SettingsContent() {
         joinNotice: settings.customMessages?.joinNotice || '',
         ticketMessage: settings.customMessages?.ticketMessage || '',
         kioskMessage: settings.customMessages?.kioskMessage || '',
+        
+        // Business Hours
+        businessHoursEnabled: settings.businessHours?.enabled ?? false,
+        businessHoursTimezone: settings.businessHours?.timezone || 'Asia/Tokyo',
+        businessHoursSchedule: settings.businessHours?.schedule || {
+          '0': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+          '1': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+          '2': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+          '3': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+          '4': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+          '5': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+          '6': { isOpen: true, openTime: '09:00', closeTime: '21:00' },
+        },
       });
     }
   }, [store]);
@@ -951,6 +977,11 @@ function SettingsContent() {
         joinNotice: formData.joinNotice || undefined,
         ticketMessage: formData.ticketMessage || undefined,
         kioskMessage: formData.kioskMessage || undefined,
+      },
+      businessHours: {
+        enabled: formData.businessHoursEnabled,
+        timezone: formData.businessHoursTimezone,
+        schedule: formData.businessHoursSchedule,
       },
     };
 
@@ -1570,6 +1601,7 @@ function SettingsContent() {
     { id: 'reservation', label: t('settings.reservation'), icon: CalendarDays },
     { id: 'branding', label: t('settings.branding'), icon: Palette },
     { id: 'messages', label: t('settings.customMessages'), icon: MessageSquare },
+    { id: 'businessHours', label: t('settings.businessHours'), icon: Clock },
     { id: 'qrcode', label: t('settings.qrcode'), icon: QrCode },
     { id: 'security', label: t('settings.security'), icon: Shield },
   ];
@@ -3433,6 +3465,160 @@ function SettingsContent() {
                     {t('settings.messageCharCount').replace('{count}', String(formData.kioskMessage.length))}
                   </p>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Business Hours Settings */}
+          <TabsContent value="businessHours">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  {t('settings.businessHours')}
+                </CardTitle>
+                <CardDescription>{t('settings.businessHoursDescription')}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Enable toggle */}
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-medium">
+                      {t('settings.businessHoursEnabled')}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.businessHoursEnabledHelp')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.businessHoursEnabled}
+                    onCheckedChange={(checked) => setFormData({ ...formData, businessHoursEnabled: checked })}
+                  />
+                </div>
+
+                {formData.businessHoursEnabled && (
+                  <>
+                    {/* Timezone */}
+                    <div className="space-y-2">
+                      <Label className="text-base font-medium">
+                        {t('settings.businessHoursTimezone')}
+                      </Label>
+                      <Select
+                        value={formData.businessHoursTimezone}
+                        onValueChange={(value) => setFormData({ ...formData, businessHoursTimezone: value })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Asia/Tokyo">Asia/Tokyo (JST, UTC+9)</SelectItem>
+                          <SelectItem value="Asia/Seoul">Asia/Seoul (KST, UTC+9)</SelectItem>
+                          <SelectItem value="Asia/Shanghai">Asia/Shanghai (CST, UTC+8)</SelectItem>
+                          <SelectItem value="Asia/Hong_Kong">Asia/Hong_Kong (HKT, UTC+8)</SelectItem>
+                          <SelectItem value="Asia/Taipei">Asia/Taipei (CST, UTC+8)</SelectItem>
+                          <SelectItem value="Asia/Singapore">Asia/Singapore (SGT, UTC+8)</SelectItem>
+                          <SelectItem value="Asia/Bangkok">Asia/Bangkok (ICT, UTC+7)</SelectItem>
+                          <SelectItem value="America/New_York">America/New_York (EST, UTC-5)</SelectItem>
+                          <SelectItem value="America/Los_Angeles">America/Los_Angeles (PST, UTC-8)</SelectItem>
+                          <SelectItem value="Europe/London">Europe/London (GMT, UTC+0)</SelectItem>
+                          <SelectItem value="Europe/Paris">Europe/Paris (CET, UTC+1)</SelectItem>
+                          <SelectItem value="Australia/Sydney">Australia/Sydney (AEST, UTC+10)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <Separator />
+
+                    {/* Weekly Schedule */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-base font-medium">
+                          {t('settings.businessHoursSchedule')}
+                        </Label>
+                      </div>
+                      <div className="space-y-2">
+                        {[0, 1, 2, 3, 4, 5, 6].map((day) => {
+                          const dayKey = String(day);
+                          const dayData = formData.businessHoursSchedule[dayKey] || { isOpen: true, openTime: '09:00', closeTime: '21:00' };
+                          const dayNames = ['day.sun', 'day.mon', 'day.tue', 'day.wed', 'day.thu', 'day.fri', 'day.sat'];
+                          return (
+                            <div key={day} className="flex items-center gap-3 rounded-lg border p-3">
+                              <div className="w-10 text-center font-medium text-sm">
+                                {t(dayNames[day] as any)}
+                              </div>
+                              <Switch
+                                checked={dayData.isOpen}
+                                onCheckedChange={(checked) => {
+                                  setFormData({
+                                    ...formData,
+                                    businessHoursSchedule: {
+                                      ...formData.businessHoursSchedule,
+                                      [dayKey]: { ...dayData, isOpen: checked },
+                                    },
+                                  });
+                                }}
+                              />
+                              {dayData.isOpen ? (
+                                <div className="flex items-center gap-2 flex-1">
+                                  <Input
+                                    type="time"
+                                    value={dayData.openTime}
+                                    onChange={(e) => {
+                                      setFormData({
+                                        ...formData,
+                                        businessHoursSchedule: {
+                                          ...formData.businessHoursSchedule,
+                                          [dayKey]: { ...dayData, openTime: e.target.value },
+                                        },
+                                      });
+                                    }}
+                                    className="w-28"
+                                  />
+                                  <span className="text-muted-foreground">~</span>
+                                  <Input
+                                    type="time"
+                                    value={dayData.closeTime}
+                                    onChange={(e) => {
+                                      setFormData({
+                                        ...formData,
+                                        businessHoursSchedule: {
+                                          ...formData.businessHoursSchedule,
+                                          [dayKey]: { ...dayData, closeTime: e.target.value },
+                                        },
+                                      });
+                                    }}
+                                    className="w-28"
+                                  />
+                                  {day === 0 && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="ml-auto text-xs"
+                                      onClick={() => {
+                                        const sundayData = formData.businessHoursSchedule['0'] || { isOpen: true, openTime: '09:00', closeTime: '21:00' };
+                                        const newSchedule: Record<string, { isOpen: boolean; openTime: string; closeTime: string }> = {};
+                                        for (let d = 0; d <= 6; d++) {
+                                          newSchedule[String(d)] = { ...sundayData };
+                                        }
+                                        setFormData({ ...formData, businessHoursSchedule: newSchedule });
+                                      }}
+                                    >
+                                      {t('settings.businessHoursCopyToAll')}
+                                    </Button>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">
+                                  {t('settings.businessHoursClosedDay')}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

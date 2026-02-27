@@ -4,10 +4,11 @@ import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Minus, Plus, Printer, CheckCircle, RotateCcw, AlertCircle, Globe, QrCode } from 'lucide-react';
+import { Minus, Plus, Printer, CheckCircle, RotateCcw, AlertCircle, Globe, QrCode, Clock } from 'lucide-react';
 import { AnimatedPage } from '@/components/AnimatedPage';
 import { BrandThemeProvider } from '@/components/BrandThemeProvider';
 import { RATE_LIMITED_ERR_MSG } from '@shared/const';
+import { checkBusinessHours, getTodayBusinessHoursText } from '../../../../shared/businessHours';
 import type { Locale } from '@/contexts/LocaleContext';
 
 
@@ -123,11 +124,48 @@ function KioskDisplayContent() {
 
   const isPaused = store.intakeStatus === 'paused';
 
+  // Business hours check
+  const businessHoursStatus = useMemo(() => {
+    return checkBusinessHours(store.settings?.businessHours as any);
+  }, [store.settings?.businessHours]);
+
+  const todayHoursText = useMemo(() => {
+    return getTodayBusinessHoursText(store.settings?.businessHours as any);
+  }, [store.settings?.businessHours]);
+
+  const isOutsideBusinessHours = !businessHoursStatus.isOpen;
+
   if (isPaused) {
     return (
       <div className="kiosk-mode flex flex-col items-center justify-center gap-6 p-8 bg-warning/5">
         <AlertCircle className="h-32 w-32 text-warning" />
         <h1 className="text-5xl font-bold text-center">{t('store.intakePaused')}</h1>
+      </div>
+    );
+  }
+
+  if (isOutsideBusinessHours) {
+    return (
+      <div className="kiosk-mode flex flex-col items-center justify-center gap-8 p-8">
+        <AnimatedPage variant="zoom-fade" delay={50}>
+          <div className="flex flex-col items-center gap-4">
+            {store.settings?.branding?.logoUrl && (
+              <img src={store.settings.branding.logoUrl} alt={store.name} className="h-20 w-20 rounded-2xl object-contain" />
+            )}
+            <Clock className="h-32 w-32 text-destructive" />
+            <h1 className="text-5xl font-bold text-center">{t('store.outsideBusinessHours')}</h1>
+            <p className="text-2xl text-muted-foreground text-center max-w-lg">
+              {businessHoursStatus.reason === 'closed_day'
+                ? t('store.closedDayMessage')
+                : t('store.closedMessage')}
+            </p>
+            {todayHoursText && (
+              <p className="text-xl text-muted-foreground">
+                {t('store.businessHoursToday')}: {todayHoursText}
+              </p>
+            )}
+          </div>
+        </AnimatedPage>
       </div>
     );
   }

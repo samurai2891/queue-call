@@ -10,6 +10,7 @@ import * as db from "./db";
 import { notifyTicketCalled } from "./notifications";
 import { broadcastQueueUpdate, broadcastTicketUpdate, broadcastIntakeStatus } from "./sse";
 import { createCheckoutSession, getSmsBalance, getSmsTransactions, CHARGE_PLANS, SMS_COST_PER_MESSAGE } from "./stripe";
+import { checkBusinessHours } from "../shared/businessHours";
 
 
 
@@ -170,6 +171,7 @@ const storeRouter = router({
           board: store.settings?.board,
           branding: store.settings?.branding,
           customMessages: store.settings?.customMessages,
+          businessHours: store.settings?.businessHours,
         },
       };
     }),
@@ -198,6 +200,7 @@ const storeRouter = router({
           board: store.settings?.board,
           branding: store.settings?.branding,
           customMessages: store.settings?.customMessages,
+          businessHours: store.settings?.businessHours,
         },
       };
     }),
@@ -226,6 +229,7 @@ const storeRouter = router({
           board: store.settings?.board,
           branding: store.settings?.branding,
           customMessages: store.settings?.customMessages,
+          businessHours: store.settings?.businessHours,
         },
       };
     }),
@@ -588,6 +592,12 @@ const ticketRouter = router({
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Intake is paused' });
       }
 
+      // 営業時間チェック
+      const bhCheck = checkBusinessHours(store.settings?.businessHours);
+      if (!bhCheck.isOpen) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Outside business hours' });
+      }
+
       const ipAddress = getRequestIp(ctx.req);
       const source = input.source ?? 'web';
       const isKiosk = source === 'kiosk';
@@ -790,6 +800,12 @@ const ticketRouter = router({
       }
       if (store.intakeStatus === 'paused') {
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Intake is paused' });
+      }
+
+      // 営業時間チェック
+      const bhCheck = checkBusinessHours(store.settings?.businessHours);
+      if (!bhCheck.isOpen) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Outside business hours' });
       }
 
       const ticket = await db.createTicket({

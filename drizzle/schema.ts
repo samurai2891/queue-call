@@ -144,6 +144,17 @@ export interface StoreSettings {
     ticketMessage?: string;   // Ticket画面のチケットメッセージ
     kioskMessage?: string;    // KioskDisplay画面のメッセージ
   };
+  businessHours?: {
+    enabled?: boolean;         // 営業時間制御の有効/無効
+    timezone?: string;         // タイムゾーン（例: "Asia/Tokyo"）
+    schedule?: {
+      [dayOfWeek: string]: {   // "0"=日曜〜"6"=土曜
+        isOpen: boolean;       // その曜日が営業日か
+        openTime: string;      // 開店時間（HH:mm）
+        closeTime: string;     // 閉店時間（HH:mm）
+      };
+    };
+  };
 }
 
 /**

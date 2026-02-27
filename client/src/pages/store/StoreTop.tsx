@@ -12,7 +12,8 @@ import { AnimatedPage, AnimatedCard } from '@/components/AnimatedPage';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { BrandThemeProvider } from '@/components/BrandThemeProvider';
 import { useSSE } from '@/hooks/useSSE';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { checkBusinessHours, getTodayBusinessHoursText } from '../../../../shared/businessHours';
 import type { Locale } from '@/contexts/LocaleContext';
 
 type CrowdLevel = 'empty' | 'low' | 'moderate' | 'busy' | 'crowded';
@@ -97,6 +98,18 @@ function StoreTopContent() {
 
   const isPaused = store.intakeStatus === 'paused';
 
+  // Business hours check
+  const businessHoursStatus = useMemo(() => {
+    return checkBusinessHours(store.settings?.businessHours as any);
+  }, [store.settings?.businessHours]);
+
+  const todayHoursText = useMemo(() => {
+    return getTodayBusinessHoursText(store.settings?.businessHours as any);
+  }, [store.settings?.businessHours]);
+
+  const isOutsideBusinessHours = !businessHoursStatus.isOpen;
+  const isEffectivelyPaused = isPaused || isOutsideBusinessHours;
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
@@ -122,6 +135,33 @@ function StoreTopContent() {
               <p className="text-muted-foreground mt-1 max-w-sm">{store.settings.customMessages.welcomeMessage}</p>
             ) : (
               <p className="text-muted-foreground mt-1">{t('store.welcome')}</p>
+            )}
+
+            {/* Business Hours Badge */}
+            {store.settings?.businessHours?.enabled && (
+              <div className="flex flex-col items-center gap-1 mt-2">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
+                  businessHoursStatus.isOpen
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                }`}>
+                  <span className={`h-2 w-2 rounded-full ${
+                    businessHoursStatus.isOpen ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                  }`} />
+                  {businessHoursStatus.isOpen ? t('store.nowOpen') : t('store.nowClosed')}
+                </span>
+                {todayHoursText && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {t('store.businessHoursToday')}: {todayHoursText}
+                  </span>
+                )}
+                {businessHoursStatus.reason === 'closed_day' && (
+                  <span className="text-xs text-muted-foreground">
+                    {t('store.closedDayMessage')}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </AnimatedPage>
@@ -178,6 +218,13 @@ function StoreTopContent() {
                   <p className="text-warning font-medium">{t('store.intakePaused')}</p>
                 </div>
               )}
+
+              {/* Outside Business Hours */}
+              {isOutsideBusinessHours && !isPaused && (
+                <div className="mt-6 p-3 bg-destructive/10 rounded-lg text-center">
+                  <p className="text-destructive font-medium">{t('store.closedMessage')}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </AnimatedCard>
@@ -189,7 +236,7 @@ function StoreTopContent() {
               <Button 
                 size="lg" 
                 className="w-full h-14 text-lg active:scale-[0.97] transition-transform"
-                disabled={isPaused}
+                disabled={isEffectivelyPaused}
               >
                 <ClipboardList className="mr-2 h-5 w-5" />
                 {t('store.joinQueue')}
