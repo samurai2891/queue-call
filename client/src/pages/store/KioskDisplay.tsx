@@ -98,6 +98,15 @@ function KioskDisplayContent() {
     return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(ticketUrl)}&margin=8`;
   }, [issuedTicket, params.storeSlug]);
 
+  // Business hours check (must be before early returns)
+  const businessHoursStatus = useMemo(() => {
+    return checkBusinessHours(store?.settings?.businessHours as any);
+  }, [store?.settings?.businessHours]);
+
+  const todayHoursText = useMemo(() => {
+    return getTodayBusinessHoursText(store?.settings?.businessHours as any);
+  }, [store?.settings?.businessHours]);
+
   if (storeLoading) {
     return (
       <div className="kiosk-mode flex items-center justify-center">
@@ -123,16 +132,6 @@ function KioskDisplayContent() {
 
 
   const isPaused = store.intakeStatus === 'paused';
-
-  // Business hours check
-  const businessHoursStatus = useMemo(() => {
-    return checkBusinessHours(store.settings?.businessHours as any);
-  }, [store.settings?.businessHours]);
-
-  const todayHoursText = useMemo(() => {
-    return getTodayBusinessHoursText(store.settings?.businessHours as any);
-  }, [store.settings?.businessHours]);
-
   const isOutsideBusinessHours = !businessHoursStatus.isOpen;
 
   if (isPaused) {

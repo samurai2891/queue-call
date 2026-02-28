@@ -1561,3 +1561,17 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] キオスク・掲示板・SMS通知の確認 — OK (BUG-003修正)
 - [x] プラン・決済・多言語・ダークモードの確認 — OK (StripeはSandbox未クレームのため決済フロー未テスト)
 - [x] バグレポート作成・修正実施 — 3件発見・3件修正完了
+
+---
+
+## リリース前最終チェック
+- [x] TypeScriptコンパイルエラー: 0件
+- [x] 本番ビルド: 成功
+- [x] テスト: 31ファイル・586テスト全パス
+- [x] セキュリティ: フロントエンドにシークレット漏れなし、スタッフ操作はsessionTokenで保護済み
+- [x] SEO/OGP: title, description, og:image, twitter:card設定済み
+- [x] favicon: ico, png, apple-touch-icon存在確認
+- [x] robots.txt: 新規作成（/admin/と/api/をDisallow）
+- [x] Reactフックルール違反: JoinQueue.tsx, KioskDisplay.tsxの追加修正完了（BUG-004, BUG-005）
+- [ ] Stripe Sandboxクレーム — ユーザー操作必要（期限3/14）
+- [ ] SMS実送信テスト — Twilio設定済み電話番号で確認必要

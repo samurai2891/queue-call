@@ -38,6 +38,15 @@ function JoinQueueContent() {
     { enabled: !!store?.id, refetchInterval: 10000 }
   );
 
+  // Business hours check (must be before early returns)
+  const businessHoursStatus = useMemo(() => {
+    return checkBusinessHours(store?.settings?.businessHours as any);
+  }, [store?.settings?.businessHours]);
+
+  const todayHoursText = useMemo(() => {
+    return getTodayBusinessHoursText(store?.settings?.businessHours as any);
+  }, [store?.settings?.businessHours]);
+
   const createTicketMutation = trpc.ticket.create.useMutation({
     onSuccess: (ticket) => {
       navigate(`/s/${params.storeSlug}/ticket/${ticket.ticketToken}`);
@@ -120,16 +129,6 @@ function JoinQueueContent() {
   }
 
   const isPaused = store.intakeStatus === 'paused';
-
-  // Business hours check
-  const businessHoursStatus = useMemo(() => {
-    return checkBusinessHours(store.settings?.businessHours as any);
-  }, [store.settings?.businessHours]);
-
-  const todayHoursText = useMemo(() => {
-    return getTodayBusinessHoursText(store.settings?.businessHours as any);
-  }, [store.settings?.businessHours]);
-
   const isOutsideBusinessHours = !businessHoursStatus.isOpen;
 
   if (isPaused || isOutsideBusinessHours) {
