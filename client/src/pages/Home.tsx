@@ -13,8 +13,13 @@ import {
   ArrowRight,
   Store,
   Loader2,
-  BarChart3
+  BarChart3,
+  Check,
+  X,
+  MessageSquare,
+  Zap
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { getLoginUrl } from "@/const";
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
@@ -224,6 +229,183 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Pricing Section */}
+      <section className="container py-16 md:py-24" id="pricing">
+        <AnimatedPage variant="fade-up" delay={100}>
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">シンプルな料金プラン</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              店舗の規模に合わせて選べる3つのプラン。
+              すべてのプランでWeb Push通知が無料で使えます。
+            </p>
+          </div>
+        </AnimatedPage>
+
+        {/* Plan Cards */}
+        <div className="grid gap-6 md:grid-cols-3 max-w-5xl mx-auto">
+          {/* Free Plan */}
+          <AnimatedCard delay={200}>
+            <Card className="h-full flex flex-col">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl">Free</CardTitle>
+                <CardDescription>まずは試してみたい方に</CardDescription>
+                <div className="mt-4">
+                  <span className="text-4xl font-bold">¥0</span>
+                  <span className="text-muted-foreground ml-1">/月</span>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col">
+                <ul className="space-y-3 flex-1">
+                  <PlanFeature included>月間50人まで</PlanFeature>
+                  <PlanFeature included>Web Push通知</PlanFeature>
+                  <PlanFeature included>多言語対応（5言語）</PlanFeature>
+                  <PlanFeature included>スタッフ1名</PlanFeature>
+                  <PlanFeature included>基本分析（当日のみ）</PlanFeature>
+                  <PlanFeature>SMS通知</PlanFeature>
+                  <PlanFeature>予約機能</PlanFeature>
+                  <PlanFeature>営業時間制御</PlanFeature>
+                  <PlanFeature>ブランディング</PlanFeature>
+                </ul>
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="w-full mt-6 active:scale-[0.97] transition-transform"
+                  onClick={() => window.location.href = getLoginUrl()}
+                >
+                  無料で始める
+                </Button>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+
+          {/* Standard Plan */}
+          <AnimatedCard delay={300}>
+            <Card className="h-full flex flex-col border-primary border-2 relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <Badge className="bg-primary text-primary-foreground px-3 py-1 text-sm">
+                  おすすめ
+                </Badge>
+              </div>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl">Standard</CardTitle>
+                <CardDescription>本格的に運用したい店舗に</CardDescription>
+                <div className="mt-4">
+                  <span className="text-4xl font-bold">¥1,500</span>
+                  <span className="text-muted-foreground ml-1">/月</span>
+                  <p className="text-sm text-muted-foreground mt-1">税込 ¥1,650</p>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col">
+                <ul className="space-y-3 flex-1">
+                  <PlanFeature included highlight>並べる人数 無制限</PlanFeature>
+                  <PlanFeature included>Web Push通知</PlanFeature>
+                  <PlanFeature included>SMS通知（残高別途）</PlanFeature>
+                  <PlanFeature included>予約機能</PlanFeature>
+                  <PlanFeature included>多言語対応（5言語）</PlanFeature>
+                  <PlanFeature included>スタッフ3名</PlanFeature>
+                  <PlanFeature included>分析ダッシュボード（30日間）</PlanFeature>
+                  <PlanFeature included>営業時間制御</PlanFeature>
+                  <PlanFeature included>カスタムカラー</PlanFeature>
+                  <PlanFeature included>メールサポート</PlanFeature>
+                </ul>
+                <Button 
+                  size="lg" 
+                  className="w-full mt-6 active:scale-[0.97] transition-transform"
+                  onClick={() => window.location.href = getLoginUrl()}
+                >
+                  申し込む
+                </Button>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+
+          {/* Pro Plan */}
+          <AnimatedCard delay={400}>
+            <Card className="h-full flex flex-col">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl">Pro</CardTitle>
+                <CardDescription>大規模店舗・チェーン向け</CardDescription>
+                <div className="mt-4">
+                  <span className="text-4xl font-bold">¥3,500</span>
+                  <span className="text-muted-foreground ml-1">/月</span>
+                  <p className="text-sm text-muted-foreground mt-1">税込 ¥3,850</p>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col">
+                <ul className="space-y-3 flex-1">
+                  <PlanFeature included highlight>並べる人数 無制限</PlanFeature>
+                  <PlanFeature included>Web Push通知</PlanFeature>
+                  <PlanFeature included>SMS通知（残高別途）</PlanFeature>
+                  <PlanFeature included>予約機能</PlanFeature>
+                  <PlanFeature included>多言語対応（5言語）</PlanFeature>
+                  <PlanFeature included highlight>スタッフ 無制限</PlanFeature>
+                  <PlanFeature included highlight>分析ダッシュボード（90日間+CSV）</PlanFeature>
+                  <PlanFeature included>営業時間制御</PlanFeature>
+                  <PlanFeature included highlight>フルカスタムブランディング</PlanFeature>
+                  <PlanFeature included highlight>優先メールサポート</PlanFeature>
+                </ul>
+                <Button 
+                  variant="outline"
+                  size="lg" 
+                  className="w-full mt-6 active:scale-[0.97] transition-transform"
+                  onClick={() => window.location.href = getLoginUrl()}
+                >
+                  申し込む
+                </Button>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+        </div>
+
+        {/* SMS Pricing Note */}
+        <AnimatedPage variant="fade-up" delay={500}>
+          <div className="max-w-3xl mx-auto mt-12">
+            <Card className="bg-muted/30">
+              <CardContent className="py-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-2">SMS通知について</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      SMS通知はStandard・Proプランでご利用いただけます。
+                      料金は<span className="font-semibold text-foreground">1通25円</span>のプリペイド方式で、
+                      事前にチャージした残高から消費されます。
+                      Web Push通知はすべてのプランで<span className="font-semibold text-foreground">無料</span>でご利用いただけます。
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </AnimatedPage>
+
+        {/* Comparison with competitors */}
+        <AnimatedPage variant="fade-up" delay={600}>
+          <div className="max-w-3xl mx-auto mt-8">
+            <Card className="bg-muted/30">
+              <CardContent className="py-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Zap className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-2">業界最安クラスの料金</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      一般的な順番待ちシステムは月額5,000円〜22,000円が相場です。
+                      Queue Callは月額<span className="font-semibold text-foreground">1,500円</span>から、
+                      SMS通知・予約機能・分析ダッシュボードなどフル機能をご利用いただけます。
+                      初期費用・解約金は一切かかりません。
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </AnimatedPage>
+      </section>
+
       {/* CTA Section */}
       {!isAuthenticated && (
         <section className="container py-16">
@@ -290,5 +472,28 @@ function FeatureCard({
         </CardContent>
       </Card>
     </AnimatedCard>
+  );
+}
+
+function PlanFeature({ 
+  children, 
+  included = false,
+  highlight = false
+}: { 
+  children: React.ReactNode; 
+  included?: boolean;
+  highlight?: boolean;
+}) {
+  return (
+    <li className="flex items-center gap-2">
+      {included ? (
+        <Check className={`h-4 w-4 shrink-0 ${highlight ? 'text-primary' : 'text-green-600'}`} />
+      ) : (
+        <X className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+      )}
+      <span className={`text-sm ${!included ? 'text-muted-foreground/60' : ''} ${highlight ? 'font-semibold text-primary' : ''}`}>
+        {children}
+      </span>
+    </li>
   );
 }
