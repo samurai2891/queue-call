@@ -1199,3 +1199,9 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] 修正: doneMutation/skipMutationにonMutateで楽観的にチケットをローカルstateから即座に除去
 - [x] 修正: Done/Skip/Recallボタンにdisabled属性を追加し連打防止
 - [x] 修正: 全mutationのonErrorでrefetchWaitingList()を呼びロールバックを保証
+
+### callNext操作の楽観的更新・連打防止（完了）
+- [x] callNextMutationにonMutateで楽観的更新を追加（先頭のWAITINGチケットを即座にCALLEDに変更しwaitingTickets.lengthが減少）
+- [x] 呼び出しボタンにdisabled制御済み（isPending || waitingTickets.length === 0で既に対応済み、楽観的更新でさらに強化）
+- [x] onErrorでrefetchWaitingList()を呼びロールバックを保証
+- [x] TypeScriptエラーゼロ・全195テストパス

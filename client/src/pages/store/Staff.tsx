@@ -190,12 +190,23 @@ function StaffContent() {
   });
 
   const callNextMutation = trpc.staff.callNext.useMutation({
+    onMutate: async () => {
+      // Optimistically move the first WAITING ticket to CALLED status to prevent double-call
+      setTickets(prev => {
+        const firstWaiting = prev.find(t => t.status === 'WAITING');
+        if (!firstWaiting) return prev;
+        return prev.map(t =>
+          t.id === firstWaiting.id ? { ...t, status: 'CALLED' as const } : t
+        );
+      });
+    },
     onSuccess: (ticket) => {
       toast.success(`${t('staff.call')}: #${ticket.number}`);
       refetchWaitingList();
     },
     onError: (error: any) => {
       toast.error(error.message);
+      refetchWaitingList();
     },
   });
 
