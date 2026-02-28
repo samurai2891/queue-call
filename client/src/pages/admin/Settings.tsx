@@ -55,6 +55,8 @@ import {
   Palette,
   RotateCcw,
   Upload,
+  AlertTriangle,
+  XCircle,
 } from 'lucide-react';
 
 import { toast } from 'sonner';
@@ -4362,6 +4364,76 @@ function BillingTab({ store, t }: { store: any; t: (key: string) => string }) {
   });
 
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
+  const [downgradeDialogOpen, setDowngradeDialogOpen] = React.useState(false);
+  const [downgradeTargetPlan, setDowngradeTargetPlan] = React.useState<{ id: string; name: string } | null>(null);
+  const [lostFeatures, setLostFeatures] = React.useState<Array<{ key: string; impact: string }>>([]);
+  const [loadingLostFeatures, setLoadingLostFeatures] = React.useState(false);
+
+  // Determine if selecting a plan is a downgrade
+  const planOrder: Record<string, number> = { free: 0, standard: 1, pro: 2 };
+  const isDowngrade = (targetId: string) => (planOrder[targetId] ?? 0) < (planOrder[planId] ?? 0);
+
+  // Handle plan change button click - show warning for downgrades
+  const handlePlanChange = async (targetPlanId: string, targetPlanName: string) => {
+    if (isDowngrade(targetPlanId)) {
+      setDowngradeTargetPlan({ id: targetPlanId, name: targetPlanName });
+      setLoadingLostFeatures(true);
+      setDowngradeDialogOpen(true);
+      try {
+        const res = await fetch(`/api/trpc/subscription.getLostFeatures?input=${encodeURIComponent(JSON.stringify({ storeId: store.id, targetPlanId }))}`);
+        const data = await res.json();
+        setLostFeatures(data?.result?.data || []);
+      } catch {
+        setLostFeatures([]);
+      } finally {
+        setLoadingLostFeatures(false);
+      }
+    } else {
+      createCheckout.mutate({ storeId: store.id, planId: targetPlanId as any });
+    }
+  };
+
+  // Handle cancel button click - show warning with lost features
+  const handleCancelClick = async () => {
+    setDowngradeTargetPlan({ id: 'free', name: 'Free' });
+    setLoadingLostFeatures(true);
+    setDowngradeDialogOpen(true);
+    try {
+      const res = await fetch(`/api/trpc/subscription.getLostFeatures?input=${encodeURIComponent(JSON.stringify({ storeId: store.id, targetPlanId: 'free' }))}`);
+      const data = await res.json();
+      setLostFeatures(data?.result?.data || []);
+    } catch {
+      setLostFeatures([]);
+    } finally {
+      setLoadingLostFeatures(false);
+    }
+  };
+
+  const confirmDowngrade = () => {
+    if (!downgradeTargetPlan) return;
+    if (downgradeTargetPlan.id === 'free') {
+      cancelSub.mutate({ storeId: store.id });
+    } else {
+      createCheckout.mutate({ storeId: store.id, planId: downgradeTargetPlan.id as any });
+    }
+    setDowngradeDialogOpen(false);
+    setDowngradeTargetPlan(null);
+    setLostFeatures([]);
+  };
+
+  // Lost feature translation map
+  const LOST_FEATURE_LABELS: Record<string, string> = {
+    sms: t('downgrade.lost.sms' as any) || 'SMS通知が利用できなくなります',
+    reservation: t('downgrade.lost.reservation' as any) || '予約機能が利用できなくなります',
+    menuLimit: t('downgrade.lost.menuLimit' as any) || 'メニュー登録が5品までに制限されます',
+    businessHours: t('downgrade.lost.businessHours' as any) || '営業時間制御が利用できなくなります',
+    staffDecrease: t('downgrade.lost.staffDecrease' as any) || 'スタッフアカウント数が制限されます',
+    analyticsReduced: t('downgrade.lost.analyticsReduced' as any) || '分析データの参照期間が短くなります',
+    csvExport: t('downgrade.lost.csvExport' as any) || 'CSVエクスポートが利用できなくなります',
+    customColor: t('downgrade.lost.customColor' as any) || 'カスタムカラーがリセットされます',
+    customLogo: t('downgrade.lost.customLogo' as any) || 'カスタムロゴが利用できなくなります',
+    supportDowngrade: t('downgrade.lost.supportDowngrade' as any) || 'サポートレベルが低下します',
+  };
 
   if (isLoading) {
     return (
@@ -4486,8 +4558,8 @@ function BillingTab({ store, t }: { store: any; t: (key: string) => string }) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCancelDialogOpen(true)}
-                disabled={cancelSub.isPending}
+                onClick={handleCancelClick}
+                disabled={cancelSub.isPending || loadingLostFeatures}
               >
                 {cancelSub.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {t('settings.cancelSubscription')}
@@ -4550,12 +4622,15 @@ function BillingTab({ store, t }: { store: any; t: (key: string) => string }) {
                   {!isCurrent && (
                     <Button
                       className="w-full"
-                      variant={plan.id === 'standard' && planId === 'free' ? 'default' : 'outline'}
-                      onClick={() => createCheckout.mutate({ storeId: store.id, planId: plan.id })}
-                      disabled={createCheckout.isPending}
+                      variant={isDowngrade(plan.id) ? 'outline' : (plan.id === 'standard' && planId === 'free' ? 'default' : 'outline')}
+                      onClick={() => handlePlanChange(plan.id, plan.name)}
+                      disabled={createCheckout.isPending || loadingLostFeatures}
                     >
-                      {createCheckout.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {planId === 'free' ? `${plan.name} ${t('settings.subscribeTo')}` : t('settings.changePlan')}
+                      {(createCheckout.isPending || loadingLostFeatures) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {isDowngrade(plan.id)
+                        ? (t('downgrade.downgradeButton' as any) || `${plan.name}にダウングレード`)
+                        : (planId === 'free' ? `${plan.name} ${t('settings.subscribeTo')}` : t('settings.changePlan'))
+                      }
                     </Button>
                   )}
                 </div>
@@ -4565,25 +4640,73 @@ function BillingTab({ store, t }: { store: any; t: (key: string) => string }) {
         </CardContent>
       </Card>
 
-      {/* Cancel Confirmation Dialog */}
-      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-        <AlertDialogContent>
+      {/* Downgrade / Cancel Warning Dialog */}
+      <AlertDialog open={downgradeDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setDowngradeDialogOpen(false);
+          setDowngradeTargetPlan(null);
+          setLostFeatures([]);
+        }
+      }}>
+        <AlertDialogContent className="sm:max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('settings.cancelSubscription')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('settings.cancelSubscriptionConfirm')}
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30 mb-2">
+              <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <AlertDialogTitle className="text-center">
+              {downgradeTargetPlan?.id === 'free'
+                ? (t('downgrade.cancelTitle' as any) || 'サブスクリプションをキャンセルしますか？')
+                : (t('downgrade.downgradeTitle' as any) || `${downgradeTargetPlan?.name}プランにダウングレードしますか？`)
+              }
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              {downgradeTargetPlan?.id === 'free'
+                ? (t('downgrade.cancelDescription' as any) || '現在の課金期間終了後、Freeプランに戻ります。以下の機能が利用できなくなります。')
+                : (t('downgrade.downgradeDescription' as any) || 'プランを変更すると、以下の機能が利用できなくなります。')
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+
+          {/* Lost features list */}
+          <div className="py-3">
+            {loadingLostFeatures ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : lostFeatures.length > 0 ? (
+              <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+                {lostFeatures.map((feature) => (
+                  <div
+                    key={feature.key}
+                    className="flex items-start gap-3 p-3 rounded-lg bg-destructive/5 border border-destructive/20"
+                  >
+                    <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                    <p className="text-sm text-foreground">
+                      {LOST_FEATURE_LABELS[feature.key] || feature.key}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-2">
+                {t('downgrade.noFeaturesLost' as any) || '失われる機能はありません。'}
+              </p>
+            )}
+          </div>
+
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="sm:flex-1">
+              {t('downgrade.keepCurrentPlan' as any) || '現在のプランを維持'}
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                cancelSub.mutate({ storeId: store.id });
-                setCancelDialogOpen(false);
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDowngrade}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 sm:flex-1"
+              disabled={loadingLostFeatures}
             >
-              {t('settings.cancelSubscription')}
+              {downgradeTargetPlan?.id === 'free'
+                ? (t('downgrade.confirmCancel' as any) || 'キャンセルする')
+                : (t('downgrade.confirmDowngrade' as any) || 'ダウングレードする')
+              }
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

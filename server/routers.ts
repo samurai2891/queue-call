@@ -12,7 +12,7 @@ import { broadcastQueueUpdate, broadcastTicketUpdate, broadcastIntakeStatus } fr
 import { createCheckoutSession, getSmsBalance, getSmsTransactions, getSmsAnalytics, CHARGE_PLANS, SMS_COST_PER_MESSAGE } from "./stripe";
 import { PLANS, createSubscriptionCheckout, getSubscriptionInfo, cancelSubscription, reactivateSubscription, changeSubscriptionPlan, checkAndIncrementMonthlyTicket, type PlanId } from "./subscription";
 import { checkBusinessHours } from "../shared/businessHours";
-import { checkSmsAllowed, checkReservationAllowed, checkMenuLimit, checkStaffLimit, getAnalyticsDaysLimit, checkCsvExportAllowed, checkBrandingAllowed, getPlanLimitsInfo, getBrandingLevel, checkBusinessHoursAllowed, getUnlockedFeatures } from "./plan-limits";
+import { checkSmsAllowed, checkReservationAllowed, checkMenuLimit, checkStaffLimit, getAnalyticsDaysLimit, checkCsvExportAllowed, checkBrandingAllowed, getPlanLimitsInfo, getBrandingLevel, checkBusinessHoursAllowed, getUnlockedFeatures, getLostFeatures } from "./plan-limits";
 
 
 
@@ -2282,6 +2282,20 @@ const subscriptionRouter = router({
     }))
     .query(({ input }) => {
       return getUnlockedFeatures(input.oldPlanId, input.newPlanId);
+    }),
+
+  // Get lost features for downgrade/cancel warning
+  getLostFeatures: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      targetPlanId: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      return getLostFeatures(store.subscriptionPlan, input.targetPlanId);
     }),
 
   // Cancel subscription (at period end)

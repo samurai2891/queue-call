@@ -207,6 +207,69 @@ export function getUnlockedFeatures(
 }
 
 /**
+ * プランダウングレードで失われる機能一覧を返す
+ * @param currentPlanId 現在のプランID
+ * @param targetPlanId ダウングレード先のプランID（キャンセル時は'free'）
+ * @returns 失われる機能のキーと影響説明の配列
+ */
+export function getLostFeatures(
+  currentPlanId: string | null | undefined,
+  targetPlanId: string | null | undefined
+): Array<{ key: string; impact: string }> {
+  const currentFeatures = getPlanFeatures(currentPlanId);
+  const targetFeatures = getPlanFeatures(targetPlanId);
+  const lost: Array<{ key: string; impact: string }> = [];
+
+  // SMS通知
+  if (currentFeatures.smsEnabled && !targetFeatures.smsEnabled) {
+    lost.push({ key: 'sms', impact: 'sms_disabled' });
+  }
+  // 予約機能
+  if (currentFeatures.reservationEnabled && !targetFeatures.reservationEnabled) {
+    lost.push({ key: 'reservation', impact: 'reservation_disabled' });
+  }
+  // メニュー数制限
+  if (currentFeatures.menuLimit === null && targetFeatures.menuLimit !== null) {
+    lost.push({ key: 'menuLimit', impact: 'menu_limited' });
+  }
+  // 営業時間制御
+  if (currentFeatures.businessHoursEnabled && !targetFeatures.businessHoursEnabled) {
+    lost.push({ key: 'businessHours', impact: 'business_hours_disabled' });
+  }
+  // スタッフ数減少
+  if (
+    (currentFeatures.staffLimit === null && targetFeatures.staffLimit !== null) ||
+    (currentFeatures.staffLimit !== null && targetFeatures.staffLimit !== null && currentFeatures.staffLimit > targetFeatures.staffLimit)
+  ) {
+    const newLimit = targetFeatures.staffLimit;
+    lost.push({ key: 'staffDecrease', impact: `staff_limited_${newLimit}` });
+  }
+  // 分析期間縮小
+  if (currentFeatures.analyticsDays > targetFeatures.analyticsDays) {
+    lost.push({ key: 'analyticsReduced', impact: `analytics_reduced_${targetFeatures.analyticsDays}` });
+  }
+  // CSVエクスポート
+  if (currentFeatures.csvExport && !targetFeatures.csvExport) {
+    lost.push({ key: 'csvExport', impact: 'csv_disabled' });
+  }
+  // カスタムカラー
+  if (currentFeatures.brandingLevel !== 'basic' && targetFeatures.brandingLevel === 'basic') {
+    lost.push({ key: 'customColor', impact: 'color_disabled' });
+  }
+  // カスタムロゴ
+  if (currentFeatures.brandingLevel === 'full' && targetFeatures.brandingLevel !== 'full') {
+    lost.push({ key: 'customLogo', impact: 'logo_disabled' });
+  }
+  // サポートレベル低下
+  const supportOrder = { community: 0, email: 1, priority_email: 2 };
+  if (supportOrder[currentFeatures.supportLevel] > supportOrder[targetFeatures.supportLevel]) {
+    lost.push({ key: 'supportDowngrade', impact: 'support_downgraded' });
+  }
+
+  return lost;
+}
+
+/**
  * プラン制限の概要を返す（フロントエンド表示用）
  */
 export function getPlanLimitsInfo(subscriptionPlan: string | null | undefined): {

@@ -13,6 +13,7 @@ import {
   checkBrandingAllowed,
   getPlanLimitsInfo,
   getUnlockedFeatures,
+  getLostFeatures,
 } from "./plan-limits";
 
 describe("getPlanFeatures", () => {
@@ -323,6 +324,88 @@ describe("getUnlockedFeatures", () => {
     expect(analytics?.settingsTab).toBeUndefined();
     const csv = features.find(f => f.key === "csvExport");
     expect(csv?.settingsTab).toBeUndefined();
+  });
+});
+
+describe("getLostFeatures", () => {
+  it("returns all lost features when downgrading from pro to free", () => {
+    const lost = getLostFeatures("pro", "free");
+    const keys = lost.map(f => f.key);
+    expect(keys).toContain("sms");
+    expect(keys).toContain("reservation");
+    expect(keys).toContain("menuLimit");
+    expect(keys).toContain("businessHours");
+    expect(keys).toContain("staffDecrease");
+    expect(keys).toContain("analyticsReduced");
+    expect(keys).toContain("csvExport");
+    expect(keys).toContain("customColor");
+    expect(keys).toContain("customLogo");
+    expect(keys).toContain("supportDowngrade");
+    expect(lost.length).toBe(10);
+  });
+
+  it("returns standard-lost features when downgrading from standard to free", () => {
+    const lost = getLostFeatures("standard", "free");
+    const keys = lost.map(f => f.key);
+    expect(keys).toContain("sms");
+    expect(keys).toContain("reservation");
+    expect(keys).toContain("menuLimit");
+    expect(keys).toContain("businessHours");
+    expect(keys).toContain("staffDecrease");
+    expect(keys).toContain("analyticsReduced");
+    expect(keys).toContain("customColor");
+    expect(keys).toContain("supportDowngrade");
+    // Standard does NOT have CSV or custom logo
+    expect(keys).not.toContain("csvExport");
+    expect(keys).not.toContain("customLogo");
+    expect(lost.length).toBe(8);
+  });
+
+  it("returns pro-only lost features when downgrading from pro to standard", () => {
+    const lost = getLostFeatures("pro", "standard");
+    const keys = lost.map(f => f.key);
+    expect(keys).toContain("csvExport");
+    expect(keys).toContain("customLogo");
+    expect(keys).toContain("analyticsReduced");
+    expect(keys).toContain("staffDecrease");
+    expect(keys).toContain("supportDowngrade");
+    // These remain in standard
+    expect(keys).not.toContain("sms");
+    expect(keys).not.toContain("reservation");
+    expect(keys).not.toContain("menuLimit");
+    expect(keys).not.toContain("businessHours");
+    expect(keys).not.toContain("customColor");
+    expect(lost.length).toBe(5);
+  });
+
+  it("returns empty array for same plan", () => {
+    expect(getLostFeatures("free", "free")).toEqual([]);
+    expect(getLostFeatures("standard", "standard")).toEqual([]);
+    expect(getLostFeatures("pro", "pro")).toEqual([]);
+  });
+
+  it("returns empty array for upgrade", () => {
+    expect(getLostFeatures("free", "pro")).toEqual([]);
+    expect(getLostFeatures("free", "standard")).toEqual([]);
+    expect(getLostFeatures("standard", "pro")).toEqual([]);
+  });
+
+  it("includes correct impact descriptions", () => {
+    const lost = getLostFeatures("pro", "free");
+    const sms = lost.find(f => f.key === "sms");
+    expect(sms?.impact).toBe("sms_disabled");
+    const staff = lost.find(f => f.key === "staffDecrease");
+    expect(staff?.impact).toBe("staff_limited_1");
+    const analytics = lost.find(f => f.key === "analyticsReduced");
+    expect(analytics?.impact).toBe("analytics_reduced_1");
+  });
+
+  it("handles null/undefined current plan as free", () => {
+    // Free to free = no loss
+    expect(getLostFeatures(null, "free")).toEqual([]);
+    expect(getLostFeatures(undefined, "free")).toEqual([]);
+    // Free to standard = upgrade, no loss
+    expect(getLostFeatures(null, "standard")).toEqual([]);
   });
 });
 
