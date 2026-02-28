@@ -35,6 +35,10 @@ const Settings = lazy(() => import("./pages/admin/Settings"));
 const SmsHistory = lazy(() => import("./pages/admin/SmsHistory"));
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
 
+// Legal pages
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
+
 function LoadingFallback() {
   return (
     <div className="min-h-screen flex items-center justify-center">
@@ -82,6 +86,10 @@ function Router() {
         <Route path="/admin/settings/:section" component={Settings} />
         <Route path="/admin/sms-history" component={SmsHistory} />
         <Route path="/admin/dashboard" component={Dashboard} />
+        
+        {/* Legal Pages */}
+        <Route path="/privacy" component={Privacy} />
+        <Route path="/terms" component={Terms} />
         
         {/* 404 */}
         <Route path="/404" component={NotFound} />

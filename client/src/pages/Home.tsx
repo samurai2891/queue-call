@@ -16,7 +16,7 @@ import {
   BarChart3
 } from "lucide-react";
 import { getLoginUrl } from "@/const";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { AnimatedPage, AnimatedCard } from "@/components/AnimatedPage";
@@ -253,6 +253,12 @@ export default function Home() {
         <div className="container py-8 text-center text-sm text-muted-foreground">
           <p>Queue Call - 順番待ち呼び出しシステム</p>
           <p className="mt-2">PWA対応 | 多言語対応 | リアルタイム更新</p>
+          <div className="flex items-center justify-center gap-4 mt-4">
+            <Link href="/terms" className="hover:text-foreground transition-colors">利用規約</Link>
+            <span>|</span>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">プライバシーポリシー</Link>
+          </div>
+          <p className="mt-2">&copy; {new Date().getFullYear()} 合同会社Asobe. All rights reserved.</p>
         </div>
       </footer>
     </div>
