@@ -2273,6 +2273,42 @@ const subscriptionRouter = router({
       return getPlanLimitsInfo(store.subscriptionPlan);
     }),
 
+  // Get plan usage summary (current usage vs limits)
+  getPlanUsage: protectedProcedure
+    .input(z.object({ storeId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      const limits = getPlanLimitsInfo(store.subscriptionPlan);
+
+      // 並列で各カウントを取得
+      const [menuCount, staffCount, feedCount] = await Promise.all([
+        db.getMenuItemCount(input.storeId),
+        db.getActiveStaffSessionCount(input.storeId),
+        db.getFeedPostCount(input.storeId),
+      ]);
+
+      return {
+        planId: limits.planId,
+        planName: limits.planName,
+        usage: {
+          menu: { current: menuCount, limit: limits.menuLimit },
+          staff: { current: staffCount, limit: limits.staffLimit },
+          feed: { current: feedCount, limit: limits.menuLimit }, // フィードもメニューと同じ上限
+          analyticsDays: limits.analyticsDays,
+          smsEnabled: limits.smsEnabled,
+          reservationEnabled: limits.reservationEnabled,
+          csvExport: limits.csvExport,
+          businessHoursEnabled: limits.businessHoursEnabled,
+          brandingLevel: limits.brandingLevel,
+          supportLevel: limits.supportLevel,
+        },
+      };
+    }),
+
   // Get unlocked features after plan upgrade
   getUnlockedFeatures: protectedProcedure
     .input(z.object({

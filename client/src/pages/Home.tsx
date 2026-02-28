@@ -26,6 +26,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { AnimatedPage, AnimatedCard } from "@/components/AnimatedPage";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { PlanUsageSummary } from "@/components/PlanUsageSummary";
 
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
@@ -145,41 +146,52 @@ export default function Home() {
               </Card>
             </AnimatedCard>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {myStores.map((store, i) => (
-                <AnimatedCard key={store.id} delay={150 + i * 80}>
-                  <Card className="h-full">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Store className="h-5 w-5" />
-                        {store.name}
-                      </CardTitle>
-                      <CardDescription>/s/{store.slug}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Button size="sm" className="active:scale-[0.97] transition-transform" onClick={() => navigate(`/s/${store.slug}`)}>
-                          店舗トップ
-                        </Button>
-                        <Button size="sm" variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate(`/s/${store.slug}/staff`)}>
-                          スタッフ
-                        </Button>
-                        {store.kioskKey && (
-                          <Button size="sm" variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate(`/s/${store.slug}/kiosk?key=${store.kioskKey}`)}>
-                            キオスク
+            <>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {myStores.map((store, i) => (
+                  <AnimatedCard key={store.id} delay={150 + i * 80}>
+                    <Card className="h-full">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Store className="h-5 w-5" />
+                          {store.name}
+                        </CardTitle>
+                        <CardDescription>/s/{store.slug}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" className="active:scale-[0.97] transition-transform" onClick={() => navigate(`/s/${store.slug}`)}>
+                            店舗トップ
                           </Button>
-                        )}
-                        {store.boardKey && (
-                          <Button size="sm" variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate(`/s/${store.slug}/board?key=${store.boardKey}`)}>
-                            ボード
+                          <Button size="sm" variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate(`/s/${store.slug}/staff`)}>
+                            スタッフ
                           </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </AnimatedCard>
-              ))}
-            </div>
+                          {store.kioskKey && (
+                            <Button size="sm" variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate(`/s/${store.slug}/kiosk?key=${store.kioskKey}`)}>
+                              キオスク
+                            </Button>
+                          )}
+                          {store.boardKey && (
+                            <Button size="sm" variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate(`/s/${store.slug}/board?key=${store.boardKey}`)}>
+                              ボード
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </AnimatedCard>
+                ))}
+              </div>
+
+              {/* Plan Usage Summary Widget */}
+              <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {myStores.map((store, i) => (
+                  <AnimatedCard key={`usage-${store.id}`} delay={300 + i * 80}>
+                    <PlanUsageSummary storeId={store.id} storeName={store.name} />
+                  </AnimatedCard>
+                ))}
+              </div>
+            </>
           )}
         </section>
       )}
