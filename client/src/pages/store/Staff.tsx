@@ -44,7 +44,8 @@ import {
   ChevronUp,
   ChevronDown,
   ListChecks,
-  X
+  X,
+  Filter
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSSE } from '@/hooks/useSSE';
@@ -101,6 +102,7 @@ function StaffContent() {
   const [bulkSkipDialogOpen, setBulkSkipDialogOpen] = useState(false);
   const [bulkSkipReason, setBulkSkipReason] = useState('');
   const [bulkDoneDialogOpen, setBulkDoneDialogOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'WAITING' | 'CALLED' | 'ARRIVED'>('ALL');
 
 
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
@@ -451,7 +453,7 @@ function StaffContent() {
   };
 
   const toggleSelectAll = () => {
-    const selectableIds = tickets.map(t => t.id);
+    const selectableIds = filteredTickets.map(t => t.id);
     if (selectedIds.size === selectableIds.length) {
       setSelectedIds(new Set());
     } else {
@@ -645,9 +647,25 @@ function StaffContent() {
   const waitingTickets = tickets.filter(t => t.status === 'WAITING');
   const calledTickets = tickets.filter(t => t.status === 'CALLED');
   const arrivedTickets = tickets.filter(t => t.status === 'ARRIVED');
+  const filteredTickets = statusFilter === 'ALL' ? tickets : tickets.filter(t => t.status === statusFilter);
   const waitingIndexMap = new Map(waitingTickets.map((ticket, index) => [ticket.id, index]));
   const lastWaitingIndex = waitingTickets.length - 1;
   const canReorder = reorderEnabled && reorderModeEnabled && reorderMaxMove > 0;
+
+  const handleFilterChange = (filter: 'ALL' | 'WAITING' | 'CALLED' | 'ARRIVED') => {
+    setStatusFilter(filter);
+    // Reset selection when filter changes
+    if (selectionMode) {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const statusFilterOptions = [
+    { value: 'ALL' as const, label: t('staff.filterAll'), count: tickets.length },
+    { value: 'WAITING' as const, label: t('ticket.status.WAITING'), count: waitingTickets.length },
+    { value: 'CALLED' as const, label: t('ticket.status.CALLED'), count: calledTickets.length },
+    { value: 'ARRIVED' as const, label: t('ticket.status.ARRIVED'), count: arrivedTickets.length },
+  ];
 
   return (
     <StoreLayout storeSlug={params.storeSlug || ''} storeName={store.name}>
@@ -872,12 +890,34 @@ function StaffContent() {
           </Button>
         </div>
 
+        {/* Status Filter Tabs */}
+        <div className="flex items-center gap-1 mb-3 overflow-x-auto pb-1">
+          <Filter className="h-4 w-4 text-muted-foreground mr-1 shrink-0" />
+          {statusFilterOptions.map((option) => (
+            <Button
+              key={option.value}
+              variant={statusFilter === option.value ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleFilterChange(option.value)}
+              className="shrink-0"
+            >
+              {option.label}
+              <Badge
+                variant={statusFilter === option.value ? 'secondary' : 'outline'}
+                className="ml-1.5 px-1.5 py-0 text-xs min-w-[1.25rem] justify-center"
+              >
+                {option.count}
+              </Badge>
+            </Button>
+          ))}
+        </div>
+
         {/* Bulk Action Bar */}
         {selectionMode && (
           <div className="flex items-center justify-between mb-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
             <div className="flex items-center gap-3">
               <Button variant="outline" size="sm" onClick={toggleSelectAll}>
-                {selectedIds.size === tickets.length ? t('staff.deselectAll') : t('staff.selectAll')}
+                {selectedIds.size === filteredTickets.length ? t('staff.deselectAll') : t('staff.selectAll')}
               </Button>
               <span className="text-sm font-medium">
                 {selectedIds.size}{t('staff.selectedCount')}
@@ -915,9 +955,14 @@ function StaffContent() {
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>{t('staff.noWaiting')}</p>
             </div>
+          ) : filteredTickets.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Filter className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>{t('staff.filterNoResults')}</p>
+            </div>
           ) : (
             <div className="space-y-3">
-              {tickets.map((ticket) => {
+              {filteredTickets.map((ticket) => {
                 const waitingIndex = waitingIndexMap.get(ticket.id);
                 const canMoveUp = canReorder && ticket.status === 'WAITING' && waitingIndex !== undefined && waitingIndex > 0;
                 const canMoveDown = canReorder && ticket.status === 'WAITING' && waitingIndex !== undefined && waitingIndex < lastWaitingIndex;
