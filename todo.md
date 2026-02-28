@@ -1302,3 +1302,11 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] 店舗設定画面のキュー設定セクションにmaxTicketsPerHour入力フィールドを追加（10〜500、デフォルト50）
 - [x] 多言語翻訳キーを追加（5言語：日本語・英語・韓国語・簡体字・繁体字）
 - [x] テスト14件追加、全287テストパス、TSエラーゼロ
+
+### R7: Stripe Webhook修正（セキュリティ・決済）（完了）
+- [x] Webhookエンドポイント（/api/stripe/webhook）の実装を確認
+- [x] express.rawをexpress.jsonより前に移動（署名検証にraw bodyが必要）
+- [x] テストイベント（evt_test_*）のハンドリング確認済み（{ verified: true }を返却）
+- [x] Webhook署名検証が正常に動作することを確認
+- [x] テスト15件追加、全302テストパス、TSエラーゼロ
+- [x] 動作確認完了（署名なし→400、不正署名→400、正規署名+テストイベント→200 verified:true）

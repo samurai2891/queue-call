@@ -332,17 +332,10 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
   app.use(requestContextMiddleware);
-  // Configure body parser with larger size limit for file uploads
 
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
-  registerMediaRoutes(app);
-  // SSE endpoint for real-time updates
-  app.get('/api/sse', handleSSE);
-  
-  // Stripe Webhook endpoint (MUST be before express.json() for signature verification)
+  // Stripe Webhook endpoint - MUST be registered BEFORE express.json()
+  // express.json() would parse the body as JSON, but Stripe signature verification
+  // requires the raw body buffer. Registering this route first ensures raw body is preserved.
   app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     const signature = req.headers['stripe-signature'] as string;
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -377,6 +370,15 @@ async function startServer() {
       res.status(400).json({ error: `Webhook Error: ${err.message}` });
     }
   });
+
+  // Configure body parser with larger size limit for file uploads
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // OAuth callback under /api/oauth/callback
+  registerOAuthRoutes(app);
+  registerMediaRoutes(app);
+  // SSE endpoint for real-time updates
+  app.get('/api/sse', handleSSE);
 
   app.post('/api/twilio/webhook', async (req, res) => {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
