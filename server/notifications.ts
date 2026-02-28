@@ -32,11 +32,60 @@ const buildLogContext = (context?: NotificationLogContext) => {
   };
 };
 
-const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@example.com';
+/**
+ * Resolve VAPID subject (mailto: URI) from:
+ * 1. VAPID_SUBJECT env var (explicit override)
+ * 2. Owner's email from DB (auto-detected at first use)
+ * 3. App domain-based fallback
+ */
+let resolvedVapidSubject: string | null = null;
+
+async function getVapidSubject(): Promise<string> {
+  // Return cached value
+  if (resolvedVapidSubject) return resolvedVapidSubject;
+
+  // 1. Explicit env var
+  if (process.env.VAPID_SUBJECT) {
+    resolvedVapidSubject = process.env.VAPID_SUBJECT;
+    return resolvedVapidSubject;
+  }
+
+  // 2. Try to get owner's email from DB
+  try {
+    const ownerOpenId = process.env.OWNER_OPEN_ID;
+    if (ownerOpenId) {
+      const db = await getDb();
+      if (db) {
+        const { users } = await import('../drizzle/schema');
+        const result = await db.select({ email: users.email }).from(users).where(eq(users.openId, ownerOpenId)).limit(1);
+        if (result[0]?.email) {
+          resolvedVapidSubject = `mailto:${result[0].email}`;
+          console.log(`[VAPID] Subject resolved from owner email: ${resolvedVapidSubject}`);
+          return resolvedVapidSubject;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[VAPID] Failed to resolve owner email:', e);
+  }
+
+  // 3. Domain-based fallback
+  const appDomain = process.env.VITE_APP_DOMAIN || 'queue-call.app';
+  resolvedVapidSubject = `mailto:noreply@${appDomain}`;
+  return resolvedVapidSubject;
+}
+
+// Reset cached VAPID subject (for testing only)
+export function resetVapidSubjectForTesting() {
+  resolvedVapidSubject = null;
+}
+
+// Export for testing
+export { getVapidSubject, resolvedVapidSubject };
 
 let vapidConfigured = false;
 
-const ensureVapidConfig = () => {
+const ensureVapidConfig = async (): Promise<boolean> => {
   if (vapidConfigured) return true;
   const publicKey = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -44,7 +93,8 @@ const ensureVapidConfig = () => {
     console.warn('[Push] VAPID keys are not configured');
     return false;
   }
-  webPush.setVapidDetails(vapidSubject, publicKey, privateKey);
+  const subject = await getVapidSubject();
+  webPush.setVapidDetails(subject, publicKey, privateKey);
   vapidConfigured = true;
   return true;
 };
@@ -79,7 +129,7 @@ export async function sendPushNotification(
     }
 
 
-    if (!ensureVapidConfig()) {
+    if (!(await ensureVapidConfig())) {
       return false;
     }
 
@@ -142,7 +192,7 @@ export async function sendTestPushNotification(
   payload: PushPayload
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!ensureVapidConfig()) {
+    if (!(await ensureVapidConfig())) {
       return { success: false, error: 'VAPID keys not configured' };
     }
 
@@ -450,6 +500,86 @@ export async function verifyOtp(
   }
 }
 
+// Localized fallback messages for push notifications
+const PUSH_FALLBACK_MESSAGES: Record<string, { call: string; recall: string }> = {
+  ja: {
+    call: 'お客様の番号 {number} が呼び出されました。カウンターまでお越しください。',
+    recall: 'お客様の番号 {number} が呼び出されています。再度ご確認ください。',
+  },
+  en: {
+    call: 'Your number {number} has been called. Please come to the counter.',
+    recall: 'Your number {number} is being called. Please check again.',
+  },
+  ko: {
+    call: '고객님 번호 {number}가 호출되었습니다. 카운터로 와주세요.',
+    recall: '고객님 번호 {number}가 호출 중입니다. 다시 확인해 주세요.',
+  },
+  'zh-Hans': {
+    call: '您的号码 {number} 已被呼叫，请到柜台。',
+    recall: '您的号码 {number} 正在呼叫，请再次确认。',
+  },
+  'zh-Hant': {
+    call: '您的號碼 {number} 已被叫號，請至櫃台。',
+    recall: '您的號碼 {number} 正在叫號，請再次確認。',
+  },
+};
+
+// Localized fallback messages for SMS notifications
+const SMS_FALLBACK_MESSAGES: Record<string, { call: string; recall: string }> = {
+  ja: {
+    call: '【{storeName}】お客様の番号 {number} が呼び出されました。カウンターまでお越しください。',
+    recall: '【{storeName}】再度のご案内です。お客様の番号 {number} が呼び出されています。',
+  },
+  en: {
+    call: '[{storeName}] Your number {number} has been called. Please come to the counter.',
+    recall: '[{storeName}] Reminder: Your number {number} is being called. Please check again.',
+  },
+  ko: {
+    call: '[{storeName}] 고객님 번호 {number}가 호출되었습니다. 카운터로 와주세요.',
+    recall: '[{storeName}] 다시 안내드립니다. 고객님 번호 {number}가 호출 중입니다.',
+  },
+  'zh-Hans': {
+    call: '【{storeName}】您的号码 {number} 已被呼叫，请到柜台。',
+    recall: '【{storeName}】再次提醒：您的号码 {number} 正在呼叫。',
+  },
+  'zh-Hant': {
+    call: '【{storeName}】您的號碼 {number} 已被叫號，請至櫃台。',
+    recall: '【{storeName}】再次提醒：您的號碼 {number} 正在叫號。',
+  },
+};
+
+// Localized fallback messages for wait time alerts
+export const WAIT_ALERT_FALLBACK_MESSAGES: Record<string, { title: string; body: string }> = {
+  ja: {
+    title: '{storeName} - まもなく順番',
+    body: 'まもなく順番です！予測待ち時間が約{minutes}分になりました。',
+  },
+  en: {
+    title: '{storeName} - Almost your turn',
+    body: 'Almost your turn! Estimated wait time is about {minutes} minutes.',
+  },
+  ko: {
+    title: '{storeName} - 곧 차례입니다',
+    body: '곧 차례입니다! 예상 대기 시간이 약 {minutes}분입니다.',
+  },
+  'zh-Hans': {
+    title: '{storeName} - 即将轮到您',
+    body: '即将轮到您！预计等待时间约{minutes}分钟。',
+  },
+  'zh-Hant': {
+    title: '{storeName} - 即將輪到您',
+    body: '即將輪到您！預計等待時間約{minutes}分鐘。',
+  },
+};
+
+function getLocaleFallback(locale?: string | null): string {
+  if (locale && PUSH_FALLBACK_MESSAGES[locale]) return locale;
+  return 'ja'; // Default to Japanese
+}
+
+// Export for testing
+export { PUSH_FALLBACK_MESSAGES, SMS_FALLBACK_MESSAGES };
+
 // Notify ticket holder when called
 export async function notifyTicketCalled(
   ticketId: number,
@@ -473,6 +603,7 @@ export async function notifyTicketCalled(
     storeSlug?: string;
     requestId?: string;
     checkinGraceMinutes?: number;
+    ticketLocale?: string | null;
   }
 ): Promise<{ push: boolean; sms: boolean; smsReason?: string }> {
   const results: { push: boolean; sms: boolean; smsReason?: string } = { push: false, sms: false };
@@ -484,11 +615,13 @@ export async function notifyTicketCalled(
     requestId: options?.requestId,
   };
   const messageType = options?.messageType ?? 'call';
+  const locale = getLocaleFallback(options?.ticketLocale);
 
   if (pushEnabled) {
+    const localizedMessages = PUSH_FALLBACK_MESSAGES[locale];
     const fallbackMessage = messageType === 'recall'
-      ? `お客様の番号 ${ticketNumber} が呼び出されています。再度ご確認ください。`
-      : `お客様の番号 ${ticketNumber} が呼び出されました。カウンターまでお越しください。`;
+      ? localizedMessages.recall
+      : localizedMessages.call;
     const message = (options?.pushTemplate ?? fallbackMessage)
       .replace('{storeName}', storeName)
       .replace('{number}', String(ticketNumber))
@@ -516,9 +649,10 @@ export async function notifyTicketCalled(
 
   const twilioConfig = options?.twilioConfig;
   if (twilioConfig) {
+    const smsLocalizedMessages = SMS_FALLBACK_MESSAGES[locale];
     const fallbackMessage = messageType === 'recall'
-      ? `【${storeName}】再度のご案内です。お客様の番号 ${ticketNumber} が呼び出されています。`
-      : `【${storeName}】お客様の番号 ${ticketNumber} が呼び出されました。カウンターまでお越しください。`;
+      ? smsLocalizedMessages.recall
+      : smsLocalizedMessages.call;
 
     const ticketUrl = options?.ticketUrl ?? '';
     const message = (options?.smsTemplate ?? fallbackMessage)
@@ -650,6 +784,7 @@ export async function sendWaitTimeAlert(
   options?: {
     storeSlug?: string;
     requestId?: string;
+    ticketLocale?: string | null;
   }
 ): Promise<boolean> {
   const logContext: NotificationLogContext = {
@@ -659,10 +794,13 @@ export async function sendWaitTimeAlert(
     requestId: options?.requestId,
   };
 
-  const message = `まもなく順番です！予測待ち時間が約${estimatedMinutes}分になりました。`;
+  const locale = getLocaleFallback(options?.ticketLocale);
+  const localizedAlert = WAIT_ALERT_FALLBACK_MESSAGES[locale];
+  const title = localizedAlert.title.replace('{storeName}', storeName);
+  const message = localizedAlert.body.replace('{minutes}', String(estimatedMinutes));
 
   const result = await sendPushNotification(ticketId, {
-    title: `${storeName} - まもなく順番`,
+    title,
     body: message,
     tag: `wait-alert-${ticketId}`,
     data: {

@@ -5,9 +5,11 @@ interface UsePushNotificationOptions {
   onSubscribed?: () => void;
   onError?: (error: string) => void;
   subscribeFn?: (data: { ticketId: number; endpoint: string; p256dh: string; auth: string }) => Promise<void>;
+  /** Optional function to check server-side subscription status */
+  checkServerSubscription?: (ticketId: number, endpoint: string) => Promise<boolean>;
 }
 
-export function usePushNotification({ ticketId, onSubscribed, onError, subscribeFn }: UsePushNotificationOptions = {}) {
+export function usePushNotification({ ticketId, onSubscribed, onError, subscribeFn, checkServerSubscription }: UsePushNotificationOptions = {}) {
   const [isSupported, setIsSupported] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -20,14 +22,38 @@ export function usePushNotification({ ticketId, onSubscribed, onError, subscribe
 
     if (supported) {
       setPermission(Notification.permission);
+
+      // Check both browser subscription AND server-side subscription
       navigator.serviceWorker.ready
-        .then((registration) => registration.pushManager.getSubscription())
-        .then((subscription) => {
-          setIsSubscribed(!!subscription);
+        .then(async (registration) => {
+          const subscription = await registration.pushManager.getSubscription();
+          if (!subscription) {
+            setIsSubscribed(false);
+            return;
+          }
+
+          // If we have a server check function and ticketId, verify server-side too
+          if (checkServerSubscription && ticketId) {
+            try {
+              const serverHasSubscription = await checkServerSubscription(ticketId, subscription.endpoint);
+              setIsSubscribed(serverHasSubscription);
+              if (!serverHasSubscription) {
+                console.log('[Push] Browser has subscription but server does not - needs re-subscribe');
+              }
+            } catch {
+              // If server check fails, fall back to browser-only check
+              setIsSubscribed(true);
+            }
+          } else {
+            // No server check available, use browser-only
+            setIsSubscribed(!!subscription);
+          }
         })
-        .catch(() => {});
+        .catch(() => {
+          setIsSubscribed(false);
+        });
     }
-  }, []);
+  }, [ticketId, checkServerSubscription]);
 
 
   const requestPermission = useCallback(async () => {
@@ -72,7 +98,6 @@ export function usePushNotification({ ticketId, onSubscribed, onError, subscribe
 
       if (!subscription) {
         // Create new subscription
-        // Note: In production, you'd get the VAPID public key from the server
         const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
         
         if (!vapidPublicKey) {
@@ -90,17 +115,27 @@ export function usePushNotification({ ticketId, onSubscribed, onError, subscribe
         });
       }
 
-      // Send subscription to server
+      // Send subscription to server - only mark as subscribed if server registration succeeds
       const subscriptionJson = subscription.toJSON();
-      await subscribeFn({
-        ticketId,
-        endpoint: subscription.endpoint,
-        p256dh: subscriptionJson.keys?.p256dh || '',
-        auth: subscriptionJson.keys?.auth || '',
-      });
+      try {
+        await subscribeFn({
+          ticketId,
+          endpoint: subscription.endpoint,
+          p256dh: subscriptionJson.keys?.p256dh || '',
+          auth: subscriptionJson.keys?.auth || '',
+        });
 
-      setIsSubscribed(true);
-      onSubscribed?.();
+        // Server registration succeeded - now we can mark as subscribed
+        setIsSubscribed(true);
+        onSubscribed?.();
+      } catch (serverError) {
+        // Server registration failed - browser subscription exists but server doesn't know about it
+        console.error('Push subscription server registration failed:', serverError);
+        onError?.('Failed to register push subscription with server');
+        setIsLoading(false);
+        return false;
+      }
+
       setIsLoading(false);
       return true;
     } catch (e) {

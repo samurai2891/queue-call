@@ -1724,6 +1724,7 @@ export async function getTicketsForWaitAlert(storeId: number): Promise<Array<{
   number: number;
   waitAlertMinutes: number;
   groupsAhead: number;
+  locale: string | null;
 }>> {
   const db = await getDb();
   if (!db) {
@@ -1743,6 +1744,7 @@ export async function getTicketsForWaitAlert(storeId: number): Promise<Array<{
     number: tickets.number,
     waitAlertMinutes: tickets.waitAlertMinutes,
     queueRank: tickets.queueRank,
+    locale: tickets.locale,
   })
     .from(tickets)
     .where(and(
@@ -1764,6 +1766,7 @@ export async function getTicketsForWaitAlert(storeId: number): Promise<Array<{
         number: ticket.number,
         waitAlertMinutes: ticket.waitAlertMinutes!,
         groupsAhead,
+        locale: ticket.locale,
       };
     })
   );

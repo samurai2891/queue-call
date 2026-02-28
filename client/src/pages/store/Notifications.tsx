@@ -46,11 +46,20 @@ function NotificationsContent() {
   );
 
   const subscribePushMutation = trpc.notification.subscribePush.useMutation();
+  const trpcUtils = trpc.useUtils();
 
   const { isSupported, isSubscribed, isLoading: isPushLoading, permission, subscribe } = usePushNotification({
     ticketId: ticket?.id,
     subscribeFn: async (data) => {
       await subscribePushMutation.mutateAsync(data);
+    },
+    checkServerSubscription: async (ticketId: number, endpoint: string) => {
+      try {
+        const result = await trpcUtils.notification.checkPushSubscription.fetch({ ticketId, endpoint });
+        return result.exists;
+      } catch {
+        return true; // If check fails, assume subscribed to avoid false negatives
+      }
     },
     onSubscribed: () => {
       toast.success(t('notification.pushEnabled'));

@@ -54,7 +54,7 @@ async function processStoreWaitAlerts(store: { id: number; name: string; slug: s
           store.name,
           ticket.number,
           estimatedWaitMinutes,
-          { storeSlug: store.slug }
+          { storeSlug: store.slug, ticketLocale: ticket.locale }
         );
 
         if (sent) {

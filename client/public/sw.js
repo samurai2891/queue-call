@@ -132,14 +132,3 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Background sync for offline actions
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-checkin') {
-    event.waitUntil(syncCheckin());
-  }
-});
-
-async function syncCheckin() {
-  // Implement offline checkin sync if needed
-  console.log('Background sync: checkin');
-}

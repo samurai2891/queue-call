@@ -1049,6 +1049,7 @@ const ticketRouter = router({
           storeSlug: store?.slug,
           requestId: ctx.requestId,
           checkinGraceMinutes: graceMinutes,
+          ticketLocale: nextTicket.locale,
         });
       }
  
@@ -1128,6 +1129,7 @@ const ticketRouter = router({
           storeSlug: store?.slug,
           requestId: ctx.requestId,
           checkinGraceMinutes: graceMinutesCS,
+          ticketLocale: ticket.locale,
         });
       }
 
@@ -1213,6 +1215,7 @@ const ticketRouter = router({
           storeSlug: store?.slug,
           requestId: ctx.requestId,
           checkinGraceMinutes: graceMinutesRecall,
+          ticketLocale: ticket.locale,
         });
       }
 
@@ -1872,6 +1875,18 @@ const notificationRouter = router({
     .mutation(async ({ input }) => {
       await db.createPushSubscription(input);
       return { success: true };
+    }),
+
+  // Check if a push subscription exists on the server
+  checkPushSubscription: publicProcedure
+    .input(z.object({
+      ticketId: z.number(),
+      endpoint: z.string(),
+    }))
+    .query(async ({ input }) => {
+      const subscriptions = await db.getPushSubscriptionsByTicket(input.ticketId);
+      const exists = subscriptions.some(sub => sub.endpoint === input.endpoint);
+      return { exists };
     }),
 
   // Get SMS subscription status

@@ -2,6 +2,7 @@ import webPush from 'web-push';
 import { getDb } from './db';
 import { stores } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
+import { getVapidSubject } from './notifications';
 
 // Generate new VAPID keys
 export function generateVapidKeys(): { publicKey: string; privateKey: string } {
@@ -44,8 +45,9 @@ export async function saveVapidKeysToStore(
 
   // Configure web-push with new keys
   try {
+    const subject = await getVapidSubject();
     webPush.setVapidDetails(
-      'mailto:noreply@queue-call.app',
+      subject,
       keys.publicKey,
       keys.privateKey
     );
@@ -80,8 +82,9 @@ export async function loadVapidKeysFromDb(): Promise<boolean> {
       process.env.VAPID_PRIVATE_KEY = vapid.privateKey;
 
       try {
+        const subject = await getVapidSubject();
         webPush.setVapidDetails(
-          'mailto:noreply@queue-call.app',
+          subject,
           vapid.publicKey,
           vapid.privateKey
         );

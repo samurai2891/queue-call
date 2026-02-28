@@ -1387,3 +1387,10 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] M-5: Service Workerのキャッシュバージョン管理を動的化（Date.now()ベース、古いキャッシュの自動クリーンアップ）
 - [x] sw.jsのpushイベントハンドラでネストされたdataオブジェクトからurl/ticketTokenを正しく取得するよう修正
 - [x] テスト追加・実行（24テスト全パス、全376テスト全パス）
+
+### Webプッシュ通知 Low問題修正（L-1〜L-4）（完了）
+- [x] L-1: VAPID_SUBJECTをオーナーのメールアドレスから自動解決（優先度: env変数 > オーナーDB > ドメインフォールバック）
+- [x] L-2: sw.jsのBackground Sync空実装（syncCheckin）を削除しコード整理
+- [x] L-3: usePushNotificationのisSubscribed判定をブラウザ+サーバー両方で確認するよう改善（checkPushSubscription API追加）
+- [x] L-4: プッシュ/SMS/待ち時間アラートのフォールバックメッセージを5言語対応（ja/en/ko/zh-Hans/zh-Hant）
+- [x] テスト追加・実行（29テスト全パス、全405テスト全パス）
