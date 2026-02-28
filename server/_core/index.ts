@@ -16,6 +16,7 @@ import { serveStatic, setupVite } from "./vite";
 import { handleSSE } from "../sse";
 import { startAutoSkipJob } from "../jobs/autoSkip";
 import { startCleanupSmsLogsJob } from "../jobs/cleanupSmsLogs";
+import { startCleanupOldTicketsJob } from "../jobs/cleanupOldTickets";
 import { startDailyResetJob } from "../jobs/dailyReset";
 import { startWaitAlertJob } from "../jobs/waitAlert";
 
@@ -433,6 +434,7 @@ async function startServer() {
     // Start background jobs
     startAutoSkipJob(60); // Run every 60 seconds
     startCleanupSmsLogsJob();
+    startCleanupOldTicketsJob(); // Clean up tickets older than 90 days, runs every 24h
     startDailyResetJob(300);
     startWaitAlertJob(60); // Run every 60 seconds
 

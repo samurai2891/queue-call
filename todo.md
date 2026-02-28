@@ -1260,10 +1260,12 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] OGP画像（1200x630）を生成しCDNにアップロード
 - [x] テスト9件追加、全216テストパス、TSエラーゼロ
 
-### R4: 古いチケットデータの自動削除ジョブ（Medium / 運用）
-- [ ] 一定期間（90日）経過した完了・キャンセル済みチケットの自動削除ジョブを追加
-- [ ] 関連するpushSubscriptions, smsSubscriptionsも連動削除
-- [ ] ジョブの起動をserver起動時に登録
+### R4: 古いチケットデータの自動削除ジョブ（Medium / 運用）（完了）
+- [x] 90日経過した終了済み（DONE/CANCELED/SKIPPED/EXPIRED）チケットの自動削除ジョブを追加
+- [x] 関連するpushSubscriptions, smsSubscriptions, queueAuditLogsも連動削除
+- [x] バッチ処理（500件ずつ）で大量データも安全に削除
+- [x] サーバー起動時にジョブ登録（初回実行5分後、以降24時間ごと）
+- [x] テスト7件追加、全223テストパス、TSエラーゼロ
 
 ### R5: プライバシーポリシー・利用規約ページ（Medium / 法務）
 - [ ] プライバシーポリシーページを作成（/privacy）
