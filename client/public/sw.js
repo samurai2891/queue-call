@@ -1,4 +1,8 @@
-const CACHE_NAME = 'queue-call-v1';
+// Dynamic cache version based on build timestamp
+// Updated automatically when the service worker file changes
+const CACHE_VERSION = Date.now().toString(36);
+const CACHE_PREFIX = 'queue-call-';
+const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
@@ -14,14 +18,17 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up ALL old caches with our prefix
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
+          .filter((name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME)
+          .map((name) => {
+            console.log(`[SW] Deleting old cache: ${name}`);
+            return caches.delete(name);
+          })
       );
     })
   );
@@ -39,14 +46,19 @@ self.addEventListener('fetch', (event) => {
   // Skip SSE requests
   if (event.request.url.includes('/sse')) return;
 
+  // Skip chrome-extension and other non-http(s) requests
+  if (!event.request.url.startsWith('http')) return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clone the response for caching
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseClone);
-        });
+        // Only cache successful responses
+        if (response.status === 200) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
+        }
         return response;
       })
       .catch(() => {
@@ -71,6 +83,9 @@ self.addEventListener('push', (event) => {
 
   try {
     const data = event.data.json();
+    // Server sends: { title, body, tag, data: { type, ticketId, ticketNumber, url, ticketToken } }
+    // Extract url/ticketToken from nested data object or top-level for backward compatibility
+    const nestedData = data.data || {};
     const options = {
       body: data.body || '',
       icon: '/icons/icon-192x192.png',
@@ -80,8 +95,10 @@ self.addEventListener('push', (event) => {
       renotify: true,
       requireInteraction: true,
       data: {
-        url: data.url || '/',
-        ticketToken: data.ticketToken,
+        url: nestedData.url || data.url || '/',
+        ticketToken: nestedData.ticketToken || data.ticketToken,
+        type: nestedData.type,
+        ticketId: nestedData.ticketId,
       },
     };
 

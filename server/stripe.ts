@@ -254,6 +254,47 @@ export async function sendLowBalanceNotification(
 }
 
 /**
+ * SMS送信失敗時の残高返金
+ * Twilio APIエラー等でSMSが実際には送信されなかった場合に、
+ * 既に消費した残高を返金する
+ */
+export async function refundSmsBalance(params: {
+  storeId: number;
+  ticketId: number;
+  reason: string;
+}): Promise<{ success: boolean; newBalance: number }> {
+  const db = await getDb();
+  if (!db) {
+    return { success: false, newBalance: 0 };
+  }
+
+  const { storeId, ticketId, reason } = params;
+
+  const [store] = await db.select().from(stores).where(eq(stores.id, storeId)).limit(1);
+  if (!store) {
+    return { success: false, newBalance: 0 };
+  }
+
+  const newBalance = store.smsBalance + SMS_COST_PER_MESSAGE;
+  await db
+    .update(stores)
+    .set({ smsBalance: newBalance })
+    .where(eq(stores.id, storeId));
+
+  await db.insert(smsTransactions).values({
+    storeId,
+    type: "refund",
+    amount: SMS_COST_PER_MESSAGE,
+    balanceAfter: newBalance,
+    ticketId,
+    description: `SMS送信失敗による返金 (チケット#${ticketId}): ${reason}`,
+  });
+
+  console.log(`[SMS Refund] Refunded ${SMS_COST_PER_MESSAGE}円 for store ${storeId}, ticket ${ticketId}: ${reason}`);
+  return { success: true, newBalance };
+}
+
+/**
  * 店舗のSMS残高を取得
  */
 export async function getSmsBalance(storeId: number): Promise<number> {

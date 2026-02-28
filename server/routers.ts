@@ -1048,6 +1048,7 @@ const ticketRouter = router({
           recallMaxCount,
           storeSlug: store?.slug,
           requestId: ctx.requestId,
+          checkinGraceMinutes: graceMinutes,
         });
       }
  
@@ -1111,6 +1112,7 @@ const ticketRouter = router({
       const recallLimitSeconds = notificationSettings?.recallLimitSeconds;
       const recallMaxCount = notificationSettings?.recallMaxCount;
       const shouldNotify = pushEnabled || twilioConfigured;
+      const graceMinutesCS = store?.settings?.queue?.checkinGraceMinutes || 5;
 
       let notificationResult: { push: boolean; sms: boolean; smsReason?: string } | undefined;
       if (shouldNotify) {
@@ -1125,6 +1127,7 @@ const ticketRouter = router({
           recallMaxCount,
           storeSlug: store?.slug,
           requestId: ctx.requestId,
+          checkinGraceMinutes: graceMinutesCS,
         });
       }
 
@@ -1194,6 +1197,7 @@ const ticketRouter = router({
       const recallLimitSeconds = notificationSettings?.recallLimitSeconds;
       const recallMaxCount = notificationSettings?.recallMaxCount;
       const shouldNotify = pushEnabled || twilioConfigured;
+      const graceMinutesRecall = store?.settings?.queue?.checkinGraceMinutes || 5;
 
       let notificationResult: { push: boolean; sms: boolean; smsReason?: string } | undefined;
       if (shouldNotify) {
@@ -1208,6 +1212,7 @@ const ticketRouter = router({
           recallMaxCount,
           storeSlug: store?.slug,
           requestId: ctx.requestId,
+          checkinGraceMinutes: graceMinutesRecall,
         });
       }
 

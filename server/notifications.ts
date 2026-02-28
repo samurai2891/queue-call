@@ -2,7 +2,7 @@ import { getDb, createSmsLog, updateSmsLog } from './db';
 import { pushSubscriptions, smsSubscriptions, tickets, smsLogs } from '../drizzle/schema';
 import { eq, and, isNull, isNotNull, sql } from 'drizzle-orm';
 import webPush from 'web-push';
-import { consumeSmsBalance, SMS_COST_PER_MESSAGE } from './stripe';
+import { consumeSmsBalance, refundSmsBalance, SMS_COST_PER_MESSAGE } from './stripe';
 
 
 // Web Push notification payload
@@ -51,10 +51,14 @@ const ensureVapidConfig = () => {
 
 // Send Web Push notification to a ticket
 
+// Default TTL for push notifications (10 minutes)
+const DEFAULT_PUSH_TTL = 600;
+
 export async function sendPushNotification(
   ticketId: number,
   payload: PushPayload,
-  context?: NotificationLogContext
+  context?: NotificationLogContext,
+  pushOptions?: { ttl?: number }
 ): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
@@ -92,7 +96,8 @@ export async function sendPushNotification(
         };
 
         try {
-          await webPush.sendNotification(subscription, payloadJson, { TTL: 86400 });
+          const ttl = pushOptions?.ttl ?? DEFAULT_PUSH_TTL;
+          await webPush.sendNotification(subscription, payloadJson, { TTL: ttl, urgency: 'high' });
           return true;
         } catch (error) {
           const statusCode =
@@ -150,7 +155,7 @@ export async function sendTestPushNotification(
     };
 
     const payloadJson = JSON.stringify(payload);
-    await webPush.sendNotification(pushSubscription, payloadJson, { TTL: 86400 });
+    await webPush.sendNotification(pushSubscription, payloadJson, { TTL: 600, urgency: 'high' });
     return { success: true };
   } catch (error) {
     const statusCode =
@@ -329,7 +334,12 @@ export async function sendSmsNotification(
       const error = await response.text();
       console.error('[SMS] Twilio error:', logContext, error);
       await updateSmsLog(smsLogId, { status: 'failed', errorMessage: error });
-      // Note: Balance was already consumed. In production, consider refund logic here.
+      // 残高を返金（Twilio APIエラーでSMSは送信されていない）
+      await refundSmsBalance({
+        storeId,
+        ticketId,
+        reason: `Twilio API error: ${error.substring(0, 200)}`,
+      });
       return { success: false, reason: 'Twilio API error' };
     }
 
@@ -462,6 +472,7 @@ export async function notifyTicketCalled(
     recallMaxCount?: number;
     storeSlug?: string;
     requestId?: string;
+    checkinGraceMinutes?: number;
   }
 ): Promise<{ push: boolean; sms: boolean; smsReason?: string }> {
   const results: { push: boolean; sms: boolean; smsReason?: string } = { push: false, sms: false };
@@ -483,6 +494,11 @@ export async function notifyTicketCalled(
       .replace('{number}', String(ticketNumber))
       .trim();
 
+    // TTL = checkinGraceMinutes * 60 (default 10 minutes = 600s)
+    const pushTtl = options?.checkinGraceMinutes
+      ? options.checkinGraceMinutes * 60
+      : DEFAULT_PUSH_TTL;
+
     results.push = await sendPushNotification(ticketId, {
       title: `${storeName}`,
       body: message,
@@ -494,7 +510,7 @@ export async function notifyTicketCalled(
         url: options?.ticketUrl || '/',
         ticketToken: undefined, // included in url
       },
-    }, logContext);
+    }, logContext, { ttl: pushTtl });
   }
 
 
@@ -593,6 +609,12 @@ export async function sendReservationReminderSms(
       const error = await response.text();
       console.error('[SMS] Twilio error for reservation reminder:', logContext, error);
       await updateSmsLog(smsLogId, { status: 'failed', errorMessage: error });
+      // 残高を返金（Twilio APIエラーでSMSは送信されていない）
+      await refundSmsBalance({
+        storeId,
+        ticketId: 0,
+        reason: `Reservation reminder Twilio error: ${error.substring(0, 200)}`,
+      });
       return { success: false, reason: 'Twilio API error' };
     }
 

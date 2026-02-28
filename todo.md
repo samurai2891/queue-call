@@ -1378,3 +1378,12 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] H-3: notifyTicketCalledの結果をcallNext/callSpecific/recallのレスポンスに含め、Staff.tsxでトースト表示
 - [x] テスト実行・確認（全352件パス）
 - [x] 多言語翻訳キー追加（5言語、6キー）
+
+### Webプッシュ通知 Medium問題修正（M-1〜M-5）（完了）
+- [x] M-1: TTLを600秒（デフォルト10分）に短縮し、checkinGraceMinutesと連動するよう改善
+- [x] M-2: Urgencyヘッダーを'high'に設定（バッテリーセーバーでの遅延防止）
+- [x] M-3: SMS送信失敗時の残高返金ロジックを実装（refundSmsBalance関数、refundタイプのトランザクション追加）
+- [x] M-4: VAPID鍵生成後の自動設定フローを改善（生成→DB保存→process.env自動設定をワンクリックに）
+- [x] M-5: Service Workerのキャッシュバージョン管理を動的化（Date.now()ベース、古いキャッシュの自動クリーンアップ）
+- [x] sw.jsのpushイベントハンドラでネストされたdataオブジェクトからurl/ticketTokenを正しく取得するよう修正
+- [x] テスト追加・実行（24テスト全パス、全376テスト全パス）

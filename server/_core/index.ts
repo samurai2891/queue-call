@@ -21,6 +21,7 @@ import { startDailyResetJob } from "../jobs/dailyReset";
 import { startWaitAlertJob } from "../jobs/waitAlert";
 
 import { constructWebhookEvent, handleCheckoutCompleted, handleInvoicePaid } from "../stripe";
+import { loadVapidKeysFromDb } from "../vapid";
 import { storageGet, storagePut } from "../storage";
 import * as db from "../db";
 import { sdk } from "./sdk";
@@ -436,6 +437,14 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
     
+    // Load VAPID keys from DB if not in env vars
+    loadVapidKeysFromDb().then((loaded) => {
+      if (loaded) console.log('[Startup] VAPID keys configured');
+      else console.log('[Startup] VAPID keys not configured - generate them in Settings');
+    }).catch((err) => {
+      console.error('[Startup] Failed to load VAPID keys:', err);
+    });
+
     // Start background jobs
     startAutoSkipJob(60); // Run every 60 seconds
     startCleanupSmsLogsJob();

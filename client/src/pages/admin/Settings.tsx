@@ -4011,7 +4011,7 @@ function SettingsContent() {
 
             {/* VAPID Settings for Push Notifications */}
             <div className="mt-6">
-              <VapidSettings t={t} />
+              <VapidSettings t={t as (key: string) => string} storeId={store?.id} />
             </div>
           </TabsContent>
         </Tabs>

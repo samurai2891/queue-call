@@ -12,10 +12,11 @@ import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
 
 interface VapidSettingsProps {
-  t: (key: any) => string;
+  t: (key: string) => string;
+  storeId?: number;
 }
 
-export function VapidSettings({ t }: VapidSettingsProps) {
+export function VapidSettings({ t, storeId }: VapidSettingsProps) {
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
   const [generatedKeys, setGeneratedKeys] = useState<{
     publicKey: string;
@@ -32,6 +33,10 @@ export function VapidSettings({ t }: VapidSettingsProps) {
   const generateKeysMutation = trpc.system.generateVapidKeys.useMutation({
     onSuccess: (data) => {
       setGeneratedKeys(data.keys);
+      if (data.autoConfigured) {
+        toast.success(t('settings.vapid.autoConfigured'));
+        refetch();
+      }
       setShowGenerateDialog(true);
     },
     onError: (error) => {
@@ -71,7 +76,7 @@ export function VapidSettings({ t }: VapidSettingsProps) {
   }, []);
 
   const handleGenerateKeys = () => {
-    generateKeysMutation.mutate();
+    generateKeysMutation.mutate({ storeId: storeId || 0 });
   };
 
   const handleCopy = async (text: string, field: string) => {

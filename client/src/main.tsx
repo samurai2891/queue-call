@@ -12,9 +12,16 @@ const queryClient = new QueryClient();
 
 if (typeof window !== "undefined" && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch((error) => {
-      console.warn("[ServiceWorker] Registration failed", error);
-    });
+    navigator.serviceWorker.register("/sw.js", { updateViaCache: 'none' })
+      .then((registration) => {
+        // Check for updates periodically (every 30 minutes)
+        setInterval(() => {
+          registration.update().catch(() => {});
+        }, 30 * 60 * 1000);
+      })
+      .catch((error) => {
+        console.warn("[ServiceWorker] Registration failed", error);
+      });
   });
 }
 

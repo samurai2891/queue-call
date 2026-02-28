@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { notifyOwner } from "./notification";
 import { adminProcedure, publicProcedure, router } from "./trpc";
-import { generateVapidKeys, getVapidStatus, getVapidPublicKey } from "../vapid";
+import { generateVapidKeys, getVapidStatus, getVapidPublicKey, saveVapidKeysToStore } from "../vapid";
 import { sendTestPushNotification } from "../notifications";
 
 export const systemRouter = router({
@@ -35,18 +35,32 @@ export const systemRouter = router({
       return getVapidStatus();
     }),
 
-  // Generate new VAPID keys
+  // Generate new VAPID keys and auto-save to DB
   generateVapidKeys: adminProcedure
-    .mutation(() => {
+    .input(
+      z.object({
+        storeId: z.number().int().positive(),
+      })
+    )
+    .mutation(async ({ input }) => {
       const keys = generateVapidKeys();
+      
+      // Auto-save to DB so keys persist without manual env var configuration
+      const saved = await saveVapidKeysToStore(input.storeId, keys);
+      
       return {
         success: true,
+        autoConfigured: saved,
         keys,
-        instructions: {
-          VAPID_PUBLIC_KEY: keys.publicKey,
-          VAPID_PRIVATE_KEY: keys.privateKey,
-          VITE_VAPID_PUBLIC_KEY: keys.publicKey,
-        },
+        instructions: saved
+          ? {
+              message: 'VAPID keys have been generated and automatically configured. No manual setup required.',
+            }
+          : {
+              VAPID_PUBLIC_KEY: keys.publicKey,
+              VAPID_PRIVATE_KEY: keys.privateKey,
+              VITE_VAPID_PUBLIC_KEY: keys.publicKey,
+            },
       };
     }),
 
