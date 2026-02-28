@@ -1081,6 +1081,19 @@ export const translations = {
     'planUsage.supportEmail': 'メール',
     'planUsage.supportPriority': '優先メール',
     'planUsage.upgradeButton': 'プランをアップグレード',
+
+    // Usage Limit Alert
+    'usageLimitAlert.titleApproaching': 'プラン上限に近づいています',
+    'usageLimitAlert.titleAtLimit': 'プラン上限に達しました',
+    'usageLimitAlert.descriptionApproaching': '一部の項目が上限に近づいています。アップグレードで制限を解除できます。',
+    'usageLimitAlert.descriptionAtLimit': '上限に達した項目があります。これ以上追加するにはアップグレードが必要です。',
+    'usageLimitAlert.menuItems': 'メニュー登録数',
+    'usageLimitAlert.staffAccounts': 'スタッフアカウント数',
+    'usageLimitAlert.feedPosts': 'フィード投稿数',
+    'usageLimitAlert.upgradeTitle': 'アップグレードで制限を解除',
+    'usageLimitAlert.upgradeDescription': '上位プランにアップグレードすると、メニュー・スタッフ・フィードの登録数が無制限になり、さらに多くの機能が利用できます。',
+    'usageLimitAlert.dismissButton': 'あとで確認する',
+    'usageLimitAlert.upgradeButton': 'プランをアップグレード',
   },
   en: {
     // Common
@@ -2150,6 +2163,19 @@ export const translations = {
     'planUsage.supportEmail': 'Email',
     'planUsage.supportPriority': 'Priority Email',
     'planUsage.upgradeButton': 'Upgrade Plan',
+
+    // Usage Limit Alert
+    'usageLimitAlert.titleApproaching': 'Approaching plan limits',
+    'usageLimitAlert.titleAtLimit': 'Plan limit reached',
+    'usageLimitAlert.descriptionApproaching': 'Some items are approaching their limits. Upgrade to remove restrictions.',
+    'usageLimitAlert.descriptionAtLimit': 'You have reached the limit. Upgrade to add more.',
+    'usageLimitAlert.menuItems': 'Menu items',
+    'usageLimitAlert.staffAccounts': 'Staff accounts',
+    'usageLimitAlert.feedPosts': 'Feed posts',
+    'usageLimitAlert.upgradeTitle': 'Unlock unlimited with an upgrade',
+    'usageLimitAlert.upgradeDescription': 'Upgrade to a higher plan for unlimited menu items, staff accounts, feed posts, and more features.',
+    'usageLimitAlert.dismissButton': 'Remind me later',
+    'usageLimitAlert.upgradeButton': 'Upgrade Plan',
   },
   ko: {
     // Common
@@ -3220,6 +3246,19 @@ export const translations = {
     'planUsage.supportEmail': '이메일',
     'planUsage.supportPriority': '우선 이메일',
     'planUsage.upgradeButton': '플랜 업그레이드',
+
+    // Usage Limit Alert
+    'usageLimitAlert.titleApproaching': '플랜 한도에 가까워지고 있습니다',
+    'usageLimitAlert.titleAtLimit': '플랜 한도에 도달했습니다',
+    'usageLimitAlert.descriptionApproaching': '일부 항목이 한도에 가까워지고 있습니다. 업그레이드하여 제한을 해제하세요.',
+    'usageLimitAlert.descriptionAtLimit': '한도에 도달한 항목이 있습니다. 추가하려면 업그레이드가 필요합니다.',
+    'usageLimitAlert.menuItems': '메뉴 등록 수',
+    'usageLimitAlert.staffAccounts': '스태프 계정 수',
+    'usageLimitAlert.feedPosts': '피드 게시물 수',
+    'usageLimitAlert.upgradeTitle': '업그레이드로 제한 해제',
+    'usageLimitAlert.upgradeDescription': '상위 플랜으로 업그레이드하면 메뉴, 스태프, 피드 등록 수가 무제한이 되며 더 많은 기능을 이용할 수 있습니다.',
+    'usageLimitAlert.dismissButton': '나중에 확인',
+    'usageLimitAlert.upgradeButton': '플랜 업그레이드',
   },
   'zh-Hans': {
     // Common
@@ -4290,6 +4329,19 @@ export const translations = {
     'planUsage.supportEmail': '邮件',
     'planUsage.supportPriority': '优先邮件',
     'planUsage.upgradeButton': '升级方案',
+
+    // Usage Limit Alert
+    'usageLimitAlert.titleApproaching': '接近方案上限',
+    'usageLimitAlert.titleAtLimit': '已达方案上限',
+    'usageLimitAlert.descriptionApproaching': '部分项目接近上限。升级可解除限制。',
+    'usageLimitAlert.descriptionAtLimit': '已有项目达到上限。需要升级才能继续添加。',
+    'usageLimitAlert.menuItems': '菜单注册数',
+    'usageLimitAlert.staffAccounts': '员工账户数',
+    'usageLimitAlert.feedPosts': '动态发布数',
+    'usageLimitAlert.upgradeTitle': '升级解除限制',
+    'usageLimitAlert.upgradeDescription': '升级到更高方案可获得无限菜单、员工、动态注册数以及更多功能。',
+    'usageLimitAlert.dismissButton': '稍后再看',
+    'usageLimitAlert.upgradeButton': '升级方案',
   },
   'zh-Hant': {
     // Common
@@ -5360,6 +5412,19 @@ export const translations = {
     'planUsage.supportEmail': '郵件',
     'planUsage.supportPriority': '優先郵件',
     'planUsage.upgradeButton': '升級方案',
+
+    // Usage Limit Alert
+    'usageLimitAlert.titleApproaching': '接近方案上限',
+    'usageLimitAlert.titleAtLimit': '已達方案上限',
+    'usageLimitAlert.descriptionApproaching': '部分項目接近上限。升級可解除限制。',
+    'usageLimitAlert.descriptionAtLimit': '已有項目達到上限。需要升級才能繼續添加。',
+    'usageLimitAlert.menuItems': '菜單註冊數',
+    'usageLimitAlert.staffAccounts': '員工帳戶數',
+    'usageLimitAlert.feedPosts': '動態發佈數',
+    'usageLimitAlert.upgradeTitle': '升級解除限制',
+    'usageLimitAlert.upgradeDescription': '升級到更高方案可獲得無限菜單、員工、動態註冊數以及更多功能。',
+    'usageLimitAlert.dismissButton': '稍後再看',
+    'usageLimitAlert.upgradeButton': '升級方案',
   },
 } as const;
 

@@ -10,6 +10,7 @@ import { Users, Clock, TrendingUp, Calendar, BarChart3, ArrowLeft, Flame, Downlo
 import { exportToCSV, generateFilename } from "@/lib/csvExport";
 import { exportToPDF, generatePDFFilename } from "@/lib/pdfExport";
 import { PlanBadge } from "@/components/PlanGate";
+import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { useState, useRef } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -301,6 +302,9 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Usage Limit Alert Popup */}
+      {storeId && <UsageLimitAlert storeId={storeId} />}
+
       {/* Header */}
       <header className="border-b bg-card">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">

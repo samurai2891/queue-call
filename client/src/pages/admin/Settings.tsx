@@ -66,6 +66,7 @@ import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 import { VapidSettings } from '@/components/VapidSettings';
 import { PlanGate, PlanBadge } from '@/components/PlanGate';
 import { UpgradeOnboardingDialog, useUpgradeOnboarding } from '@/components/UpgradeOnboardingDialog';
+import { UsageLimitAlert } from '@/components/UsageLimitAlert';
 
 const LOCALE_OPTIONS = [
   { value: 'ja', label: '日本語' },
@@ -1970,6 +1971,9 @@ function SettingsContent() {
 
   return (
     <div className="min-h-screen bg-muted/30">
+      {/* Usage Limit Alert Popup */}
+      {store?.id && <UsageLimitAlert storeId={store.id} />}
+
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background border-b">
         <div className="container py-4 flex items-center justify-between">

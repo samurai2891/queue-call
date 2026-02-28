@@ -27,6 +27,7 @@ import { trpc } from "@/lib/trpc";
 import { AnimatedPage, AnimatedCard } from "@/components/AnimatedPage";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PlanUsageSummary } from "@/components/PlanUsageSummary";
+import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
@@ -191,6 +192,11 @@ export default function Home() {
                   </AnimatedCard>
                 ))}
               </div>
+
+              {/* Usage Limit Alert Popup */}
+              {myStores.map((store) => (
+                <UsageLimitAlert key={`alert-${store.id}`} storeId={store.id} />
+              ))}
             </>
           )}
         </section>
