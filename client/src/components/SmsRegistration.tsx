@@ -13,6 +13,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MessageSquare, Phone, CheckCircle, Loader2, XCircle, Send } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Link } from 'wouter';
 import { toast } from 'sonner';
 import { RATE_LIMITED_ERR_MSG } from '@shared/const';
 
@@ -43,6 +45,7 @@ export function SmsRegistration({ ticketId }: SmsRegistrationProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [privacyAgreed, setPrivacyAgreed] = useState(false);
 
   // Get current SMS status
   const { data: smsStatus, refetch: refetchStatus } = trpc.notification.getSmsStatus.useQuery(
@@ -295,17 +298,31 @@ export function SmsRegistration({ ticketId }: SmsRegistrationProps) {
             </div>
             <p className="text-xs text-muted-foreground">{t('sms.phoneHint')}</p>
           </div>
+          <div className="flex items-start gap-2">
+            <Checkbox
+              id="privacy-consent"
+              checked={privacyAgreed}
+              onCheckedChange={(checked) => setPrivacyAgreed(checked === true)}
+              className="mt-0.5"
+            />
+            <label htmlFor="privacy-consent" className="text-sm text-muted-foreground leading-tight cursor-pointer">
+              <Link href="/privacy" className="text-primary underline underline-offset-2 hover:text-primary/80" target="_blank">
+                {t('sms.privacyPolicy')}
+              </Link>
+              {t('sms.privacyConsent')}
+            </label>
+          </div>
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => setStep('idle')}
+              onClick={() => { setStep('idle'); setPrivacyAgreed(false); }}
               className="flex-1"
             >
               {t('common.cancel')}
             </Button>
             <Button
               onClick={handleSendCode}
-              disabled={!phoneNumber || registerMutation.isPending}
+              disabled={!phoneNumber || !privacyAgreed || registerMutation.isPending}
               className="flex-1"
             >
               {registerMutation.isPending ? (
