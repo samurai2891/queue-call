@@ -161,6 +161,7 @@ function StaffContent() {
     scope: 'staff',
     storeId: store?.id || 0,
     storeSlug: params.storeSlug,
+    sessionToken: sessionToken || undefined,
     enabled: !!store?.id && !!sessionToken && !!session,
     onQueueUpdate: () => {
 

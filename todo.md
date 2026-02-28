@@ -1224,3 +1224,53 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] フィルター結果が0件の場合の空状態表示（「該当するチケットがありません」）
 - [x] 翻訳キー追加（5言語×2キー=10エントリ）
 - [x] TypeScriptエラーゼロ・全195テストパス
+
+
+---
+
+## リリース前タスク（優先順位順）
+
+以下の順序で実施。各タスクは独立しており衝突しない。
+
+### R1: SSEエンドポイントの認証・接続数制限追加（High / セキュリティ）（完了）
+- [x] staffスコープのSSE接続にsessionToken認証を追加
+- [x] ticketスコープのSSE接続にticketToken検証を追加
+- [x] 全スコープで店舗存在確認を追加
+- [x] SSE接続数の上限を店舗あたり100・IPあたり10で設定（DoS対策）
+- [x] 不正なstoreId（非数値・0・負数）での接続を拡否するバリデーション追加
+- [x] フロントエンドのuseSSEフックにsessionTokenパラメータを追加
+- [x] テスト12件追加、全207テストパス、TSエラーゼロ
+
+### R2: データベースインデックスの追加（High / パフォーマンス）
+- [ ] ticketsテーブルに (storeId, status) 複合インデックスを追加
+- [ ] ticketsテーブルに (storeId, dayKey) 複合インデックスを追加
+- [ ] reservationsテーブルに (storeId, date) 複合インデックスを追加
+- [ ] pnpm db:pushでマイグレーション実行
+
+### R3: index.htmlの修正（Medium / SEO・UX）
+- [ ] html lang属性を "en" → "ja" に修正
+- [ ] favicon linkタグを追加
+- [ ] meta descriptionタグを追加
+- [ ] OGPタグ（og:title, og:description, og:image）を追加
+- [ ] テンプレートのコメントブロック（Google Fonts）を削除
+
+### R4: 古いチケットデータの自動削除ジョブ（Medium / 運用）
+- [ ] 一定期間（90日）経過した完了・キャンセル済みチケットの自動削除ジョブを追加
+- [ ] 関連するpushSubscriptions, smsSubscriptionsも連動削除
+- [ ] ジョブの起動をserver起動時に登録
+
+### R5: プライバシーポリシー・利用規約ページ（Medium / 法務）
+- [ ] プライバシーポリシーページを作成（/privacy）
+- [ ] 利用規約ページを作成（/terms）
+- [ ] フッターまたはStoreTopからリンクを追加
+- [ ] SMS登録時にプライバシーポリシーへの同意チェックを追加
+
+### R6: レート制限の強化（Medium / セキュリティ）
+- [ ] SMS送信APIにレート制限を追加
+- [ ] スタッフログイン試行にレート制限を追加
+- [ ] 予約作成APIにレート制限を追加
+
+### R7: Stripe Webhook登録順序の修正 + Sandboxクレーム（最後 / 決済）
+- [ ] /api/stripe/webhookをexpress.json()の前に移動
+- [ ] Stripe Sandboxのクレーム（2026-03-14期限）
+- [ ] テスト決済（4242 4242 4242 4242）で動作確認

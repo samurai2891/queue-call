@@ -7,6 +7,7 @@ interface UseSSEOptions {
   storeId: number;
   storeSlug?: string;
   ticketToken?: string;
+  sessionToken?: string;
   onMessage?: (event: string, data: any) => void;
   onQueueUpdate?: (data: { currentNumber: number; waitingCount: number; nextNumbers?: number[] }) => void;
   onTicketUpdate?: (data: { status: string; number: number; groupsAhead?: number }) => void;
@@ -21,6 +22,7 @@ export function useSSE({
   storeId,
   storeSlug,
   ticketToken,
+  sessionToken,
   onMessage,
   onQueueUpdate,
   onTicketUpdate,
@@ -75,6 +77,9 @@ export function useSSE({
     }
     if (ticketToken) {
       params.set('ticketToken', ticketToken);
+    }
+    if (sessionToken) {
+      params.set('sessionToken', sessionToken);
     }
 
 
@@ -149,7 +154,7 @@ export function useSSE({
     eventSource.addEventListener('ping', () => {
       // Keep-alive, no action needed
     });
-  }, [enabled, storeId, scope, storeSlug, ticketToken, onMessage, onQueueUpdate, onTicketUpdate, onCalled, onIntakeStatus]);
+  }, [enabled, storeId, scope, storeSlug, ticketToken, sessionToken, onMessage, onQueueUpdate, onTicketUpdate, onCalled, onIntakeStatus]);
 
 
   useEffect(() => {

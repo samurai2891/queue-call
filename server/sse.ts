@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { getRequestId } from './_core/requestContext';
+import * as db from './db';
 
 
 // SSE connection types
@@ -13,8 +14,12 @@ interface SSEClient {
   storeSlug?: string;
   ticketToken?: string;
   requestId?: string;
+  ip?: string;
 }
 
+// Connection limits
+const MAX_CONNECTIONS_PER_STORE = 100;
+const MAX_CONNECTIONS_PER_IP = 10;
 
 // Store active SSE connections
 const clients: Map<string, SSEClient> = new Map();
@@ -22,6 +27,63 @@ const clients: Map<string, SSEClient> = new Map();
 // Generate unique client ID
 function generateClientId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Get client IP from request
+function getClientIP(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.socket.remoteAddress || 'unknown';
+}
+
+// Count connections by store
+function getConnectionCountByStore(storeId: number): number {
+  let count = 0;
+  clients.forEach((client) => {
+    if (client.storeId === storeId) count++;
+  });
+  return count;
+}
+
+// Count connections by IP
+function getConnectionCountByIP(ip: string): number {
+  let count = 0;
+  clients.forEach((client) => {
+    if (client.ip === ip) count++;
+  });
+  return count;
+}
+
+// Validate store exists
+async function validateStoreId(storeId: number): Promise<boolean> {
+  try {
+    const store = await db.getStoreById(storeId);
+    return !!store;
+  } catch {
+    return false;
+  }
+}
+
+// Validate staff session token
+async function validateStaffSession(sessionToken: string, storeId: number): Promise<boolean> {
+  try {
+    const session = await db.getStaffSession(sessionToken);
+    return !!session && session.storeId === storeId;
+  } catch {
+    return false;
+  }
+}
+
+// Validate ticket token
+async function validateTicketToken(ticketToken: string): Promise<boolean> {
+  try {
+    const ticket = await db.getTicketByToken(ticketToken);
+    return !!ticket;
+  } catch {
+    return false;
+  }
 }
 
 // Send SSE message to a client
@@ -100,13 +162,13 @@ export function broadcastIntakeStatus(storeId: number, status: 'open' | 'paused'
 }
 
 // SSE endpoint handler
-export function handleSSE(req: Request, res: Response) {
-  const { scope, storeId, ticketToken, storeSlug } = req.query;
+export async function handleSSE(req: Request, res: Response) {
+  const { scope, storeId, ticketToken, storeSlug, sessionToken } = req.query;
   const requestId = getRequestId();
   const storeSlugValue = Array.isArray(storeSlug) ? storeSlug[0] : storeSlug;
+  const clientIP = getClientIP(req);
   
   if (!scope || !storeId) {
-
     res.status(400).json({ error: 'Missing scope or storeId' });
     return;
   }
@@ -114,6 +176,65 @@ export function handleSSE(req: Request, res: Response) {
   const validScopes: SSEScope[] = ['board', 'staff', 'ticket'];
   if (!validScopes.includes(scope as SSEScope)) {
     res.status(400).json({ error: 'Invalid scope' });
+    return;
+  }
+
+  const parsedStoreId = parseInt(storeId as string, 10);
+  if (isNaN(parsedStoreId) || parsedStoreId <= 0) {
+    res.status(400).json({ error: 'Invalid storeId' });
+    return;
+  }
+
+  // --- Authentication checks per scope ---
+
+  // Validate store exists for all scopes
+  const storeExists = await validateStoreId(parsedStoreId);
+  if (!storeExists) {
+    res.status(404).json({ error: 'Store not found' });
+    return;
+  }
+
+  // Staff scope: require valid sessionToken
+  if (scope === 'staff') {
+    const token = sessionToken as string | undefined;
+    if (!token) {
+      res.status(401).json({ error: 'Authentication required for staff SSE' });
+      return;
+    }
+    const validSession = await validateStaffSession(token, parsedStoreId);
+    if (!validSession) {
+      res.status(401).json({ error: 'Invalid or expired staff session' });
+      return;
+    }
+  }
+
+  // Ticket scope: require valid ticketToken
+  if (scope === 'ticket') {
+    const token = ticketToken as string | undefined;
+    if (!token) {
+      res.status(401).json({ error: 'Ticket token required' });
+      return;
+    }
+    const validTicket = await validateTicketToken(token);
+    if (!validTicket) {
+      res.status(401).json({ error: 'Invalid ticket token' });
+      return;
+    }
+  }
+
+  // --- Connection limits ---
+
+  // Check per-store limit
+  const storeConnectionCount = getConnectionCountByStore(parsedStoreId);
+  if (storeConnectionCount >= MAX_CONNECTIONS_PER_STORE) {
+    res.status(429).json({ error: 'Too many connections for this store' });
+    return;
+  }
+
+  // Check per-IP limit
+  const ipConnectionCount = getConnectionCountByIP(clientIP);
+  if (ipConnectionCount >= MAX_CONNECTIONS_PER_IP) {
+    res.status(429).json({ error: 'Too many connections from this IP' });
     return;
   }
 
@@ -130,10 +251,11 @@ export function handleSSE(req: Request, res: Response) {
     id: clientId,
     res,
     scope: scope as SSEScope,
-    storeId: parseInt(storeId as string, 10),
+    storeId: parsedStoreId,
     storeSlug: typeof storeSlugValue === 'string' ? storeSlugValue : undefined,
     ticketToken: ticketToken as string | undefined,
     requestId,
+    ip: clientIP,
   };
 
 
