@@ -48,6 +48,27 @@ vi.mock('./notifications', () => ({
   notifyTicketCalled: vi.fn().mockResolvedValue({ push: false, sms: false }),
 }));
 
+// Mock subscription
+vi.mock('./subscription', () => ({
+  PLANS: {
+    free: { id: 'free', monthlyTicketLimit: 50, features: {} },
+    standard: { id: 'standard', monthlyTicketLimit: null, features: {} },
+    pro: { id: 'pro', monthlyTicketLimit: null, features: {} },
+  },
+  createSubscriptionCheckout: vi.fn(),
+  getSubscriptionInfo: vi.fn(),
+  cancelSubscription: vi.fn(),
+  reactivateSubscription: vi.fn(),
+  changeSubscriptionPlan: vi.fn(),
+  checkAndIncrementMonthlyTicket: vi.fn().mockResolvedValue({ allowed: true }),
+  handleSubscriptionCheckoutCompleted: vi.fn(),
+  handleSubscriptionUpdated: vi.fn(),
+  handleSubscriptionDeleted: vi.fn(),
+  resetPriceCache: vi.fn(),
+  FREE_MONTHLY_TICKET_LIMIT: 50,
+  STRIPE_PRODUCT_CONFIG: {},
+}));
+
 // Mock bcrypt
 vi.mock('bcryptjs', () => ({
   hash: vi.fn().mockResolvedValue('hashed_pin'),

@@ -71,6 +71,13 @@
       "when": 1772257868518,
       "tag": "0009_slow_bucky",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1772274294795,
+      "tag": "0010_glamorous_ultimatum",
+      "breakpoints": true
     }
   ]
 }

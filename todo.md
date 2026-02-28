@@ -1414,3 +1414,14 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] 申し込み用CTAボタン（Free:無料で始める / Standard・Pro:申し込む）
 - [x] ブラウザで表示確認（ダークモードで全セクションOK）
 - [x] 全405テストパス
+
+### Stripe月額サブスクリプション決済機能の実装（完了）
+- [x] 現在のStripe連携・DB構造を確認
+- [x] Stripe Products/Pricesの定義（Standard ¥1,650税込/月、Pro ¥3,850税込/月）、自動作成・キャッシュ機能付き
+- [x] DBスキーマ更新（subscriptionPlan, stripeSubscriptionId, monthlyTicketCount, monthlyTicketResetDate）
+- [x] Checkout Session作成API（mode: subscription、metadata付き）
+- [x] Webhook処理（checkout.session.completed分岐、subscription.updated/deleted）
+- [x] サブスクリプション状態取得・解約・再有効化・プラン変更API
+- [x] フロントエンドUI（BillingTab: 現在のプラン表示・アップグレード・解約・再有効化・プラン変更・月間使用量プログレスバー）
+- [x] 無料枠の月間50人制限ロジック（checkAndIncrementMonthlyTicket、月初自動リセット）
+- [x] テスト追加・実行（22テスト追加、全427テスト全パス）

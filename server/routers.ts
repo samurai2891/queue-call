@@ -10,6 +10,7 @@ import * as db from "./db";
 import { notifyTicketCalled } from "./notifications";
 import { broadcastQueueUpdate, broadcastTicketUpdate, broadcastIntakeStatus } from "./sse";
 import { createCheckoutSession, getSmsBalance, getSmsTransactions, getSmsAnalytics, CHARGE_PLANS, SMS_COST_PER_MESSAGE } from "./stripe";
+import { PLANS, createSubscriptionCheckout, getSubscriptionInfo, cancelSubscription, reactivateSubscription, changeSubscriptionPlan, checkAndIncrementMonthlyTicket, type PlanId } from "./subscription";
 import { checkBusinessHours } from "../shared/businessHours";
 
 
@@ -650,6 +651,15 @@ const ticketRouter = router({
         if (!bhCheck.isOpen) {
           throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Outside business hours' });
         }
+      }
+
+      // 月間チケット制限チェック
+      const ticketCheck = await checkAndIncrementMonthlyTicket(input.storeId);
+      if (!ticketCheck.allowed) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: ticketCheck.reason || 'Monthly ticket limit reached',
+        });
       }
 
       const ipAddress = getRequestIp(ctx.req);
@@ -2120,6 +2130,100 @@ const stripeRouter = router({
     }),
 });
 
+// ==================== Subscription Router ====================
+const subscriptionRouter = router({
+  // Get available plans
+  getPlans: publicProcedure.query(() => {
+    return Object.values(PLANS);
+  }),
+
+  // Get current store subscription info
+  getInfo: protectedProcedure
+    .input(z.object({ storeId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      const info = await getSubscriptionInfo(input.storeId);
+      if (!info) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
+      }
+      return info;
+    }),
+
+  // Create subscription checkout session
+  createCheckout: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      planId: z.enum(['standard', 'pro']),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      // 既に同じプランの場合はエラー
+      if (store.subscriptionPlan === input.planId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: '既にこのプランに加入しています' });
+      }
+
+      // 既存のサブスクリプションがある場合はプラン変更
+      if (store.stripeSubscriptionId && store.subscriptionStatus === 'active') {
+        const result = await changeSubscriptionPlan(input.storeId, input.planId);
+        if (!result.success) {
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: result.message });
+        }
+        return { type: 'plan_changed' as const, message: result.message };
+      }
+
+      const origin = ctx.req.headers.origin || 'http://localhost:3000';
+
+      const session = await createSubscriptionCheckout({
+        storeId: store.id,
+        storeName: store.name,
+        planId: input.planId,
+        successUrl: `${origin}/admin/settings?tab=billing&subscription=success`,
+        cancelUrl: `${origin}/admin/settings?tab=billing&subscription=canceled`,
+        customerEmail: ctx.user.email || undefined,
+        stripeCustomerId: store.stripeCustomerId || undefined,
+      });
+
+      return { type: 'checkout' as const, url: session.url, sessionId: session.sessionId };
+    }),
+
+  // Cancel subscription (at period end)
+  cancel: protectedProcedure
+    .input(z.object({ storeId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      const result = await cancelSubscription(input.storeId);
+      if (!result.success) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: result.message });
+      }
+      return result;
+    }),
+
+  // Reactivate canceled subscription
+  reactivate: protectedProcedure
+    .input(z.object({ storeId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      const result = await reactivateSubscription(input.storeId);
+      if (!result.success) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: result.message });
+      }
+      return result;
+    }),
+});
+
 // ==================== SMS Logs Router ====================
 const smsLogsRouter = router({
   // Get SMS logs with pagination (protected)
@@ -2782,6 +2886,7 @@ export const appRouter = router({
   stripe: stripeRouter,
   smsLogs: smsLogsRouter,
   reservation: reservationRouter,
+  subscription: subscriptionRouter,
 });
 
 export type AppRouter = typeof appRouter;

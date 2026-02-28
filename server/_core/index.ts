@@ -21,6 +21,7 @@ import { startDailyResetJob } from "../jobs/dailyReset";
 import { startWaitAlertJob } from "../jobs/waitAlert";
 
 import { constructWebhookEvent, handleCheckoutCompleted, handleInvoicePaid } from "../stripe";
+import { handleSubscriptionCheckoutCompleted, handleSubscriptionUpdated, handleSubscriptionDeleted } from "../subscription";
 import { loadVapidKeysFromDb } from "../vapid";
 import { storageGet, storagePut } from "../storage";
 import * as db from "../db";
@@ -358,11 +359,24 @@ async function startServer() {
       console.log(`[Stripe Webhook] Received event: ${event.type}`);
       
       switch (event.type) {
-        case 'checkout.session.completed':
-          await handleCheckoutCompleted(event.data.object as any);
+        case 'checkout.session.completed': {
+          const session = event.data.object as any;
+          // サブスクリプションか一回きりの決済かを判定
+          if (session.mode === 'subscription' && session.metadata?.type === 'subscription') {
+            await handleSubscriptionCheckoutCompleted(session);
+          } else {
+            await handleCheckoutCompleted(session);
+          }
           break;
+        }
         case 'invoice.paid':
           await handleInvoicePaid(event.data.object as any);
+          break;
+        case 'customer.subscription.updated':
+          await handleSubscriptionUpdated(event.data.object as any);
+          break;
+        case 'customer.subscription.deleted':
+          await handleSubscriptionDeleted(event.data.object as any);
           break;
         default:
           console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);

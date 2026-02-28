@@ -57,6 +57,16 @@ export const stores = mysqlTable("stores", {
   // SMS残高（プリペイド）
   smsBalance: int("smsBalance").default(0).notNull(),
   
+  // サブスクリプションプラン
+  subscriptionPlan: mysqlEnum("subscriptionPlan", ["free", "standard", "pro"]).default("free").notNull(),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }),
+  subscriptionStatus: varchar("subscriptionStatus", { length: 32 }), // active, past_due, canceled, etc.
+  subscriptionCurrentPeriodEnd: timestamp("subscriptionCurrentPeriodEnd"),
+  
+  // 月間チケットカウント（無料枠制限用）
+  monthlyTicketCount: int("monthlyTicketCount").default(0).notNull(),
+  monthlyTicketResetDate: varchar("monthlyTicketResetDate", { length: 10 }), // YYYY-MM形式
+  
   // Stripe顧客ID
   stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
   

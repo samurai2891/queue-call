@@ -1,5 +1,5 @@
 import { useParams, useLocation, useSearch } from 'wouter';
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
@@ -1850,6 +1850,7 @@ function SettingsContent() {
     { id: 'businessHours', label: t('settings.businessHours'), icon: Clock },
     { id: 'qrcode', label: t('settings.qrcode'), icon: QrCode },
     { id: 'security', label: t('settings.security'), icon: Shield },
+    { id: 'billing', label: t('settings.billing') || 'プラン・お支払い', icon: CreditCard },
   ];
 
 
@@ -4014,6 +4015,11 @@ function SettingsContent() {
               <VapidSettings t={t as (key: string) => string} storeId={store?.id} />
             </div>
           </TabsContent>
+
+          {/* Billing Tab */}
+          <TabsContent value="billing">
+            <BillingTab store={store} t={t as (key: string) => string} />
+          </TabsContent>
         </Tabs>
 
         <AlertDialog open={reorderConfirmOpen} onOpenChange={setReorderConfirmOpen}>
@@ -4036,6 +4042,228 @@ function SettingsContent() {
 
 
       </main>
+    </div>
+  );
+}
+
+// ==================== Billing Tab Component ====================
+function BillingTab({ store, t }: { store: any; t: (key: string) => string }) {
+  const utils = trpc.useUtils();
+  const { data: subInfo, isLoading } = trpc.subscription.getInfo.useQuery(
+    { storeId: store?.id },
+    { enabled: !!store?.id }
+  );
+
+  const createCheckout = trpc.subscription.createCheckout.useMutation({
+    onSuccess: (result) => {
+      if (result.type === 'checkout' && result.url) {
+        toast.info(t('settings.redirectingToCheckout'));
+        window.open(result.url, '_blank');
+      } else if (result.type === 'plan_changed') {
+        toast.success(t('settings.planChangedSuccess'));
+        utils.subscription.getInfo.invalidate();
+      }
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const cancelSub = trpc.subscription.cancel.useMutation({
+    onSuccess: () => {
+      toast.success(t('settings.subscriptionCanceled'));
+      utils.subscription.getInfo.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const reactivateSub = trpc.subscription.reactivate.useMutation({
+    onSuccess: () => {
+      toast.success(t('settings.subscriptionReactivated'));
+      utils.subscription.getInfo.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-12 flex justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const currentPlan = subInfo?.plan;
+  const planId = currentPlan?.id || 'free';
+  const status = subInfo?.status;
+  const cancelAtPeriodEnd = subInfo?.cancelAtPeriodEnd;
+
+  const getStatusBadge = () => {
+    if (planId === 'free') return <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">{t('settings.planStatusFree')}</span>;
+    if (cancelAtPeriodEnd) return <span className="inline-flex items-center rounded-full bg-yellow-500/10 text-yellow-600 px-2.5 py-0.5 text-xs font-medium">{t('settings.planStatusCanceled')}</span>;
+    if (status === 'active') return <span className="inline-flex items-center rounded-full bg-green-500/10 text-green-600 px-2.5 py-0.5 text-xs font-medium">{t('settings.planStatusActive')}</span>;
+    if (status === 'past_due') return <span className="inline-flex items-center rounded-full bg-red-500/10 text-red-600 px-2.5 py-0.5 text-xs font-medium">{t('settings.planStatusPastDue')}</span>;
+    return <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">{t('settings.planStatusFree')}</span>;
+  };
+
+  const plans = [
+    { id: 'standard' as const, name: 'Standard', price: 1500, priceTax: 1650 },
+    { id: 'pro' as const, name: 'Pro', price: 3500, priceTax: 3850 },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Current Plan Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.currentPlan')}</CardTitle>
+          <CardDescription>{t('settings.billingDescription')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-2xl font-bold">{currentPlan?.name || 'Free'}</h3>
+              {currentPlan && currentPlan.priceMonthly > 0 && (
+                <p className="text-muted-foreground">
+                  ¥{currentPlan.priceMonthlyTax.toLocaleString()}{t('settings.perMonth')}
+                  <span className="text-xs ml-1">({t('settings.taxIncluded')})</span>
+                </p>
+              )}
+            </div>
+            {getStatusBadge()}
+          </div>
+
+          {/* Next billing / Expiry */}
+          {subInfo?.currentPeriodEnd && (
+            <div className="text-sm text-muted-foreground">
+              {cancelAtPeriodEnd ? (
+                <p>{t('settings.planExpiresAt')}: {new Date(subInfo.currentPeriodEnd).toLocaleDateString()}</p>
+              ) : (
+                <p>{t('settings.planNextBilling')}: {new Date(subInfo.currentPeriodEnd).toLocaleDateString()}</p>
+              )}
+            </div>
+          )}
+
+          {/* Monthly ticket usage */}
+          <div className="rounded-lg border p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">{t('settings.monthlyTicketUsage')}</span>
+              <span className="text-sm text-muted-foreground">
+                {subInfo?.monthlyTicketCount || 0} / {subInfo?.monthlyTicketLimit ? subInfo.monthlyTicketLimit : t('settings.monthlyTicketUnlimited')}
+              </span>
+            </div>
+            {subInfo?.monthlyTicketLimit && (
+              <div className="w-full bg-muted rounded-full h-2">
+                <div
+                  className="bg-primary rounded-full h-2 transition-all"
+                  style={{ width: `${Math.min(100, ((subInfo.monthlyTicketCount || 0) / subInfo.monthlyTicketLimit) * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-2">
+            {status === 'active' && !cancelAtPeriodEnd && planId !== 'free' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCancelDialogOpen(true)}
+                disabled={cancelSub.isPending}
+              >
+                {cancelSub.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {t('settings.cancelSubscription')}
+              </Button>
+            )}
+            {cancelAtPeriodEnd && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => reactivateSub.mutate({ storeId: store.id })}
+                disabled={reactivateSub.isPending}
+              >
+                {reactivateSub.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {t('settings.reactivateSubscription')}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Available Plans */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{planId === 'free' ? t('settings.upgradePlan') : t('settings.changePlan')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2">
+            {plans.map((plan) => {
+              const isCurrent = planId === plan.id;
+              return (
+                <div
+                  key={plan.id}
+                  className={`rounded-lg border p-4 space-y-3 ${
+                    isCurrent ? 'border-primary bg-primary/5' : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-lg">{plan.name}</h4>
+                    {isCurrent && (
+                      <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium">
+                        {t('settings.currentPlan')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-2xl font-bold">
+                    ¥{plan.priceTax.toLocaleString()}
+                    <span className="text-sm font-normal text-muted-foreground">{t('settings.perMonth')}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    (¥{plan.price.toLocaleString()} + {t('settings.taxIncluded')})
+                  </p>
+                  {!isCurrent && (
+                    <Button
+                      className="w-full"
+                      variant={plan.id === 'standard' && planId === 'free' ? 'default' : 'outline'}
+                      onClick={() => createCheckout.mutate({ storeId: store.id, planId: plan.id })}
+                      disabled={createCheckout.isPending}
+                    >
+                      {createCheckout.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {planId === 'free' ? `${plan.name} ${t('settings.subscribeTo')}` : t('settings.changePlan')}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Cancel Confirmation Dialog */}
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('settings.cancelSubscription')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('settings.cancelSubscriptionConfirm')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                cancelSub.mutate({ storeId: store.id });
+                setCancelDialogOpen(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t('settings.cancelSubscription')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

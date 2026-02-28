@@ -49,7 +49,9 @@ describe("Stripe Webhook Implementation", () => {
 
     it("should handle checkout.session.completed event", () => {
       expect(indexContent).toContain("case 'checkout.session.completed':");
-      expect(indexContent).toContain("handleCheckoutCompleted(event.data.object");
+      // Now handles both subscription and one-time checkout
+      expect(indexContent).toContain("handleCheckoutCompleted");
+      expect(indexContent).toContain("handleSubscriptionCheckoutCompleted");
     });
 
     it("should return { received: true } on success", () => {
