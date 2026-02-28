@@ -1297,3 +1297,8 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] SMS OTPは現状維持（STATIC_RATE_LIMITSに移行、コスト保護目的）
 - [x] StoreSettingsにmaxTicketsPerHour設定を追加（デフォルト50）
 - [x] テスト25件更新、全273テストパス、TSエラーゼロ
+
+### maxTicketsPerHour設定UIの追加（完了）
+- [x] 店舗設定画面のキュー設定セクションにmaxTicketsPerHour入力フィールドを追加（10〜500、デフォルト50）
+- [x] 多言語翻訳キーを追加（5言語：日本語・英語・韓国語・簡体字・繁体字）
+- [x] テスト14件追加、全287テストパス、TSエラーゼロ

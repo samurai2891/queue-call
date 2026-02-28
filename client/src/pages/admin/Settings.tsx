@@ -519,6 +519,7 @@ function SettingsContent() {
     crowdLevelLow: 3,
     crowdLevelModerate: 7,
     crowdLevelBusy: 12,
+    maxTicketsPerHour: 50,
     
     // Notifications
     pushEnabled: true,
@@ -741,6 +742,7 @@ function SettingsContent() {
         crowdLevelLow: settings.queue?.crowdLevelThresholds?.low ?? 3,
         crowdLevelModerate: settings.queue?.crowdLevelThresholds?.moderate ?? 7,
         crowdLevelBusy: settings.queue?.crowdLevelThresholds?.busy ?? 12,
+        maxTicketsPerHour: settings.queue?.maxTicketsPerHour ?? 50,
         
         pushEnabled: settings.notifications?.pushEnabled ?? true,
         smsEnabled: settings.notifications?.smsEnabled || false,
@@ -927,6 +929,7 @@ function SettingsContent() {
           moderate: formData.crowdLevelModerate,
           busy: formData.crowdLevelBusy,
         },
+        maxTicketsPerHour: formData.maxTicketsPerHour,
       },
       notifications: {
         pushEnabled: formData.pushEnabled,
@@ -1825,6 +1828,24 @@ function SettingsContent() {
                         updateField('checkinGraceMinutes', Number.isNaN(val) ? 5 : val);
                       }}
                     />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="maxTicketsPerHour">{t('settings.maxTicketsPerHour')}</Label>
+                    <Input
+                      id="maxTicketsPerHour"
+                      type="number"
+                      min={10}
+                      max={500}
+                      value={Number.isNaN(formData.maxTicketsPerHour) ? '' : formData.maxTicketsPerHour}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        updateField('maxTicketsPerHour', Number.isNaN(val) ? 50 : val);
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">{t('settings.maxTicketsPerHourHelp')}</p>
                   </div>
                 </div>
 
