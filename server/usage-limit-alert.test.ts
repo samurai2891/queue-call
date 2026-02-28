@@ -256,3 +256,152 @@ describe("UsageLimitAlert - Translation keys", () => {
     expect(t("en", "usageLimitAlert.tooltipAtLimit")).toContain("Upgrade");
   });
 });
+
+describe("Dashboard Usage Trend - Linear regression prediction", () => {
+  // Mirror the linear regression logic from Dashboard.tsx
+  function linearRegression(data: number[]) {
+    const len = data.length;
+    if (len < 2) return { slope: 0, intercept: data[0] || 0 };
+    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    for (let i = 0; i < len; i++) {
+      sumX += i;
+      sumY += data[i];
+      sumXY += i * data[i];
+      sumXX += i * i;
+    }
+    const slope = (len * sumXY - sumX * sumY) / (len * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / len;
+    return { slope, intercept };
+  }
+
+  function estimateDaysToLimit(currentValue: number, slope: number, limit: number | null) {
+    if (limit === null || limit === 0) return null;
+    if (currentValue >= limit) return 0;
+    if (slope <= 0) return null;
+    return Math.ceil((limit - currentValue) / slope);
+  }
+
+  it("calculates correct slope for constant data", () => {
+    const data = [5, 5, 5, 5, 5];
+    const { slope } = linearRegression(data);
+    expect(slope).toBeCloseTo(0, 5);
+  });
+
+  it("calculates correct slope for linearly increasing data", () => {
+    const data = [1, 2, 3, 4, 5];
+    const { slope, intercept } = linearRegression(data);
+    expect(slope).toBeCloseTo(1, 5);
+    expect(intercept).toBeCloseTo(1, 5);
+  });
+
+  it("calculates correct slope for linearly decreasing data", () => {
+    const data = [10, 8, 6, 4, 2];
+    const { slope } = linearRegression(data);
+    expect(slope).toBeCloseTo(-2, 5);
+  });
+
+  it("handles single data point", () => {
+    const data = [42];
+    const { slope, intercept } = linearRegression(data);
+    expect(slope).toBe(0);
+    expect(intercept).toBe(42);
+  });
+
+  it("handles empty data", () => {
+    const data: number[] = [];
+    const { slope, intercept } = linearRegression(data);
+    expect(slope).toBe(0);
+    expect(intercept).toBe(0);
+  });
+
+  it("estimates days to limit correctly for increasing data", () => {
+    // Current: 3, slope: 1/day, limit: 5 → 2 days
+    const days = estimateDaysToLimit(3, 1, 5);
+    expect(days).toBe(2);
+  });
+
+  it("returns 0 when already at limit", () => {
+    const days = estimateDaysToLimit(5, 1, 5);
+    expect(days).toBe(0);
+  });
+
+  it("returns 0 when over limit", () => {
+    const days = estimateDaysToLimit(7, 1, 5);
+    expect(days).toBe(0);
+  });
+
+  it("returns null for decreasing data (no risk)", () => {
+    const days = estimateDaysToLimit(3, -1, 5);
+    expect(days).toBeNull();
+  });
+
+  it("returns null for unlimited plans", () => {
+    const days = estimateDaysToLimit(3, 1, null);
+    expect(days).toBeNull();
+  });
+
+  it("returns null for zero slope (constant usage)", () => {
+    const days = estimateDaysToLimit(3, 0, 5);
+    expect(days).toBeNull();
+  });
+
+  it("rounds up fractional days", () => {
+    // Current: 3, slope: 0.7/day, limit: 5 → ceil(2/0.7) = ceil(2.857) = 3
+    const days = estimateDaysToLimit(3, 0.7, 5);
+    expect(days).toBe(3);
+  });
+});
+
+describe("Dashboard Usage Trend - Translation keys", () => {
+  const trendKeys = [
+    "dashboard.usageTrendTitle",
+    "dashboard.usageMenuTrend",
+    "dashboard.usageMenuTrendDesc",
+    "dashboard.usageFeedTrend",
+    "dashboard.usageFeedTrendDesc",
+    "dashboard.usageTicketTrendTitle",
+    "dashboard.usageTicketTrendDesc",
+    "dashboard.usageActual",
+    "dashboard.usagePredicted",
+    "dashboard.usageLimitLine",
+    "dashboard.usageDailyAvgLimit",
+    "dashboard.usageLimitReached",
+    "dashboard.usageDaysToLimit",
+    "dashboard.usageNoLimitRisk",
+    "dashboard.usageMonthlyTickets",
+    "dashboard.usageTicketTrend",
+  ];
+
+  it("all usage trend translation keys exist in all supported locales", () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      for (const key of trendKeys) {
+        const value = t(locale, key);
+        expect(value).not.toBe(key);
+        expect(value.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("usageDaysToLimit contains {days} placeholder in all locales", () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      const value = t(locale, "dashboard.usageDaysToLimit");
+      expect(value).toContain("{days}");
+    }
+  });
+
+  it("Japanese trend translations contain expected content", () => {
+    expect(t("ja", "dashboard.usageTrendTitle")).toContain("推移");
+    expect(t("ja", "dashboard.usageActual")).toBe("実績");
+    expect(t("ja", "dashboard.usagePredicted")).toBe("予測");
+    expect(t("ja", "dashboard.usageLimitLine")).toBe("上限");
+    expect(t("ja", "dashboard.usageLimitReached")).toContain("上限");
+  });
+
+  it("English trend translations contain expected content", () => {
+    expect(t("en", "dashboard.usageTrendTitle")).toContain("Trend");
+    expect(t("en", "dashboard.usageActual")).toBe("Actual");
+    expect(t("en", "dashboard.usagePredicted")).toBe("Forecast");
+    expect(t("en", "dashboard.usageLimitLine")).toBe("Limit");
+    expect(t("en", "dashboard.usageLimitReached")).toContain("reached");
+  });
+});

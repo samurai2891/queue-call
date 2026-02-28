@@ -2135,3 +2135,102 @@ export async function getFeedPostCount(storeId: number): Promise<number> {
 
   return Number(result[0]?.count ?? 0);
 }
+
+
+// ==================== Usage Trend Helpers ====================
+
+/**
+ * 日別のメニュー登録数推移を取得（createdAtベースで累積カウント）
+ */
+export async function getDailyMenuItemTrend(storeId: number, days: number = 30) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+
+  const result = await db.select({
+    date: sql<string>`DATE(${menuItems.createdAt})`.as('date'),
+    count: sql<number>`count(*)`.as('count'),
+  })
+    .from(menuItems)
+    .where(and(
+      eq(menuItems.storeId, storeId),
+      sql`${menuItems.createdAt} >= ${startDate}`
+    ))
+    .groupBy(sql`DATE(${menuItems.createdAt})`)
+    .orderBy(sql`DATE(${menuItems.createdAt})`);
+
+  return result;
+}
+
+/**
+ * 日別のフィード投稿数推移を取得（createdAtベースで累積カウント）
+ */
+export async function getDailyFeedPostTrend(storeId: number, days: number = 30) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+
+  const result = await db.select({
+    date: sql<string>`DATE(${feedPosts.createdAt})`.as('date'),
+    count: sql<number>`count(*)`.as('count'),
+  })
+    .from(feedPosts)
+    .where(and(
+      eq(feedPosts.storeId, storeId),
+      sql`${feedPosts.createdAt} >= ${startDate}`
+    ))
+    .groupBy(sql`DATE(${feedPosts.createdAt})`)
+    .orderBy(sql`DATE(${feedPosts.createdAt})`);
+
+  return result;
+}
+
+/**
+ * 日別のチケット発券数推移を取得
+ */
+export async function getDailyTicketTrend(storeId: number, days: number = 30) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+
+  const result = await db.select({
+    date: sql<string>`DATE(${tickets.createdAt})`.as('date'),
+    count: sql<number>`count(*)`.as('count'),
+  })
+    .from(tickets)
+    .where(and(
+      eq(tickets.storeId, storeId),
+      sql`${tickets.createdAt} >= ${startDate}`
+    ))
+    .groupBy(sql`DATE(${tickets.createdAt})`)
+    .orderBy(sql`DATE(${tickets.createdAt})`);
+
+  return result;
+}
+
+/**
+ * 現在の各リソースの累積カウントを取得
+ */
+export async function getResourceCounts(storeId: number) {
+  const db = await getDb();
+  if (!db) return { menu: 0, feed: 0, monthlyTickets: 0 };
+
+  const [menuResult, feedResult] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(menuItems).where(eq(menuItems.storeId, storeId)),
+    db.select({ count: sql<number>`count(*)` }).from(feedPosts).where(eq(feedPosts.storeId, storeId)),
+  ]);
+
+  return {
+    menu: Number(menuResult[0]?.count ?? 0),
+    feed: Number(feedResult[0]?.count ?? 0),
+  };
+}

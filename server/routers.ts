@@ -2363,6 +2363,98 @@ const subscriptionRouter = router({
       }
       return result;
     }),
+
+  // Get usage trend data for charts (daily resource counts + ticket counts)
+  getUsageTrend: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      days: z.number().min(7).max(90).optional().default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const effectiveDays = Math.min(input.days, maxDays);
+
+      const limits = getPlanLimitsInfo(store.subscriptionPlan);
+      const planDef = PLANS[(store.subscriptionPlan || 'free') as PlanId] || PLANS.free;
+
+      // Fetch daily trends and current counts in parallel
+      const [menuTrend, feedTrend, ticketTrend, currentCounts] = await Promise.all([
+        db.getDailyMenuItemTrend(input.storeId, effectiveDays),
+        db.getDailyFeedPostTrend(input.storeId, effectiveDays),
+        db.getDailyTicketTrend(input.storeId, effectiveDays),
+        db.getResourceCounts(input.storeId),
+      ]);
+
+      // Build date range array
+      const dates: string[] = [];
+      const now = new Date();
+      for (let i = effectiveDays - 1; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        dates.push(d.toISOString().split('T')[0]);
+      }
+
+      // Create lookup maps for daily additions
+      const menuByDate = new Map(menuTrend.map(r => [r.date, Number(r.count)]));
+      const feedByDate = new Map(feedTrend.map(r => [r.date, Number(r.count)]));
+      const ticketByDate = new Map(ticketTrend.map(r => [r.date, Number(r.count)]));
+
+      // Calculate cumulative counts working backwards from current totals
+      // Current total is known; subtract daily additions going backwards to get each day's cumulative
+      let menuCumulative = currentCounts.menu;
+      let feedCumulative = currentCounts.feed;
+
+      // First pass: calculate cumulative for each date (reverse order)
+      const menuCumulativeByDate = new Map<string, number>();
+      const feedCumulativeByDate = new Map<string, number>();
+
+      // Start from today and go backwards
+      for (let i = dates.length - 1; i >= 0; i--) {
+        const date = dates[i];
+        menuCumulativeByDate.set(date, menuCumulative);
+        feedCumulativeByDate.set(date, feedCumulative);
+        // Subtract today's additions to get yesterday's total
+        if (i > 0) {
+          menuCumulative -= (menuByDate.get(date) || 0);
+          feedCumulative -= (feedByDate.get(date) || 0);
+        }
+      }
+
+      // Build daily data points
+      const daily = dates.map(date => ({
+        date,
+        menuCount: menuCumulativeByDate.get(date) || 0,
+        feedCount: feedCumulativeByDate.get(date) || 0,
+        ticketCount: ticketByDate.get(date) || 0,
+      }));
+
+      // Monthly ticket info
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const isCurrentMonth = store.monthlyTicketResetDate === monthKey;
+      const monthlyTicketCount = isCurrentMonth ? store.monthlyTicketCount : 0;
+
+      return {
+        daily,
+        limits: {
+          menuLimit: limits.menuLimit,
+          feedLimit: limits.menuLimit, // feed uses same limit as menu
+          monthlyTicketLimit: planDef.monthlyTicketLimit,
+          staffLimit: limits.staffLimit,
+        },
+        current: {
+          menu: currentCounts.menu,
+          feed: currentCounts.feed,
+          monthlyTickets: monthlyTicketCount,
+        },
+        effectiveDays,
+        planId: limits.planId,
+      };
+    }),
 });
 
 // ==================== SMS Logs Router ====================

@@ -11,7 +11,7 @@ import { exportToCSV, generateFilename } from "@/lib/csvExport";
 import { exportToPDF, generatePDFFilename } from "@/lib/pdfExport";
 import { PlanBadge } from "@/components/PlanGate";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import {
@@ -19,12 +19,15 @@ import {
   Bar,
   LineChart,
   Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceLine,
 } from "recharts";
 
 // Crowd level colors
@@ -128,6 +131,7 @@ export default function Dashboard() {
   const [waitTimeDays, setWaitTimeDays] = useState(30);
   const [hourlyDays, setHourlyDays] = useState(30);
   const [heatmapDays, setHeatmapDays] = useState(30);
+  const [usageTrendDays, setUsageTrendDays] = useState(30);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const dashboardContentRef = useRef<HTMLDivElement>(null);
 
@@ -138,6 +142,7 @@ export default function Dashboard() {
     setWaitTimeDays(days);
     setHourlyDays(days);
     setHeatmapDays(days);
+    setUsageTrendDays(days);
   };
 
   // Handler for PDF export
@@ -206,6 +211,12 @@ export default function Dashboard() {
   // Crowd heatmap query
   const { data: crowdHeatmap, isLoading: crowdHeatmapLoading } = trpc.store.getCrowdHeatmap.useQuery(
     { storeId: storeId!, days: heatmapDays },
+    { enabled: !!storeId }
+  );
+
+  // Usage trend query
+  const { data: usageTrend, isLoading: usageTrendLoading } = trpc.subscription.getUsageTrend.useQuery(
+    { storeId: storeId!, days: usageTrendDays },
     { enabled: !!storeId }
   );
 
@@ -294,6 +305,122 @@ export default function Dashboard() {
     count: d.count,
     avgWait: Math.round(d.avgWaitMinutes || 0),
   })) || [];
+
+  // Prepare usage trend chart data with linear regression prediction
+  const usageTrendChartData = useMemo(() => {
+    if (!usageTrend?.daily || usageTrend.daily.length === 0) return { menu: [], feed: [], tickets: [] };
+
+    const daily = usageTrend.daily;
+    const n = daily.length;
+
+    // Linear regression helper: returns slope and intercept
+    const linearRegression = (data: number[]) => {
+      const len = data.length;
+      if (len < 2) return { slope: 0, intercept: data[0] || 0 };
+      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+      for (let i = 0; i < len; i++) {
+        sumX += i;
+        sumY += data[i];
+        sumXY += i * data[i];
+        sumXX += i * i;
+      }
+      const slope = (len * sumXY - sumX * sumY) / (len * sumXX - sumX * sumX);
+      const intercept = (sumY - slope * sumX) / len;
+      return { slope, intercept };
+    };
+
+    // Predict future days (7 days ahead)
+    const futureDays = 7;
+
+    // Menu trend with prediction
+    const menuValues = daily.map(d => d.menuCount);
+    const menuReg = linearRegression(menuValues);
+    const menuData: Array<{ date: string; actual: number | null; predicted: number | null }> = daily.map((d) => ({
+      date: formatDate(d.date),
+      actual: d.menuCount,
+      predicted: null,
+    }));
+    for (let i = 1; i <= futureDays; i++) {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + i);
+      const predicted = Math.max(0, Math.round(menuReg.slope * (n - 1 + i) + menuReg.intercept));
+      menuData.push({
+        date: `${futureDate.getMonth() + 1}/${futureDate.getDate()}`,
+        actual: null as number | null,
+        predicted,
+      });
+    }
+    // Add bridge point: last actual value = first predicted value
+    if (menuData.length > n) {
+      menuData[n - 1] = { ...menuData[n - 1], predicted: menuData[n - 1].actual };
+    }
+
+    // Feed trend with prediction
+    const feedValues = daily.map(d => d.feedCount);
+    const feedReg = linearRegression(feedValues);
+    const feedData: Array<{ date: string; actual: number | null; predicted: number | null }> = daily.map((d) => ({
+      date: formatDate(d.date),
+      actual: d.feedCount,
+      predicted: null,
+    }));
+    for (let i = 1; i <= futureDays; i++) {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + i);
+      const predicted = Math.max(0, Math.round(feedReg.slope * (n - 1 + i) + feedReg.intercept));
+      feedData.push({
+        date: `${futureDate.getMonth() + 1}/${futureDate.getDate()}`,
+        actual: null as number | null,
+        predicted,
+      });
+    }
+    if (feedData.length > n) {
+      feedData[n - 1] = { ...feedData[n - 1], predicted: feedData[n - 1].actual };
+    }
+
+    // Ticket trend (daily count, not cumulative)
+    const ticketValues = daily.map(d => d.ticketCount);
+    const ticketReg = linearRegression(ticketValues);
+    const ticketData: Array<{ date: string; actual: number | null; predicted: number | null }> = daily.map((d) => ({
+      date: formatDate(d.date),
+      actual: d.ticketCount,
+      predicted: null,
+    }));
+    for (let i = 1; i <= futureDays; i++) {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + i);
+      const predicted = Math.max(0, Math.round(ticketReg.slope * (n - 1 + i) + ticketReg.intercept));
+      ticketData.push({
+        date: `${futureDate.getMonth() + 1}/${futureDate.getDate()}`,
+        actual: null as number | null,
+        predicted,
+      });
+    }
+    if (ticketData.length > n) {
+      ticketData[n - 1] = { ...ticketData[n - 1], predicted: ticketData[n - 1].actual };
+    }
+
+    // Estimate days until limit reached
+    const estimateDaysToLimit = (currentValue: number, slope: number, limit: number | null) => {
+      if (limit === null || limit === 0) return null; // unlimited
+      if (currentValue >= limit) return 0;
+      if (slope <= 0) return null; // not increasing
+      return Math.ceil((limit - currentValue) / slope);
+    };
+
+    const menuDaysToLimit = estimateDaysToLimit(menuValues[n - 1], menuReg.slope, usageTrend.limits.menuLimit);
+    const feedDaysToLimit = estimateDaysToLimit(feedValues[n - 1], feedReg.slope, usageTrend.limits.feedLimit);
+
+    return {
+      menu: menuData,
+      feed: feedData,
+      tickets: ticketData,
+      menuDaysToLimit,
+      feedDaysToLimit,
+      menuSlope: menuReg.slope,
+      feedSlope: feedReg.slope,
+      ticketSlope: ticketReg.slope,
+    };
+  }, [usageTrend]);
 
   // Find peak hour
   const peakHour = hourlyStats?.reduce((max: { hour: number; count: number; avgWaitMinutes: number | null } | undefined, curr: { hour: number; count: number; avgWaitMinutes: number | null }) => 
@@ -859,6 +986,302 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Usage Trend Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              {t('dashboard.usageTrendTitle')}
+            </h2>
+            <Select value={usageTrendDays.toString()} onValueChange={(v) => setUsageTrendDays(parseInt(v))}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">{t('dashboard.heatmapDays7')}</SelectItem>
+                <SelectItem value="30" disabled={planLimits && planLimits.analyticsDays < 30}>
+                  {t('dashboard.heatmapDays30')}{planLimits && planLimits.analyticsDays < 30 && ' (Standard以上)'}
+                </SelectItem>
+                <SelectItem value="90" disabled={planLimits && planLimits.analyticsDays < 90}>
+                  {t('dashboard.heatmapDays90')}{planLimits && planLimits.analyticsDays < 90 && ' (Pro)'}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Prediction Summary Cards */}
+          {usageTrend && !usageTrendLoading && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Menu prediction */}
+              {usageTrend.limits.menuLimit !== null && (
+                <Card className={usageTrendChartData.menuDaysToLimit !== null && usageTrendChartData.menuDaysToLimit !== undefined && usageTrendChartData.menuDaysToLimit <= 7 ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20' : ''}>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-3 h-3 rounded-full bg-blue-500" />
+                      <span className="text-sm font-medium">{t('usageLimitAlert.menuItems')}</span>
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {usageTrend.current.menu} / {usageTrend.limits.menuLimit}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {usageTrendChartData.menuDaysToLimit === 0
+                        ? t('dashboard.usageLimitReached')
+                        : usageTrendChartData.menuDaysToLimit !== null && usageTrendChartData.menuDaysToLimit !== undefined
+                          ? t('dashboard.usageDaysToLimit').replace('{days}', String(usageTrendChartData.menuDaysToLimit))
+                          : t('dashboard.usageNoLimitRisk')}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Feed prediction */}
+              {usageTrend.limits.feedLimit !== null && (
+                <Card className={usageTrendChartData.feedDaysToLimit !== null && usageTrendChartData.feedDaysToLimit !== undefined && usageTrendChartData.feedDaysToLimit <= 7 ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20' : ''}>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                      <span className="text-sm font-medium">{t('usageLimitAlert.feedPosts')}</span>
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {usageTrend.current.feed} / {usageTrend.limits.feedLimit}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {usageTrendChartData.feedDaysToLimit === 0
+                        ? t('dashboard.usageLimitReached')
+                        : usageTrendChartData.feedDaysToLimit !== null && usageTrendChartData.feedDaysToLimit !== undefined
+                          ? t('dashboard.usageDaysToLimit').replace('{days}', String(usageTrendChartData.feedDaysToLimit))
+                          : t('dashboard.usageNoLimitRisk')}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Monthly tickets prediction */}
+              {usageTrend.limits.monthlyTicketLimit !== null && (
+                <Card>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-3 h-3 rounded-full bg-violet-500" />
+                      <span className="text-sm font-medium">{t('dashboard.usageMonthlyTickets')}</span>
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {usageTrend.current.monthlyTickets} / {usageTrend.limits.monthlyTicketLimit}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('dashboard.usageTicketTrend')}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* Menu Items Trend Chart */}
+          {usageTrend?.limits.menuLimit !== null && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{t('dashboard.usageMenuTrend')}</CardTitle>
+                <CardDescription>{t('dashboard.usageMenuTrendDesc')}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {usageTrendLoading ? (
+                  <Skeleton className="h-64 w-full" />
+                ) : usageTrendChartData.menu.length === 0 ? (
+                  <div className="h-64 flex items-center justify-center text-muted-foreground">
+                    {t('dashboard.noData')}
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <AreaChart data={usageTrendChartData.menu}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="date" className="text-xs" interval={Math.max(0, Math.floor(usageTrendChartData.menu.length / 10))} />
+                      <YAxis className="text-xs" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                          border: 'none',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                          padding: '12px 16px',
+                        }}
+                        itemStyle={{ color: '#fff', fontSize: '14px', padding: '4px 0' }}
+                        labelStyle={{ color: '#fff', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}
+                      />
+                      {usageTrend?.limits.menuLimit && (
+                        <ReferenceLine
+                          y={usageTrend.limits.menuLimit}
+                          stroke="oklch(0.65 0.25 25)"
+                          strokeDasharray="5 5"
+                          strokeWidth={2}
+                          label={{ value: `${t('dashboard.usageLimitLine')} (${usageTrend.limits.menuLimit})`, position: 'insideTopRight', fill: 'oklch(0.65 0.25 25)', fontSize: 12 }}
+                        />
+                      )}
+                      <Area
+                        type="monotone"
+                        dataKey="actual"
+                        name={t('dashboard.usageActual')}
+                        stroke="oklch(0.55 0.22 250)"
+                        fill="oklch(0.55 0.22 250 / 0.15)"
+                        strokeWidth={2}
+                        dot={{ fill: 'oklch(0.55 0.22 250)', strokeWidth: 0, r: 2 }}
+                        connectNulls={false}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="predicted"
+                        name={t('dashboard.usagePredicted')}
+                        stroke="oklch(0.55 0.22 250)"
+                        fill="oklch(0.55 0.22 250 / 0.05)"
+                        strokeWidth={2}
+                        strokeDasharray="6 3"
+                        dot={{ fill: 'oklch(0.55 0.22 250)', strokeWidth: 0, r: 2 }}
+                        connectNulls={false}
+                      />
+                      <Legend />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Feed Posts Trend Chart */}
+          {usageTrend?.limits.feedLimit !== null && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{t('dashboard.usageFeedTrend')}</CardTitle>
+                <CardDescription>{t('dashboard.usageFeedTrendDesc')}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {usageTrendLoading ? (
+                  <Skeleton className="h-64 w-full" />
+                ) : usageTrendChartData.feed.length === 0 ? (
+                  <div className="h-64 flex items-center justify-center text-muted-foreground">
+                    {t('dashboard.noData')}
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <AreaChart data={usageTrendChartData.feed}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="date" className="text-xs" interval={Math.max(0, Math.floor(usageTrendChartData.feed.length / 10))} />
+                      <YAxis className="text-xs" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                          border: 'none',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                          padding: '12px 16px',
+                        }}
+                        itemStyle={{ color: '#fff', fontSize: '14px', padding: '4px 0' }}
+                        labelStyle={{ color: '#fff', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}
+                      />
+                      {usageTrend?.limits.feedLimit && (
+                        <ReferenceLine
+                          y={usageTrend.limits.feedLimit}
+                          stroke="oklch(0.65 0.25 25)"
+                          strokeDasharray="5 5"
+                          strokeWidth={2}
+                          label={{ value: `${t('dashboard.usageLimitLine')} (${usageTrend.limits.feedLimit})`, position: 'insideTopRight', fill: 'oklch(0.65 0.25 25)', fontSize: 12 }}
+                        />
+                      )}
+                      <Area
+                        type="monotone"
+                        dataKey="actual"
+                        name={t('dashboard.usageActual')}
+                        stroke="oklch(0.55 0.22 160)"
+                        fill="oklch(0.55 0.22 160 / 0.15)"
+                        strokeWidth={2}
+                        dot={{ fill: 'oklch(0.55 0.22 160)', strokeWidth: 0, r: 2 }}
+                        connectNulls={false}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="predicted"
+                        name={t('dashboard.usagePredicted')}
+                        stroke="oklch(0.55 0.22 160)"
+                        fill="oklch(0.55 0.22 160 / 0.05)"
+                        strokeWidth={2}
+                        strokeDasharray="6 3"
+                        dot={{ fill: 'oklch(0.55 0.22 160)', strokeWidth: 0, r: 2 }}
+                        connectNulls={false}
+                      />
+                      <Legend />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Daily Ticket Trend Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t('dashboard.usageTicketTrendTitle')}</CardTitle>
+              <CardDescription>{t('dashboard.usageTicketTrendDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {usageTrendLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : usageTrendChartData.tickets.length === 0 ? (
+                <div className="h-64 flex items-center justify-center text-muted-foreground">
+                  {t('dashboard.noData')}
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <AreaChart data={usageTrendChartData.tickets}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="date" className="text-xs" interval={Math.max(0, Math.floor(usageTrendChartData.tickets.length / 10))} />
+                    <YAxis className="text-xs" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                        padding: '12px 16px',
+                      }}
+                      itemStyle={{ color: '#fff', fontSize: '14px', padding: '4px 0' }}
+                      labelStyle={{ color: '#fff', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}
+                    />
+                    {usageTrend?.limits.monthlyTicketLimit && (
+                      <ReferenceLine
+                        y={Math.round(usageTrend.limits.monthlyTicketLimit / 30)}
+                        stroke="oklch(0.65 0.25 25)"
+                        strokeDasharray="5 5"
+                        strokeWidth={2}
+                        label={{ value: `${t('dashboard.usageDailyAvgLimit')} (${Math.round(usageTrend.limits.monthlyTicketLimit / 30)}/日)`, position: 'insideTopRight', fill: 'oklch(0.65 0.25 25)', fontSize: 12 }}
+                      />
+                    )}
+                    <Area
+                      type="monotone"
+                      dataKey="actual"
+                      name={t('dashboard.usageActual')}
+                      stroke="oklch(0.55 0.22 290)"
+                      fill="oklch(0.55 0.22 290 / 0.15)"
+                      strokeWidth={2}
+                      dot={{ fill: 'oklch(0.55 0.22 290)', strokeWidth: 0, r: 2 }}
+                      connectNulls={false}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="predicted"
+                      name={t('dashboard.usagePredicted')}
+                      stroke="oklch(0.55 0.22 290)"
+                      fill="oklch(0.55 0.22 290 / 0.05)"
+                      strokeWidth={2}
+                      strokeDasharray="6 3"
+                      dot={{ fill: 'oklch(0.55 0.22 290)', strokeWidth: 0, r: 2 }}
+                      connectNulls={false}
+                    />
+                    <Legend />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );
