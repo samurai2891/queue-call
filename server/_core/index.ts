@@ -20,7 +20,7 @@ import { startCleanupOldTicketsJob } from "../jobs/cleanupOldTickets";
 import { startDailyResetJob } from "../jobs/dailyReset";
 import { startWaitAlertJob } from "../jobs/waitAlert";
 
-import { constructWebhookEvent, handleCheckoutCompleted } from "../stripe";
+import { constructWebhookEvent, handleCheckoutCompleted, handleInvoicePaid } from "../stripe";
 import { storageGet, storagePut } from "../storage";
 import * as db from "../db";
 import { sdk } from "./sdk";
@@ -359,6 +359,9 @@ async function startServer() {
       switch (event.type) {
         case 'checkout.session.completed':
           await handleCheckoutCompleted(event.data.object as any);
+          break;
+        case 'invoice.paid':
+          await handleInvoicePaid(event.data.object as any);
           break;
         default:
           console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);

@@ -222,6 +222,92 @@ export async function getSmsTransactions(storeId: number, limit = 50) {
 }
 
 /**
+ * Webhook: invoice.paid を処理
+ * サブスクリプションの支払い成功時にSMS残高をチャージする
+ */
+export async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  // メタデータからstore_idを取得（サブスクリプションのmetadataまたはinvoiceのmetadata）
+  const subscriptionMetadata = invoice.parent?.subscription_details?.metadata;
+  const storeId = parseInt(
+    subscriptionMetadata?.store_id ||
+    invoice.metadata?.store_id ||
+    "0",
+    10
+  );
+
+  if (!storeId) {
+    console.log("[Stripe] invoice.paid: No store_id in metadata, skipping. Invoice:", invoice.id);
+    return;
+  }
+
+  // 支払い金額を取得（Stripeは最小通貨単位で返すが、JPYは1円=1単位）
+  const amountPaid = invoice.amount_paid;
+  if (!amountPaid || amountPaid <= 0) {
+    console.log(`[Stripe] invoice.paid: Zero or negative amount for invoice ${invoice.id}, skipping.`);
+    return;
+  }
+
+  // 店舗を取得
+  const [store] = await db.select().from(stores).where(eq(stores.id, storeId)).limit(1);
+  if (!store) {
+    console.error("[Stripe] invoice.paid: Store not found:", storeId);
+    return;
+  }
+
+  // payment_intentのIDを取得（新APIではpayments配列内にpayment_intentがある）
+  let paymentIntentId: string | null = null;
+  const firstPayment = invoice.payments?.data?.[0];
+  if (firstPayment?.payment?.payment_intent) {
+    const pi = firstPayment.payment.payment_intent;
+    paymentIntentId = typeof pi === 'string' ? pi : pi.id;
+  }
+
+  // 重複処理防止: 同じpayment_intent IDで既にチャージ済みか確認
+  if (paymentIntentId) {
+    const existingTx = await db
+      .select()
+      .from(smsTransactions)
+      .where(eq(smsTransactions.stripePaymentIntentId, paymentIntentId))
+      .limit(1);
+
+    if (existingTx.length > 0) {
+      console.log(`[Stripe] invoice.paid: Already processed payment_intent ${paymentIntentId}, skipping.`);
+      return;
+    }
+  }
+
+  // 残高を更新
+  const newBalance = store.smsBalance + amountPaid;
+  await db
+    .update(stores)
+    .set({ smsBalance: newBalance })
+    .where(eq(stores.id, storeId));
+
+  // 取引履歴を記録
+  await db.insert(smsTransactions).values({
+    storeId,
+    type: "charge",
+    amount: amountPaid,
+    balanceAfter: newBalance,
+    stripePaymentIntentId: paymentIntentId || invoice.id,
+    description: `サブスクリプション支払い ${amountPaid.toLocaleString()}円 (Invoice: ${invoice.id})`,
+  });
+
+  console.log(`[Stripe] invoice.paid: Charged ${amountPaid} yen to store ${storeId}. New balance: ${newBalance}`);
+
+  // オーナーに通知
+  await notifyOwner({
+    title: "サブスクリプション支払いが完了しました",
+    content: `店舗「${store.name}」のサブスクリプション支払い ${amountPaid.toLocaleString()}円 が完了しました。\nSMS残高に ${amountPaid.toLocaleString()}円 がチャージされました。\n現在の残高: ${newBalance.toLocaleString()}円`,
+  });
+}
+
+/**
  * Webhookの署名を検証
  */
 export function constructWebhookEvent(

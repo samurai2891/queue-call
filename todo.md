@@ -1310,3 +1310,8 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] Webhook署名検証が正常に動作することを確認
 - [x] テスト15件追加、全302テストパス、TSエラーゼロ
 - [x] 動作確認完了（署名なし→400、不正署名→400、正規署名+テストイベント→200 verified:true）
+
+### invoice.paidイベント処理の追加（決済）（完了）
+- [x] Webhookハンドラにinvoice.paidイベントのcase追加
+- [x] handleInvoicePaid関数をstripe.tsに実装（SMS残高チャージ、重複防止、オーナー通知）
+- [x] テスト12件追加、全314テストパス、TSエラーゼロ
