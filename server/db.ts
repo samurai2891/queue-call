@@ -2095,3 +2095,43 @@ export async function getHourlyCrowdHeatmap(
     };
   });
 }
+
+
+// ==================== Plan Limit Helper Functions ====================
+
+export async function getMenuItemCount(storeId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const result = await db.select({ count: sql<number>`count(*)` })
+    .from(menuItems)
+    .where(eq(menuItems.storeId, storeId));
+
+  return Number(result[0]?.count ?? 0);
+}
+
+export async function getActiveStaffSessionCount(storeId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const now = new Date();
+  const result = await db.select({ count: sql<number>`count(*)` })
+    .from(staffSessions)
+    .where(and(
+      eq(staffSessions.storeId, storeId),
+      gte(staffSessions.expiresAt, now)
+    ));
+
+  return Number(result[0]?.count ?? 0);
+}
+
+export async function getFeedPostCount(storeId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const result = await db.select({ count: sql<number>`count(*)` })
+    .from(feedPosts)
+    .where(eq(feedPosts.storeId, storeId));
+
+  return Number(result[0]?.count ?? 0);
+}

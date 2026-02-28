@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Clock, TrendingUp, Calendar, BarChart3, ArrowLeft, Flame, Download, FileText } from "lucide-react";
+import { Users, Clock, TrendingUp, Calendar, BarChart3, ArrowLeft, Flame, Download, FileText, Lock } from "lucide-react";
 import { exportToCSV, generateFilename } from "@/lib/csvExport";
 import { exportToPDF, generatePDFFilename } from "@/lib/pdfExport";
+import { PlanBadge } from "@/components/PlanGate";
 import { useState, useRef } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -174,6 +175,12 @@ export default function Dashboard() {
   // Get store ID (use first store if not selected)
   const storeId = selectedStoreId || stores?.[0]?.id;
 
+  // プラン制限情報を取得
+  const { data: planLimits } = trpc.subscription.getPlanLimits.useQuery(
+    { storeId: storeId! },
+    { enabled: !!storeId }
+  );
+
   // Statistics queries
   const { data: summary, isLoading: summaryLoading } = trpc.store.getStatsSummary.useQuery(
     { storeId: storeId! },
@@ -332,8 +339,14 @@ export default function Dashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="7">{t('dashboard.heatmapDays7')}</SelectItem>
-                  <SelectItem value="30">{t('dashboard.heatmapDays30')}</SelectItem>
-                  <SelectItem value="90">{t('dashboard.heatmapDays90')}</SelectItem>
+                  <SelectItem value="30" disabled={planLimits && planLimits.analyticsDays < 30}>
+                    {t('dashboard.heatmapDays30')}
+                    {planLimits && planLimits.analyticsDays < 30 && ' (Standard以上)'}
+                  </SelectItem>
+                  <SelectItem value="90" disabled={planLimits && planLimits.analyticsDays < 90}>
+                    {t('dashboard.heatmapDays90')}
+                    {planLimits && planLimits.analyticsDays < 90 && ' (Pro)'}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -441,8 +454,12 @@ export default function Dashboard() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
-                    <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
-                    <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
+                    <SelectItem value="30" disabled={planLimits && planLimits.analyticsDays < 30}>
+                      {t("dashboard.heatmapDays30")}{planLimits && planLimits.analyticsDays < 30 && ' (Standard以上)'}
+                    </SelectItem>
+                    <SelectItem value="90" disabled={planLimits && planLimits.analyticsDays < 90}>
+                      {t("dashboard.heatmapDays90")}{planLimits && planLimits.analyticsDays < 90 && ' (Pro)'}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -470,10 +487,10 @@ export default function Dashboard() {
                       );
                     }
                   }}
-                  disabled={!dailyVisitors || dailyVisitors.length === 0}
-                  title={t('dashboard.exportCSV')}
+                  disabled={!dailyVisitors || dailyVisitors.length === 0 || !planLimits?.csvExport}
+                  title={planLimits?.csvExport ? t('dashboard.exportCSV') : 'CSVエクスポートはProプランで利用可能'}
                 >
-                  <Download className="h-4 w-4" />
+                  {planLimits?.csvExport ? <Download className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
@@ -540,8 +557,12 @@ export default function Dashboard() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
-                    <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
-                    <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
+                    <SelectItem value="30" disabled={planLimits && planLimits.analyticsDays < 30}>
+                      {t("dashboard.heatmapDays30")}{planLimits && planLimits.analyticsDays < 30 && ' (Standard以上)'}
+                    </SelectItem>
+                    <SelectItem value="90" disabled={planLimits && planLimits.analyticsDays < 90}>
+                      {t("dashboard.heatmapDays90")}{planLimits && planLimits.analyticsDays < 90 && ' (Pro)'}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -567,10 +588,10 @@ export default function Dashboard() {
                       );
                     }
                   }}
-                  disabled={!dailyWaitTime || dailyWaitTime.length === 0}
-                  title={t('dashboard.exportCSV')}
+                  disabled={!dailyWaitTime || dailyWaitTime.length === 0 || !planLimits?.csvExport}
+                  title={planLimits?.csvExport ? t('dashboard.exportCSV') : 'CSVエクスポートはProプランで利用可能'}
                 >
-                  <Download className="h-4 w-4" />
+                  {planLimits?.csvExport ? <Download className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
@@ -661,8 +682,12 @@ export default function Dashboard() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
-                    <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
-                    <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
+                    <SelectItem value="30" disabled={planLimits && planLimits.analyticsDays < 30}>
+                      {t("dashboard.heatmapDays30")}{planLimits && planLimits.analyticsDays < 30 && ' (Standard以上)'}
+                    </SelectItem>
+                    <SelectItem value="90" disabled={planLimits && planLimits.analyticsDays < 90}>
+                      {t("dashboard.heatmapDays90")}{planLimits && planLimits.analyticsDays < 90 && ' (Pro)'}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -689,10 +714,10 @@ export default function Dashboard() {
                       );
                     }
                   }}
-                  disabled={!crowdHeatmap || crowdHeatmap.length === 0}
-                  title={t('dashboard.exportCSV')}
+                  disabled={!crowdHeatmap || crowdHeatmap.length === 0 || !planLimits?.csvExport}
+                  title={planLimits?.csvExport ? t('dashboard.exportCSV') : 'CSVエクスポートはProプランで利用可能'}
                 >
-                  <Download className="h-4 w-4" />
+                  {planLimits?.csvExport ? <Download className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
@@ -735,8 +760,12 @@ export default function Dashboard() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="7">{t("dashboard.heatmapDays7")}</SelectItem>
-                    <SelectItem value="30">{t("dashboard.heatmapDays30")}</SelectItem>
-                    <SelectItem value="90">{t("dashboard.heatmapDays90")}</SelectItem>
+                    <SelectItem value="30" disabled={planLimits && planLimits.analyticsDays < 30}>
+                      {t("dashboard.heatmapDays30")}{planLimits && planLimits.analyticsDays < 30 && ' (Standard以上)'}
+                    </SelectItem>
+                    <SelectItem value="90" disabled={planLimits && planLimits.analyticsDays < 90}>
+                      {t("dashboard.heatmapDays90")}{planLimits && planLimits.analyticsDays < 90 && ' (Pro)'}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -760,10 +789,10 @@ export default function Dashboard() {
                       );
                     }
                   }}
-                  disabled={!hourlyStats || hourlyStats.length === 0}
-                  title={t('dashboard.exportCSV')}
+                  disabled={!hourlyStats || hourlyStats.length === 0 || !planLimits?.csvExport}
+                  title={planLimits?.csvExport ? t('dashboard.exportCSV') : 'CSVエクスポートはProプランで利用可能'}
                 >
-                  <Download className="h-4 w-4" />
+                  {planLimits?.csvExport ? <Download className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                 </Button>
               </div>
             </div>

@@ -12,6 +12,7 @@ import { broadcastQueueUpdate, broadcastTicketUpdate, broadcastIntakeStatus } fr
 import { createCheckoutSession, getSmsBalance, getSmsTransactions, getSmsAnalytics, CHARGE_PLANS, SMS_COST_PER_MESSAGE } from "./stripe";
 import { PLANS, createSubscriptionCheckout, getSubscriptionInfo, cancelSubscription, reactivateSubscription, changeSubscriptionPlan, checkAndIncrementMonthlyTicket, type PlanId } from "./subscription";
 import { checkBusinessHours } from "../shared/businessHours";
+import { checkSmsAllowed, checkReservationAllowed, checkMenuLimit, checkStaffLimit, getAnalyticsDaysLimit, checkCsvExportAllowed, checkBrandingAllowed, getPlanLimitsInfo, getBrandingLevel, checkBusinessHoursAllowed } from "./plan-limits";
 
 
 
@@ -386,6 +387,36 @@ const storeRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
 
+      // プラン制限チェック: 営業時間設定の変更はStandard以上
+      if (input.settings?.businessHours && Object.keys(input.settings.businessHours).length > 0) {
+        // overrideフラグのみの変更は許可（スタッフがトグルするため）
+        const bhKeys = Object.keys(input.settings.businessHours);
+        const isOnlyOverride = bhKeys.length === 1 && bhKeys[0] === 'override';
+        if (!isOnlyOverride) {
+          checkBusinessHoursAllowed(store.subscriptionPlan);
+        }
+      }
+
+      // プラン制限チェック: SMS設定の有効化はStandard以上
+      if (input.settings?.notifications?.smsEnabled === true) {
+        checkSmsAllowed(store.subscriptionPlan);
+      }
+
+      // プラン制限チェック: 予約設定の有効化はStandard以上
+      if (input.settings?.reservation?.enabled === true) {
+        checkReservationAllowed(store.subscriptionPlan);
+      }
+
+      // プラン制限チェック: ブランディング設定
+      if (input.settings?.branding) {
+        if (input.settings.branding.primaryColor || input.settings.branding.accentColor) {
+          checkBrandingAllowed(store.subscriptionPlan, 'color');
+        }
+        if (input.settings.branding.logoUrl !== undefined) {
+          checkBrandingAllowed(store.subscriptionPlan, 'logo');
+        }
+      }
+
       await db.updateStoreSettings(input.storeId, input.settings);
       return { success: true };
     }),
@@ -406,6 +437,9 @@ const storeRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
+
+      // プランチェック: カスタムロゴはProプランのみ
+      checkBrandingAllowed(store.subscriptionPlan, 'logo');
 
       const currentSettings = store.settings || {};
       const currentBranding = currentSettings.branding || {};
@@ -537,7 +571,10 @@ const storeRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      return await db.getDailyVisitorStats(input.storeId, input.days);
+      // プラン別日数制限
+      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const effectiveDays = Math.min(input.days, maxDays);
+      return await db.getDailyVisitorStats(input.storeId, effectiveDays);
     }),
 
   // 統計API: 日別平均待ち時間
@@ -551,7 +588,9 @@ const storeRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      return await db.getDailyWaitTimeStats(input.storeId, input.days);
+      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const effectiveDays = Math.min(input.days, maxDays);
+      return await db.getDailyWaitTimeStats(input.storeId, effectiveDays);
     }),
 
   // 統計API: 時間帯別来店数（ピーク時間帯分析）
@@ -565,7 +604,9 @@ const storeRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      return await db.getHourlyStats(input.storeId, input.days);
+      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const effectiveDays = Math.min(input.days, maxDays);
+      return await db.getHourlyStats(input.storeId, effectiveDays);
     }),
 
   // 統計API: サマリー（今日/今週/今月）
@@ -592,7 +633,9 @@ const storeRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      return await db.getCrowdLevelHistory(input.storeId, input.days);
+      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const effectiveDays = Math.min(input.days, maxDays);
+      return await db.getCrowdLevelHistory(input.storeId, effectiveDays);
     }),
 
   // 統計API: 日別ピーク時間帯
@@ -606,7 +649,9 @@ const storeRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      return await db.getDailyPeakHours(input.storeId, input.days);
+      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const effectiveDays = Math.min(input.days, maxDays);
+      return await db.getDailyPeakHours(input.storeId, effectiveDays);
     }),
 
   // 統計API: 混雑ヒートマップ（曜日×時間帯）
@@ -620,7 +665,9 @@ const storeRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      return await db.getHourlyCrowdHeatmap(input.storeId, input.days);
+      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const effectiveDays = Math.min(input.days, maxDays);
+      return await db.getHourlyCrowdHeatmap(input.storeId, effectiveDays);
     }),
 });
 
@@ -790,6 +837,11 @@ const ticketRouter = router({
       }
 
       const role = managerValid ? 'manager' : 'staff';
+
+      // プランチェック: スタッフ同時ログイン数上限
+      const activeSessionCount = await db.getActiveStaffSessionCount(store.id);
+      checkStaffLimit(store.subscriptionPlan, activeSessionCount);
+
       const sessionToken = await db.createStaffSession({
         storeId: store.id,
         role,
@@ -1036,7 +1088,9 @@ const ticketRouter = router({
       const pushEnabled = notificationSettings?.pushEnabled ?? true;
       const smsEnabled = notificationSettings?.smsEnabled ?? false;
       const twilioConfig = getTwilioConfig();
-      const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig);
+      // プランチェック: FreeプランはSMS不可
+      const planFeatures = getPlanLimitsInfo(store?.subscriptionPlan);
+      const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig) && planFeatures.smsEnabled;
       const pushTemplate = notificationSettings?.pushTemplateCalled;
       const smsTemplate = notificationSettings?.smsTemplateCalled;
       const ticketUrl = buildTicketUrl(store?.slug, nextTicket.ticketToken);
@@ -1115,7 +1169,9 @@ const ticketRouter = router({
       const pushEnabled = notificationSettings?.pushEnabled ?? true;
       const smsEnabled = notificationSettings?.smsEnabled ?? false;
       const twilioConfig = getTwilioConfig();
-      const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig);
+      // プランチェック: FreeプランはSMS不可
+      const planFeaturesCS = getPlanLimitsInfo(store?.subscriptionPlan);
+      const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig) && planFeaturesCS.smsEnabled;
       const pushTemplate = notificationSettings?.pushTemplateRecall;
       const smsTemplate = notificationSettings?.smsTemplateRecall;
       const ticketUrl = buildTicketUrl(store?.slug, ticket.ticketToken);
@@ -1201,7 +1257,9 @@ const ticketRouter = router({
       const pushEnabled = notificationSettings?.pushEnabled ?? true;
       const smsEnabled = notificationSettings?.smsEnabled ?? false;
       const twilioConfig = getTwilioConfig();
-      const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig);
+      // プランチェック: FreeプランはSMS不可
+      const planFeaturesRecall = getPlanLimitsInfo(store?.subscriptionPlan);
+      const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig) && planFeaturesRecall.smsEnabled;
       const pushTemplate = notificationSettings?.pushTemplateRecall;
       const smsTemplate = notificationSettings?.smsTemplateRecall;
       const ticketUrl = buildTicketUrl(store?.slug, ticket.ticketToken);
@@ -1725,6 +1783,10 @@ const menuRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
 
+      // プランチェック: メニュー数上限
+      const currentMenuCount = await db.getMenuItemCount(input.storeId);
+      checkMenuLimit(store.subscriptionPlan, currentMenuCount);
+
       await db.createMenuItem(input);
       return { success: true };
     }),
@@ -1810,6 +1872,10 @@ const menuRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
+
+      // プランチェック: メニュー/フィード数上限
+      const currentFeedCount = await db.getFeedPostCount(input.storeId);
+      checkMenuLimit(store.subscriptionPlan, currentFeedCount);
 
       await db.createFeedPost(input);
       return { success: true };
@@ -1949,6 +2015,9 @@ const notificationRouter = router({
       if (!store.settings?.notifications?.smsEnabled) {
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'SMS notifications are not enabled for this store' });
       }
+
+      // プランチェック: FreeプランはSMS不可
+      checkSmsAllowed(store.subscriptionPlan);
 
       // Check Twilio configuration
       const twilioConfig = {
@@ -2193,6 +2262,17 @@ const subscriptionRouter = router({
       return { type: 'checkout' as const, url: session.url, sessionId: session.sessionId };
     }),
 
+  // Get plan limits for current store (for frontend display)
+  getPlanLimits: protectedProcedure
+    .input(z.object({ storeId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      return getPlanLimitsInfo(store.subscriptionPlan);
+    }),
+
   // Cancel subscription (at period end)
   cancel: protectedProcedure
     .input(z.object({ storeId: z.number() }))
@@ -2284,6 +2364,9 @@ const smsLogsRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
+
+      // プランチェック: CSVエクスポートはProプランのみ
+      checkCsvExportAllowed(store.subscriptionPlan);
 
       const options: Parameters<typeof db.getSmsLogsForExport>[1] = {
         status: input.status,
@@ -2459,6 +2542,9 @@ const reservationRouter = router({
       if (!settings?.enabled) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Reservations are not enabled for this store' });
       }
+
+      // プランチェック: Freeプランは予約機能不可
+      checkReservationAllowed(store.subscriptionPlan);
 
       // 時間枚の空きを確認
       const count = await db.getReservationCountBySlot(store.id, input.reservationDate, input.reservationTime);
@@ -2681,6 +2767,9 @@ const reservationRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'SMS notifications are not enabled for this store' });
       }
 
+      // プランチェック: FreeプランはSMS不可
+      checkSmsAllowed(store.subscriptionPlan);
+
       // Twilio設定を取得
       const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
       const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
@@ -2743,6 +2832,9 @@ const reservationRouter = router({
       if (!settings?.enabled) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Reservations are not enabled for this store' });
       }
+
+      // プランチェック: Freeプランは予約機能不可
+      checkReservationAllowed(store.subscriptionPlan);
 
       // 時間枠の空きを確認
       const count = await db.getReservationCountBySlot(store.id, input.reservationDate, input.reservationTime);

@@ -1425,3 +1425,22 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] フロントエンドUI（BillingTab: 現在のプラン表示・アップグレード・解約・再有効化・プラン変更・月間使用量プログレスバー）
 - [x] 無料枠の月間50人制限ロジック（checkAndIncrementMonthlyTicket、月初自動リセット）
 - [x] テスト追加・実行（22テスト追加、全427テスト全パス）
+
+### プラン別機能制限の実装（Standard/Pro差別化）（完了）
+- [x] PLANS定義にfeature limitsを追加（SMS, 予約, メニュー数, 分析期間, 営業時間制御, スタッフ数, ブランディング）
+- [x] plan-limits.tsモジュール作成（チェック関数群: checkSmsAllowed, checkReservationAllowed, checkMenuLimit, checkBusinessHoursAllowed, checkStaffLimit, checkCsvExportAllowed, checkBrandingAllowed, getAnalyticsDaysLimit）
+- [x] サーバー側: SMS通知のプラン制限（Free不可、Standard/Pro可）- callNext, callSpecific, recall, sendTestSms, sendReservationReminder
+- [x] サーバー側: 予約機能のプラン制限（Free不可、Standard/Pro可）- createReservation, createStaffReservation
+- [x] サーバー側: メニュー/フィード数のプラン制限（Free: 5品、Standard/Pro: 無制限）- addMenuItem, createFeedPost
+- [x] サーバー側: 分析ダッシュボードの期間制限（Free: 当日、Standard: 30日、Pro: 90日）- getDailyVisitorStats, getCrowdLevelHistory, getDailyPeakHours, getCrowdHeatmap
+- [x] サーバー側: CSV出力のプラン制限（Free/Standard不可、Pro可）- exportTicketsCsv
+- [x] サーバー側: 営業時間制御のプラン制限（Free不可、Standard/Pro可）- updateSettings
+- [x] サーバー側: スタッフアカウント数のプラン制限（Free: 1名、Standard: 3名、Pro: 無制限）- staffLogin
+- [x] サーバー側: ブランディングのプラン制限（Free: ロゴ表示、Standard: カスタムカラー、Pro: フルカスタム）- saveLogo
+- [x] サーバー側: getPlanLimits APIをsubscriptionRouterに追加（フロントエンド用）
+- [x] フロントエンド: PlanGateコンポーネント作成（制限機能のラップ + アップグレード誘導UI）
+- [x] フロントエンド: Settings.tsx - SMS設定/予約設定/営業時間設定/ブランディングにPlanGate追加
+- [x] フロントエンド: Settings.tsx - BillingTabのプランカードに機能一覧表示
+- [x] フロントエンド: Dashboard.tsx - CSVエクスポートボタンにプラン制限（Lock表示）
+- [x] フロントエンド: Dashboard.tsx - 分析期間セレクターにプラン制限（30日/90日をdisabled）
+- [x] テスト追加・実行（39テスト追加、全466テスト全パス）

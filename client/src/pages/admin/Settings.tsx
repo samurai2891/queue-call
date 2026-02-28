@@ -62,6 +62,7 @@ import { getLoginUrl } from '@/const';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 import { VapidSettings } from '@/components/VapidSettings';
+import { PlanGate, PlanBadge } from '@/components/PlanGate';
 
 const LOCALE_OPTIONS = [
   { value: 'ja', label: '日本語' },
@@ -834,6 +835,12 @@ function SettingsContent() {
   const { data: store, isLoading: storeLoading, refetch: refetchStore } = trpc.store.getByOwner.useQuery(
     undefined,
     { enabled: isAuthenticated }
+  );
+
+  // プラン制限情報を取得
+  const { data: planLimits } = trpc.subscription.getPlanLimits.useQuery(
+    { storeId: store?.id || 0 },
+    { enabled: !!store?.id }
   );
 
   const { data: menuCategories, refetch: refetchCategories } = trpc.menu.getCategories.useQuery(
@@ -2283,13 +2290,16 @@ function SettingsContent() {
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label>{t('settings.smsEnabled')}</Label>
+                      <div className="flex items-center gap-2">
+                        <Label>{t('settings.smsEnabled')}</Label>
+                        {!planLimits?.smsEnabled && <PlanBadge plan="Standard" />}
+                      </div>
                       <p className="text-sm text-muted-foreground">{t('settings.smsEnabledDescription')}</p>
-
                     </div>
                     <Switch
                       checked={formData.smsEnabled}
                       onCheckedChange={(checked) => updateField('smsEnabled', checked)}
+                      disabled={!planLimits?.smsEnabled}
                     />
                   </div>
                   {formData.smsEnabled && (
@@ -3162,7 +3172,10 @@ function SettingsContent() {
                 {/* 予約受付ON/OFF */}
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>{t('settings.reservationEnabled')}</Label>
+                    <div className="flex items-center gap-2">
+                      <Label>{t('settings.reservationEnabled')}</Label>
+                      {!planLimits?.reservationEnabled && <PlanBadge plan="Standard" />}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {t('settings.reservationEnabledDescription')}
                     </p>
@@ -3170,6 +3183,7 @@ function SettingsContent() {
                   <Switch
                     checked={formData.reservationEnabled}
                     onCheckedChange={(checked) => updateField('reservationEnabled', checked)}
+                    disabled={!planLimits?.reservationEnabled}
                   />
                 </div>
 
@@ -3356,7 +3370,10 @@ function SettingsContent() {
                 {/* Store Logo */}
                 <div className="space-y-4">
                   <div>
-                    <Label className="text-sm font-medium">{t('settings.logoTitle')}</Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium">{t('settings.logoTitle')}</Label>
+                      {planLimits?.brandingLevel !== 'full' && <PlanBadge plan="Pro" />}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">{t('settings.logoDescription')}</p>
                   </div>
                   <div className="flex items-start gap-6">
@@ -3387,13 +3404,13 @@ function SettingsContent() {
                     </div>
                     {/* Upload Controls */}
                     <div className="flex flex-col gap-2">
-                      <label className="cursor-pointer">
+                      <label className={planLimits?.brandingLevel !== 'full' ? 'cursor-not-allowed' : 'cursor-pointer'}>
                         <input
                           type="file"
                           accept="image/jpeg,image/png,image/webp"
                           onChange={handleLogoUpload}
                           className="hidden"
-                          disabled={isUploadingLogo}
+                          disabled={isUploadingLogo || planLimits?.brandingLevel !== 'full'}
                         />
                         <div className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all hover:bg-muted/50 active:scale-95 ${isUploadingLogo ? 'opacity-50 cursor-not-allowed' : ''}`}>
                           {isUploadingLogo ? (
@@ -3423,6 +3440,12 @@ function SettingsContent() {
                 <Separator />
 
                 {/* Presets */}
+                <PlanGate
+                  allowed={planLimits?.brandingLevel !== 'basic'}
+                  requiredPlan="Standard"
+                  description="カスタムカラーはStandard以上のプランで利用できます"
+                  overlay
+                >
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">{t('settings.brandPresets')}</Label>
                   <div className="flex flex-wrap gap-2">
@@ -3558,6 +3581,7 @@ function SettingsContent() {
                     {t('settings.brandReset')}
                   </Button>
                 </div>
+                </PlanGate>
 
                 <Separator />
 
@@ -3754,9 +3778,12 @@ function SettingsContent() {
                 {/* Enable toggle */}
                 <div className="flex items-center justify-between rounded-lg border p-4">
                   <div className="space-y-0.5">
-                    <Label className="text-base font-medium">
-                      {t('settings.businessHoursEnabled')}
-                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-base font-medium">
+                        {t('settings.businessHoursEnabled')}
+                      </Label>
+                      {!planLimits?.businessHoursEnabled && <PlanBadge plan="Standard" />}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {t('settings.businessHoursEnabledHelp')}
                     </p>
@@ -3764,6 +3791,7 @@ function SettingsContent() {
                   <Switch
                     checked={formData.businessHoursEnabled}
                     onCheckedChange={(checked) => setFormData({ ...formData, businessHoursEnabled: checked })}
+                    disabled={!planLimits?.businessHoursEnabled}
                   />
                 </div>
 
@@ -4109,8 +4137,37 @@ function BillingTab({ store, t }: { store: any; t: (key: string) => string }) {
   };
 
   const plans = [
-    { id: 'standard' as const, name: 'Standard', price: 1500, priceTax: 1650 },
-    { id: 'pro' as const, name: 'Pro', price: 3500, priceTax: 3850 },
+    {
+      id: 'standard' as const,
+      name: 'Standard',
+      price: 1500,
+      priceTax: 1650,
+      features: [
+        '無制限の順番待ちチケット',
+        'SMS通知対応',
+        '予約機能',
+        'メニュー無制限登録',
+        'カスタムカラー',
+        '営業時間制御',
+        'スタッフ最大3名',
+        '分析データ30日分',
+        'メールサポート',
+      ],
+    },
+    {
+      id: 'pro' as const,
+      name: 'Pro',
+      price: 3500,
+      priceTax: 3850,
+      features: [
+        'Standardの全機能',
+        'カスタムロゴアップロード',
+        'スタッフ無制限',
+        '分析データ90日分',
+        'CSVエクスポート',
+        '優先メールサポート',
+      ],
+    },
   ];
 
   return (
@@ -4223,6 +4280,14 @@ function BillingTab({ store, t }: { store: any; t: (key: string) => string }) {
                   <p className="text-xs text-muted-foreground">
                     (¥{plan.price.toLocaleString()} + {t('settings.taxIncluded')})
                   </p>
+                  <ul className="space-y-1.5 text-sm text-muted-foreground">
+                    {plan.features.map((feature, i) => (
+                      <li key={i} className="flex items-center gap-2">
+                        <span className="text-green-500 text-xs">✓</span>
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
                   {!isCurrent && (
                     <Button
                       className="w-full"
