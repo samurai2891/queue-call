@@ -1574,10 +1574,50 @@ function SettingsContent() {
       await refetchAdminItems();
       toast.success(t('settings.menuCreateSuccess'));
 
+      // フリープランのメニュー上限に近づいたら警告トーストを表示
+      if (planLimits?.menuLimit !== null && planLimits?.menuLimit !== undefined) {
+        const newCount = (adminItems?.length ?? 0) + 1;
+        const remaining = planLimits.menuLimit - newCount;
+        if (remaining === 0) {
+          toast.warning(
+            formatMessage('settings.menuLimitReached', { limit: planLimits.menuLimit }),
+            {
+              duration: 8000,
+              action: {
+                label: t('settings.menuLimitUpgrade'),
+                onClick: () => navigate('/admin/settings/billing'),
+              },
+            }
+          );
+        } else if (remaining > 0 && remaining <= 2) {
+          toast.warning(
+            formatMessage('settings.menuLimitWarning', { remaining }),
+            {
+              duration: 6000,
+              action: {
+                label: t('settings.menuLimitUpgrade'),
+                onClick: () => navigate('/admin/settings/billing'),
+              },
+            }
+          );
+        }
+      }
+
     } catch (error) {
       const message = error instanceof Error ? error.message : t('settings.menuCreateFailed');
 
-      toast.error(message);
+      // プラン制限エラーの場合はアップグレードボタン付きトーストを表示
+      if (message.includes('アップグレード') || message.includes('Upgrade') || message.includes('品まで')) {
+        toast.error(message, {
+          duration: 8000,
+          action: {
+            label: t('settings.menuLimitUpgrade'),
+            onClick: () => navigate('/admin/settings/billing'),
+          },
+        });
+      } else {
+        toast.error(message);
+      }
     } finally {
       setIsCreatingMenuItem(false);
     }
@@ -1715,10 +1755,50 @@ function SettingsContent() {
       await refetchAdminFeedPosts();
       toast.success(t('settings.feedCreateSuccess'));
 
+      // フリープランのフィード上限に近づいたら警告トーストを表示
+      if (planLimits?.menuLimit !== null && planLimits?.menuLimit !== undefined) {
+        const newCount = (adminFeedPosts?.length ?? 0) + 1;
+        const remaining = planLimits.menuLimit - newCount;
+        if (remaining === 0) {
+          toast.warning(
+            formatMessage('settings.feedLimitReached', { limit: planLimits.menuLimit }),
+            {
+              duration: 8000,
+              action: {
+                label: t('settings.menuLimitUpgrade'),
+                onClick: () => navigate('/admin/settings/billing'),
+              },
+            }
+          );
+        } else if (remaining > 0 && remaining <= 2) {
+          toast.warning(
+            formatMessage('settings.menuLimitWarning', { remaining }),
+            {
+              duration: 6000,
+              action: {
+                label: t('settings.menuLimitUpgrade'),
+                onClick: () => navigate('/admin/settings/billing'),
+              },
+            }
+          );
+        }
+      }
+
     } catch (error) {
       const message = error instanceof Error ? error.message : t('settings.feedCreateFailed');
 
-      toast.error(message);
+      // プラン制限エラーの場合はアップグレードボタン付きトーストを表示
+      if (message.includes('アップグレード') || message.includes('Upgrade') || message.includes('品まで')) {
+        toast.error(message, {
+          duration: 8000,
+          action: {
+            label: t('settings.menuLimitUpgrade'),
+            onClick: () => navigate('/admin/settings/billing'),
+          },
+        });
+      } else {
+        toast.error(message);
+      }
     } finally {
       setIsCreatingFeedPost(false);
     }
@@ -2627,7 +2707,20 @@ function SettingsContent() {
                     <div className="flex items-center gap-2 text-sm font-semibold">
                       <ImagePlus className="h-4 w-4" />
                       {t('settings.menuAddNew')}
-
+                      {planLimits?.menuLimit !== null && planLimits?.menuLimit !== undefined && (
+                        <span className={`ml-auto text-xs font-normal px-2 py-0.5 rounded-full ${
+                          (adminItems?.length ?? 0) >= planLimits.menuLimit
+                            ? 'bg-destructive/10 text-destructive'
+                            : (adminItems?.length ?? 0) >= planLimits.menuLimit - 2
+                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                              : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {formatMessage('settings.menuLimitCounter', {
+                            current: adminItems?.length ?? 0,
+                            limit: planLimits.menuLimit,
+                          })}
+                        </span>
+                      )}
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
@@ -2703,7 +2796,14 @@ function SettingsContent() {
                       <p className="text-xs text-muted-foreground">{t('settings.menuItemPhotoHelp')}</p>
 
                     </div>
-                    <Button onClick={handleCreateMenuItem} disabled={isCreatingMenuItem || createMenuItemMutation.isPending}>
+                    <Button
+                      onClick={handleCreateMenuItem}
+                      disabled={
+                        isCreatingMenuItem ||
+                        createMenuItemMutation.isPending ||
+                        (planLimits?.menuLimit !== null && planLimits?.menuLimit !== undefined && (adminItems?.length ?? 0) >= planLimits.menuLimit)
+                      }
+                    >
                       {isCreatingMenuItem ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
@@ -2711,6 +2811,18 @@ function SettingsContent() {
                       )}
                       {t('common.add')}
                     </Button>
+                    {planLimits?.menuLimit !== null && planLimits?.menuLimit !== undefined && (adminItems?.length ?? 0) >= planLimits.menuLimit && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                        {formatMessage('settings.menuLimitReached', { limit: planLimits.menuLimit })}
+                        <button
+                          type="button"
+                          className="underline font-medium hover:text-amber-700 dark:hover:text-amber-300"
+                          onClick={() => navigate('/admin/settings/billing')}
+                        >
+                          {t('settings.menuLimitUpgrade')}
+                        </button>
+                      </p>
+                    )}
 
                   </div>
 
@@ -2885,7 +2997,20 @@ function SettingsContent() {
                     <div className="flex items-center gap-2 text-sm font-semibold">
                       <ImagePlus className="h-4 w-4" />
                       {t('settings.feedAddNew')}
-
+                      {planLimits?.menuLimit !== null && planLimits?.menuLimit !== undefined && (
+                        <span className={`ml-auto text-xs font-normal px-2 py-0.5 rounded-full ${
+                          (adminFeedPosts?.length ?? 0) >= planLimits.menuLimit
+                            ? 'bg-destructive/10 text-destructive'
+                            : (adminFeedPosts?.length ?? 0) >= planLimits.menuLimit - 2
+                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                              : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {formatMessage('settings.menuLimitCounter', {
+                            current: adminFeedPosts?.length ?? 0,
+                            limit: planLimits.menuLimit,
+                          })}
+                        </span>
+                      )}
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
@@ -2936,7 +3061,14 @@ function SettingsContent() {
                       <p className="text-xs text-muted-foreground">{t('settings.menuItemPhotoHelp')}</p>
 
                     </div>
-                    <Button onClick={handleCreateFeedPost} disabled={isCreatingFeedPost || createFeedPostMutation.isPending}>
+                    <Button
+                      onClick={handleCreateFeedPost}
+                      disabled={
+                        isCreatingFeedPost ||
+                        createFeedPostMutation.isPending ||
+                        (planLimits?.menuLimit !== null && planLimits?.menuLimit !== undefined && (adminFeedPosts?.length ?? 0) >= planLimits.menuLimit)
+                      }
+                    >
                       {isCreatingFeedPost ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
@@ -2944,6 +3076,18 @@ function SettingsContent() {
                       )}
                       {t('common.add')}
                     </Button>
+                    {planLimits?.menuLimit !== null && planLimits?.menuLimit !== undefined && (adminFeedPosts?.length ?? 0) >= planLimits.menuLimit && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                        {formatMessage('settings.feedLimitReached', { limit: planLimits.menuLimit })}
+                        <button
+                          type="button"
+                          className="underline font-medium hover:text-amber-700 dark:hover:text-amber-300"
+                          onClick={() => navigate('/admin/settings/billing')}
+                        >
+                          {t('settings.menuLimitUpgrade')}
+                        </button>
+                      </p>
+                    )}
 
                   </div>
 

@@ -108,6 +108,23 @@ describe("checkMenuLimit", () => {
     expect(() => checkMenuLimit("free", 4)).not.toThrow();
   });
 
+  it("does not throw when free plan has 0 items", () => {
+    expect(() => checkMenuLimit("free", 0)).not.toThrow();
+  });
+
+  it("throws at exactly the limit (boundary test)", () => {
+    expect(() => checkMenuLimit("free", 5)).toThrow();
+    expect(() => checkMenuLimit("free", 6)).toThrow();
+  });
+
+  it("does not throw at one below the limit (boundary test)", () => {
+    expect(() => checkMenuLimit("free", 4)).not.toThrow();
+  });
+
+  it("includes upgrade message in error", () => {
+    expect(() => checkMenuLimit("free", 5)).toThrow("Standard以上のプランにアップグレード");
+  });
+
   it("does not throw for standard plan regardless of count", () => {
     expect(() => checkMenuLimit("standard", 100)).not.toThrow();
   });
