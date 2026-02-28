@@ -12,6 +12,7 @@ import {
   feedPosts, InsertFeedPost,
   queueAuditLogs, InsertQueueAuditLog,
   staffSessions, InsertStaffSession,
+  staffMembers, InsertStaffMember, StaffMember,
   smsLogs, InsertSmsLog
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -859,6 +860,7 @@ const STAFF_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 export async function createStaffSession(data: {
   storeId: number;
   role: 'staff' | 'manager';
+  staffMemberId?: number;
 }): Promise<string> {
 
   const db = await getDb();
@@ -870,6 +872,7 @@ export async function createStaffSession(data: {
 
   await db.insert(staffSessions).values({
     storeId: data.storeId,
+    staffMemberId: data.staffMemberId ?? null,
     sessionToken,
     role: data.role,
     expiresAt,
@@ -906,7 +909,29 @@ export async function getStaffSession(sessionToken: string) {
     .set({ expiresAt: refreshedExpiresAt })
     .where(eq(staffSessions.id, result[0].id));
 
-  return { ...result[0], expiresAt: refreshedExpiresAt };
+  // スタッフメンバーの権限情報を取得
+  let permissions = { canCall: true, canEditSettings: true, canManage: true };
+  let staffMemberName: string | null = null;
+  if (result[0].staffMemberId) {
+    const member = await db.select()
+      .from(staffMembers)
+      .where(eq(staffMembers.id, result[0].staffMemberId))
+      .limit(1);
+    if (member[0]) {
+      permissions = {
+        canCall: member[0].canCall,
+        canEditSettings: member[0].canEditSettings,
+        canManage: member[0].canManage,
+      };
+      staffMemberName = member[0].name;
+    }
+  }
+  // マネージャーは常に全権限
+  if (result[0].role === 'manager') {
+    permissions = { canCall: true, canEditSettings: true, canManage: true };
+  }
+
+  return { ...result[0], expiresAt: refreshedExpiresAt, permissions, staffMemberName };
 
 }
 
@@ -2233,4 +2258,89 @@ export async function getResourceCounts(storeId: number) {
     menu: Number(menuResult[0]?.count ?? 0),
     feed: Number(feedResult[0]?.count ?? 0),
   };
+}
+
+
+// ==================== Staff Member Helpers ====================
+
+export async function getStaffMembers(storeId: number): Promise<StaffMember[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select()
+    .from(staffMembers)
+    .where(and(
+      eq(staffMembers.storeId, storeId),
+      eq(staffMembers.isActive, true)
+    ))
+    .orderBy(staffMembers.createdAt);
+}
+
+export async function getStaffMemberCount(storeId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const result = await db.select({ count: sql<number>`count(*)` })
+    .from(staffMembers)
+    .where(and(
+      eq(staffMembers.storeId, storeId),
+      eq(staffMembers.isActive, true)
+    ));
+
+  return Number(result[0]?.count ?? 0);
+}
+
+export async function getStaffMemberById(id: number, storeId: number): Promise<StaffMember | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select()
+    .from(staffMembers)
+    .where(and(
+      eq(staffMembers.id, id),
+      eq(staffMembers.storeId, storeId)
+    ))
+    .limit(1);
+
+  return result[0] ?? null;
+}
+
+export async function createStaffMember(data: { storeId: number; name: string; canCall?: boolean; canEditSettings?: boolean; canManage?: boolean }): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+
+  const result = await db.insert(staffMembers).values({
+    storeId: data.storeId,
+    name: data.name,
+    canCall: data.canCall ?? true,
+    canEditSettings: data.canEditSettings ?? false,
+    canManage: data.canManage ?? false,
+  });
+
+  return Number(result[0].insertId);
+}
+
+export async function updateStaffMember(id: number, storeId: number, data: { name?: string; canCall?: boolean; canEditSettings?: boolean; canManage?: boolean }): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(staffMembers)
+    .set(data)
+    .where(and(
+      eq(staffMembers.id, id),
+      eq(staffMembers.storeId, storeId)
+    ));
+}
+
+export async function deleteStaffMember(id: number, storeId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  // ソフトデリート: isActive = false に設定
+  await db.update(staffMembers)
+    .set({ isActive: false })
+    .where(and(
+      eq(staffMembers.id, id),
+      eq(staffMembers.storeId, storeId)
+    ));
 }

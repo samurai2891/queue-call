@@ -816,6 +816,7 @@ const ticketRouter = router({
     .input(z.object({
       storeId: z.number(),
       pin: z.string().min(4).max(8),
+      staffMemberId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const store = await db.getStoreById(input.storeId);
@@ -838,16 +839,36 @@ const ticketRouter = router({
 
       const role = managerValid ? 'manager' : 'staff';
 
-      // プランチェック: スタッフ同時ログイン数上限
-      const activeSessionCount = await db.getActiveStaffSessionCount(store.id);
-      checkStaffLimit(store.subscriptionPlan, activeSessionCount);
+      // スタッフの場合はスタッフ枠の選択が必須（スタッフ枠が存在する場合）
+      const staffMembers = await db.getStaffMembers(store.id);
+      if (role === 'staff' && staffMembers.length > 0 && !input.staffMemberId) {
+        // スタッフ枠が登録されているのに選択されていない場合、スタッフ一覧を返す
+        return { needsStaffSelection: true as const, staffMembers: staffMembers.map(m => ({ id: m.id, name: m.name })), role };
+      }
+
+      // スタッフ枠が指定されている場合、存在確認
+      if (input.staffMemberId) {
+        const member = await db.getStaffMemberById(input.staffMemberId, store.id);
+        if (!member) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Staff member not found' });
+        }
+      }
 
       const sessionToken = await db.createStaffSession({
         storeId: store.id,
         role,
+        staffMemberId: input.staffMemberId,
       });
 
-      return { sessionToken, role };
+      return { sessionToken, role, needsStaffSelection: false as const };
+    }),
+
+  // Get staff members list for login selection
+  getStaffMembers: publicProcedure
+    .input(z.object({ storeId: z.number() }))
+    .query(async ({ input }) => {
+      const members = await db.getStaffMembers(input.storeId);
+      return members.map(m => ({ id: m.id, name: m.name }));
     }),
 
   // Get staff session
@@ -863,6 +884,8 @@ const ticketRouter = router({
         storeId: session.storeId,
         role: session.role,
         expiresAt: session.expiresAt,
+        permissions: session.permissions,
+        staffMemberName: session.staffMemberName,
       };
     }),
 
@@ -2287,7 +2310,7 @@ const subscriptionRouter = router({
       // 並列で各カウントを取得
       const [menuCount, staffCount, feedCount] = await Promise.all([
         db.getMenuItemCount(input.storeId),
-        db.getActiveStaffSessionCount(input.storeId),
+        db.getStaffMemberCount(input.storeId),
         db.getFeedPostCount(input.storeId),
       ]);
 
@@ -2454,6 +2477,97 @@ const subscriptionRouter = router({
         effectiveDays,
         planId: limits.planId,
       };
+    }),
+});
+
+// ==================== Staff Member Router ====================
+const staffMemberRouter = router({
+  // Get all staff members for a store
+  list: protectedProcedure
+    .input(z.object({ storeId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+      return db.getStaffMembers(input.storeId);
+    }),
+
+  // Create a new staff member (manager only)
+  create: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      name: z.string().min(1).max(100),
+      canCall: z.boolean().optional().default(true),
+      canEditSettings: z.boolean().optional().default(false),
+      canManage: z.boolean().optional().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      // プラン制限チェック: スタッフ枠数
+      const currentCount = await db.getStaffMemberCount(input.storeId);
+      checkStaffLimit(store.subscriptionPlan, currentCount);
+
+      const id = await db.createStaffMember({
+        storeId: input.storeId,
+        name: input.name,
+        canCall: input.canCall,
+        canEditSettings: input.canEditSettings,
+        canManage: input.canManage,
+      });
+
+      return { id };
+    }),
+
+  // Update a staff member (manager only)
+  update: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      id: z.number(),
+      name: z.string().min(1).max(100).optional(),
+      canCall: z.boolean().optional(),
+      canEditSettings: z.boolean().optional(),
+      canManage: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      const member = await db.getStaffMemberById(input.id, input.storeId);
+      if (!member) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Staff member not found' });
+      }
+
+      const { storeId, id, ...updateData } = input;
+      await db.updateStaffMember(id, storeId, updateData);
+      return { success: true };
+    }),
+
+  // Delete a staff member (manager only, soft delete)
+  delete: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      id: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      const member = await db.getStaffMemberById(input.id, input.storeId);
+      if (!member) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Staff member not found' });
+      }
+
+      await db.deleteStaffMember(input.id, input.storeId);
+      return { success: true };
     }),
 });
 
@@ -3126,6 +3240,7 @@ export const appRouter = router({
   store: storeRouter,
   ticket: ticketRouter,
   staff: staffRouter,
+  staffMember: staffMemberRouter,
   menu: menuRouter,
   notification: notificationRouter,
   stripe: stripeRouter,

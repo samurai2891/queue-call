@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,6 +58,9 @@ import {
   Upload,
   AlertTriangle,
   XCircle,
+  Users,
+  UserPlus,
+  UserMinus,
 } from 'lucide-react';
 
 import { toast } from 'sonner';
@@ -1957,6 +1961,7 @@ function SettingsContent() {
     { id: 'messages', label: t('settings.customMessages'), icon: MessageSquare },
     { id: 'businessHours', label: t('settings.businessHours'), icon: Clock },
     { id: 'qrcode', label: t('settings.qrcode'), icon: QrCode },
+    { id: 'staffMembers', label: t('settings.staffMembers'), icon: Users },
     { id: 'security', label: t('settings.security'), icon: Shield },
     { id: 'billing', label: t('settings.billing') || 'プラン・お支払い', icon: CreditCard },
   ];
@@ -4120,6 +4125,11 @@ function SettingsContent() {
             )}
           </TabsContent>
 
+          {/* Staff Members Management */}
+          <TabsContent value="staffMembers">
+            <StaffMembersTab store={store} t={t as (key: string) => string} />
+          </TabsContent>
+
           {/* Security Settings */}
           <TabsContent value="security">
             <Card>
@@ -4711,6 +4721,242 @@ function BillingTab({ store, t }: { store: any; t: (key: string) => string }) {
                 ? (t('downgrade.confirmCancel' as any) || 'キャンセルする')
                 : (t('downgrade.confirmDowngrade' as any) || 'ダウングレードする')
               }
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ==================== Staff Members Tab Component ====================
+function StaffMembersTab({ store, t }: { store: any; t: (key: string) => string }) {
+  const utils = trpc.useUtils();
+  const [newName, setNewName] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+
+  const { data: members = [], isLoading } = trpc.staffMember.list.useQuery(
+    { storeId: store?.id },
+    { enabled: !!store?.id }
+  );
+
+  const { data: subInfo } = trpc.subscription.getInfo.useQuery(
+    { storeId: store?.id },
+    { enabled: !!store?.id }
+  );
+
+  const planId = subInfo?.plan?.id || 'free';
+  const PLANS_LIMITS: Record<string, number> = { free: 1, standard: 3, pro: 999 };
+  const staffLimit = PLANS_LIMITS[planId] || 1;
+  const isAtLimit = members.length >= staffLimit;
+
+  const createMutation = trpc.staffMember.create.useMutation({
+    onSuccess: () => {
+      utils.staffMember.list.invalidate();
+      utils.subscription.getPlanUsage.invalidate();
+      setNewName('');
+      toast.success(t('settings.staffMemberAdded'));
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const updateMutation = trpc.staffMember.update.useMutation({
+    onSuccess: () => {
+      utils.staffMember.list.invalidate();
+      setEditingId(null);
+      setEditName('');
+      toast.success(t('settings.staffMemberUpdated'));
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const deleteMutation = trpc.staffMember.delete.useMutation({
+    onSuccess: () => {
+      utils.staffMember.list.invalidate();
+      utils.subscription.getPlanUsage.invalidate();
+      setDeleteConfirmId(null);
+      toast.success(t('settings.staffMemberDeleted'));
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const updatePermsMutation = trpc.staffMember.update.useMutation({
+    onSuccess: () => {
+      utils.staffMember.list.invalidate();
+      toast.success(t('common.save'));
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const handleCreate = () => {
+    if (!newName.trim() || !store) return;
+    createMutation.mutate({ storeId: store.id, name: newName.trim() });
+  };
+
+  const handleUpdate = (id: number) => {
+    if (!editName.trim() || !store) return;
+    updateMutation.mutate({ id, storeId: store.id, name: editName.trim() });
+  };
+
+  const handleTogglePerm = (member: any, perm: 'canCall' | 'canEditSettings' | 'canManage') => {
+    if (!store) return;
+    updatePermsMutation.mutate({
+      id: member.id,
+      storeId: store.id,
+      [perm]: !member[perm],
+    });
+  };
+
+  const permissionLabels = [
+    { key: 'canCall' as const, label: t('settings.permCall'), desc: t('settings.permCallDesc') },
+    { key: 'canEditSettings' as const, label: t('settings.permSettings'), desc: t('settings.permSettingsDesc') },
+    { key: 'canManage' as const, label: t('settings.permOperations'), desc: t('settings.permOperationsDesc') },
+  ];
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                {t('settings.staffMembers')}
+              </CardTitle>
+              <CardDescription>{t('settings.staffMembersDesc')}</CardDescription>
+            </div>
+            <Badge variant={isAtLimit ? 'destructive' : 'secondary'}>
+              {members.length} / {staffLimit === 999 ? '∞' : staffLimit}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Add new staff member */}
+          {!isAtLimit && (
+            <div className="flex gap-2">
+              <Input
+                placeholder={t('settings.staffNamePlaceholder')}
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                maxLength={50}
+              />
+              <Button
+                onClick={handleCreate}
+                disabled={!newName.trim() || createMutation.isPending}
+              >
+                {createMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <UserPlus className="h-4 w-4" />
+                )}
+                <span className="ml-2 hidden sm:inline">{t('settings.addStaff')}</span>
+              </Button>
+            </div>
+          )}
+          {isAtLimit && planId !== 'pro' && (
+            <p className="text-sm text-amber-600 dark:text-amber-400">
+              {t('settings.staffLimitReached')}
+            </p>
+          )}
+
+          {/* Staff list */}
+          {members.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>{t('settings.noStaffMembers')}</p>
+              <p className="text-xs mt-1">{t('settings.noStaffMembersHint')}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {members.map((member: any) => (
+                <div key={member.id} className="rounded-lg border p-4 space-y-3">
+                  {/* Name row */}
+                  <div className="flex items-center justify-between">
+                    {editingId === member.id ? (
+                      <div className="flex gap-2 flex-1 mr-2">
+                        <Input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleUpdate(member.id)}
+                          maxLength={50}
+                          autoFocus
+                        />
+                        <Button size="sm" onClick={() => handleUpdate(member.id)} disabled={updateMutation.isPending}>
+                          {t('common.save')}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingId(null); setEditName(''); }}>
+                          {t('common.cancel')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{member.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => { setEditingId(member.id); setEditName(member.name); }}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDeleteConfirmId(member.id)}>
+                            <UserMinus className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Permissions */}
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {permissionLabels.map(({ key, label, desc }) => (
+                      <div key={key} className="flex items-center justify-between rounded-md border px-3 py-2">
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-medium leading-none">{label}</p>
+                          <p className="text-xs text-muted-foreground">{desc}</p>
+                        </div>
+                        <Switch
+                          checked={member[key]}
+                          onCheckedChange={() => handleTogglePerm(member, key)}
+                          disabled={updatePermsMutation.isPending}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteConfirmId !== null} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('settings.deleteStaffTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('settings.deleteStaffDesc')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteConfirmId && store && deleteMutation.mutate({ id: deleteConfirmId, storeId: store.id })}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

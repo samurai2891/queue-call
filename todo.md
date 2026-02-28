@@ -1534,3 +1534,15 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] フロントエンド: 3つのチャート（メニュー/フィード/チケット）すべてにズーム機能を適用
 - [x] 5言語の翻訳キー追加（ja/en/ko/zh-Hans/zh-Hant）
 - [x] テスト追加・実行（30ファイル全パス、565テスト全パス）
+
+### スタッフ枠管理機能の実装
+- [x] DB: staff_membersテーブル新設（storeId, name, canCall, canEditSettings, canManage）
+- [x] DB: staff_sessionsにstaffMemberId外部キーを追加
+- [x] バックエンド: スタッフ枠CRUD API（マネージャーのみ操作可能）
+- [x] バックエンド: プラン制限をセッション数→登録枠数に変更
+- [x] バックエンド: 各操作に権限チェック（canCall/canEditSettings/canManage）を適用
+- [x] フロントエンド: スタッフログインフロー変更（PIN入力後に名前選択）
+- [x] フロントエンド: 設定画面にスタッフ管理セクション追加（セキュリティタブ内）
+- [x] フロントエンド: マネージャーがスタッフの追加/削除/権限設定を管理
+- [x] 5言語の翻訳キー追加（ja/en/ko/zh-Hans/zh-Hant）
+- [x] テスト追加・実行（31ファイル全パス、586テスト全パス）

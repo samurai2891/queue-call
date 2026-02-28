@@ -379,11 +379,35 @@ export type QueueAuditLog = typeof queueAuditLogs.$inferSelect;
 export type InsertQueueAuditLog = typeof queueAuditLogs.$inferInsert;
 
 /**
+ * StaffMember - スタッフ枠（名前で管理、プラン制限対象）
+ */
+export const staffMembers = mysqlTable("staff_members", {
+  id: int("id").autoincrement().primaryKey(),
+  storeId: int("storeId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  
+  // 権限設定（マネージャーが管理）
+  canCall: boolean("canCall").default(true).notNull(),           // 呼び出し操作
+  canEditSettings: boolean("canEditSettings").default(false).notNull(), // 店舗設定の変更
+  canManage: boolean("canManage").default(false).notNull(),       // 管理操作（削除、並び替え、スキップ等）
+  
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ([
+  index("idx_staff_members_store").on(table.storeId),
+]));
+
+export type StaffMember = typeof staffMembers.$inferSelect;
+export type InsertStaffMember = typeof staffMembers.$inferInsert;
+
+/**
  * StaffSession - スタッフセッション
  */
 export const staffSessions = mysqlTable("staff_sessions", {
   id: int("id").autoincrement().primaryKey(),
   storeId: int("storeId").notNull(),
+  staffMemberId: int("staffMemberId"),  // 紐付けスタッフ枠（null = 旧セッション互換）
   sessionToken: varchar("sessionToken", { length: 64 }).notNull().unique(),
   role: mysqlEnum("role", ["staff", "manager"]).notNull(),
   reorderModeEnabled: boolean("reorderModeEnabled").default(false).notNull(),

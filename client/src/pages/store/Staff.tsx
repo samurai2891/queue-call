@@ -1,6 +1,6 @@
 import { useParams, useLocation } from 'wouter';
 import { StoreLayout } from '@/components/StoreLayout';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
@@ -103,6 +103,10 @@ function StaffContent() {
   const [bulkSkipReason, setBulkSkipReason] = useState('');
   const [bulkDoneDialogOpen, setBulkDoneDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'WAITING' | 'CALLED' | 'ARRIVED'>('ALL');
+  const [staffSelectionMode, setStaffSelectionMode] = useState(false);
+  const [availableStaffMembers, setAvailableStaffMembers] = useState<{id: number; name: string}[]>([]);
+  const [pendingRole, setPendingRole] = useState<'staff' | 'manager' | null>(null);
+  const [staffMemberName, setStaffMemberName] = useState<string | null>(null);
 
 
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
@@ -129,6 +133,22 @@ function StaffContent() {
       sessionStorage.removeItem(SESSION_STORAGE_KEY);
     }
   }, [sessionError]);
+
+  // Permissions derived from session (manager has all permissions)
+  const permissions = useMemo(() => {
+    if (role === 'manager') {
+      return { canCall: true, canEditSettings: true, canManage: true };
+    }
+    if (session && 'permissions' in session) {
+      const p = (session as any).permissions;
+      return {
+        canCall: p?.canCall ?? true,
+        canEditSettings: p?.canEditSettings ?? false,
+        canManage: p?.canManage ?? false,
+      };
+    }
+    return { canCall: true, canEditSettings: false, canManage: false };
+  }, [role, session]);
 
   // Get waiting list
 
@@ -175,10 +195,23 @@ function StaffContent() {
   // Mutations
   const loginMutation = trpc.staff.login.useMutation({
     onSuccess: (data) => {
-      setSessionToken(data.sessionToken);
-      setRole(data.role as 'staff' | 'manager');
-      sessionStorage.setItem(SESSION_STORAGE_KEY, data.sessionToken);
+      if ('needsStaffSelection' in data && data.needsStaffSelection && 'staffMembers' in data) {
+        setAvailableStaffMembers(data.staffMembers as {id: number; name: string}[]);
+        setPendingRole(data.role as 'staff' | 'manager');
+        setStaffSelectionMode(true);
+        setIsLoggingIn(false);
+        return;
+      }
+      if ('sessionToken' in data && data.sessionToken) {
+        setSessionToken(data.sessionToken);
+        setRole(data.role as 'staff' | 'manager');
+        setStaffMemberName('staffMemberName' in data ? (data.staffMemberName as string | null) : null);
+        sessionStorage.setItem(SESSION_STORAGE_KEY, data.sessionToken);
+      }
       setPin('');
+      setStaffSelectionMode(false);
+      setAvailableStaffMembers([]);
+      setPendingRole(null);
       setIsLoggingIn(false);
     },
     onError: (error: any) => {
@@ -370,6 +403,19 @@ function StaffContent() {
     loginMutation.mutate({ storeId: store.id, pin });
   };
 
+  const handleStaffSelect = (staffMemberId: number) => {
+    if (!store || !pin) return;
+    setIsLoggingIn(true);
+    loginMutation.mutate({ storeId: store.id, pin, staffMemberId });
+  };
+
+  const handleCancelStaffSelection = () => {
+    setStaffSelectionMode(false);
+    setAvailableStaffMembers([]);
+    setPendingRole(null);
+    setPin('');
+  };
+
   const handleLogout = () => {
     if (sessionToken) {
       logoutMutation.mutate({ sessionToken });
@@ -547,6 +593,52 @@ function StaffContent() {
     );
   }
 
+  // Staff Selection Screen — after PIN verification
+  if (staffSelectionMode && availableStaffMembers.length > 0) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
+        <header className="p-4 flex justify-between items-center">
+          <Button variant="ghost" size="icon" className="active:scale-90 transition-transform" onClick={handleCancelStaffSelection}>
+            <XCircle className="h-5 w-5" />
+          </Button>
+          <LanguageSwitcher showLabel />
+        </header>
+        <main className="flex-1 container flex flex-col items-center justify-center py-4">
+          <AnimatedCard delay={100} hoverEffect={false} className="w-full max-w-sm">
+            <Card className="w-full">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-center">{t('staff.selectStaff')}</CardTitle>
+                <CardDescription className="text-center">{t('staff.selectStaffDesc')}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {availableStaffMembers.map((member) => (
+                  <Button
+                    key={member.id}
+                    variant="outline"
+                    className="w-full h-14 text-lg justify-start gap-3 active:scale-[0.97] transition-transform"
+                    disabled={isLoggingIn}
+                    onClick={() => handleStaffSelect(member.id)}
+                  >
+                    <Users className="h-5 w-5 text-muted-foreground" />
+                    {member.name}
+                  </Button>
+                ))}
+                <Separator className="my-3" />
+                <Button
+                  variant="ghost"
+                  className="w-full text-muted-foreground"
+                  onClick={handleCancelStaffSelection}
+                >
+                  {t('common.back')}
+                </Button>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+        </main>
+      </div>
+    );
+  }
+
   // Login Screen — Numpad UI
   if (!sessionToken || !session) {
     const handleNumpadPress = (digit: string) => {
@@ -690,7 +782,9 @@ function StaffContent() {
               <Badge variant={role === 'manager' ? 'default' : 'secondary'}>
               {role === 'manager' ? t('staff.roleManager') : t('staff.roleStaff')}
             </Badge>
-
+            {staffMemberName && (
+              <span className="text-sm text-muted-foreground">{staffMemberName}</span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
@@ -709,7 +803,7 @@ function StaffContent() {
             size="lg"
             className="w-full h-14 text-lg"
             onClick={handleCallNext}
-            disabled={callNextMutation.isPending || waitingTickets.length === 0}
+            disabled={callNextMutation.isPending || waitingTickets.length === 0 || !permissions.canCall}
           >
             {callNextMutation.isPending ? (
               <Loader2 className="mr-2 h-6 w-6 animate-spin" />
@@ -751,7 +845,7 @@ function StaffContent() {
             variant={intakeStatus === 'open' ? 'destructive' : 'default'}
             size="sm"
             onClick={handleToggleIntake}
-            disabled={toggleIntakeMutation.isPending}
+            disabled={toggleIntakeMutation.isPending || !permissions.canManage}
           >
             {intakeStatus === 'open' ? (
               <>
@@ -767,8 +861,8 @@ function StaffContent() {
           </Button>
         </div>
 
-        {/* Business Hours Override — 営業時間外受付許可 */}
-        {businessHoursEnabled && isOutsideBusinessHours && (
+        {/* Business Hours Override — 営業時間外受付許可 (canManage権限が必要) */}
+        {businessHoursEnabled && isOutsideBusinessHours && permissions.canManage && (
           <div className="flex items-center justify-between p-3 bg-card rounded-lg border border-warning/50">
             <div className="flex-1 space-y-1">
               <div className="flex items-center gap-2">
@@ -790,7 +884,7 @@ function StaffContent() {
         )}
 
         {/* Business Hours Override Active Banner */}
-        {businessHoursEnabled && businessHoursOverride && (
+        {businessHoursEnabled && businessHoursOverride && permissions.canManage && (
           <Alert className="border-warning/50 bg-warning/5">
             <AlertCircle className="h-4 w-4 text-warning" />
             <AlertTitle className="text-warning">{t('staff.businessHoursOverrideActive')}</AlertTitle>
@@ -800,7 +894,8 @@ function StaffContent() {
           </Alert>
         )}
 
-        {/* Manual Add — 折りたたみ */}
+        {/* Manual Add — 折りたたみ (canManage権限が必要) */}
+        {permissions.canManage && (
         <div className="bg-card rounded-lg border">
           <button
             type="button"
@@ -856,8 +951,9 @@ function StaffContent() {
             </div>
           )}
         </div>
+        )}
 
-        {reorderEnabled && (
+        {reorderEnabled && permissions.canManage && (
           <div className="flex items-center justify-between p-3 bg-card rounded-lg border">
             <div className="space-y-1">
               <span className="text-sm font-medium">{t('staff.reorderMode')}</span>
@@ -886,7 +982,7 @@ function StaffContent() {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <h2 className="font-semibold">{t('staff.waitingList')}</h2>
-            {tickets.length > 0 && (
+            {tickets.length > 0 && permissions.canManage && (
               <Button
                 variant={selectionMode ? 'default' : 'outline'}
                 size="sm"
@@ -1043,10 +1139,11 @@ function StaffContent() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleRecall(ticket.id)}
-                                disabled={recallMutation.isPending || doneMutation.isPending || skipMutation.isPending}
+                                disabled={recallMutation.isPending || doneMutation.isPending || skipMutation.isPending || !permissions.canCall}
                               >
                                 <RefreshCw className="h-4 w-4" />
                               </Button>
+                              {permissions.canManage && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -1055,9 +1152,10 @@ function StaffContent() {
                               >
                                 <SkipForward className="h-4 w-4" />
                               </Button>
+                              )}
                             </>
                           )}
-                        {ticket.status === 'ARRIVED' && (
+                        {ticket.status === 'ARRIVED' && permissions.canManage && (
                           <Button
                             size="sm"
                             onClick={() => handleDone(ticket.id)}

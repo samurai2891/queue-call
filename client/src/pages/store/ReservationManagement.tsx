@@ -200,8 +200,14 @@ export default function ReservationManagement() {
   // ログイン
   const loginMutation = trpc.staff.login.useMutation({
     onSuccess: (data) => {
-      setSessionToken(data.sessionToken);
-      sessionStorage.setItem(SESSION_STORAGE_KEY, data.sessionToken);
+      if ('needsStaffSelection' in data && data.needsStaffSelection) {
+        setIsLoggingIn(false);
+        return;
+      }
+      if ('sessionToken' in data && data.sessionToken) {
+        setSessionToken(data.sessionToken);
+        sessionStorage.setItem(SESSION_STORAGE_KEY, data.sessionToken);
+      }
       setPin('');
       setIsLoggingIn(false);
     },
