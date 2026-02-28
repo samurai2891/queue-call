@@ -1366,3 +1366,8 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] App.tsxにルート追加、Settings.tsxにナビゲーションリンク追加
 - [x] 多言語翻訳キーを追加（5言語、15キー）
 - [x] テスト7件追加、全352件パス
+
+### BUG: getSmsAnalyticsのSQLクエリでDate形式エラー
+- [x] stripe.tsのgetSmsAnalyticsでstartDateをISO文字列に変換してからSQLに渡す（toISOString().slice(0,19).replace('T',' ')）
+- [x] 同様の問題がある他のDate使用箇所も確認→他にはなし
+- [x] テスト実行・確認（全352件パス）

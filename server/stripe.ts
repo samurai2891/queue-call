@@ -477,6 +477,8 @@ export async function getSmsAnalytics(
   const lookbackDays = period === 'monthly' ? Math.max(days, 365) : period === 'weekly' ? Math.max(days, 90) : days;
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - lookbackDays);
+  // MySQL互換のISO文字列に変換（Date.toString()はMySQL非対応形式）
+  const startDateStr = startDate.toISOString().slice(0, 19).replace('T', ' ');
 
   // 生データを取得（日別集計）
   const rawData = await db
@@ -490,7 +492,7 @@ export async function getSmsAnalytics(
     .where(
       and(
         eq(smsTransactions.storeId, storeId),
-        sql`${smsTransactions.createdAt} >= ${startDate}`
+        sql`${smsTransactions.createdAt} >= ${startDateStr}`
       )
     )
     .groupBy(sql`DATE(${smsTransactions.createdAt})`, smsTransactions.type)
