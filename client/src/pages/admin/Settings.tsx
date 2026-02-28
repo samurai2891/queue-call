@@ -1,5 +1,5 @@
 import { useParams, useLocation, useSearch } from 'wouter';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
@@ -59,6 +59,7 @@ import {
 
 import { toast } from 'sonner';
 import { getLoginUrl } from '@/const';
+import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 import { VapidSettings } from '@/components/VapidSettings';
 
@@ -108,32 +109,51 @@ function SmsBalanceCard({ storeId, autoChargeEnabled, autoChargeThreshold, autoC
   const [customAmount, setCustomAmount] = useState('');
   const [lowBalanceThreshold, setLowBalanceThreshold] = useState(1000);
   const [chargeResult, setChargeResult] = useState<'success' | 'canceled' | null>(null);
-
-
-  
-  // Stripe Checkoutからのリダイレクト結果を検出
-  useEffect(() => {
-    const params = new URLSearchParams(searchString);
-    const chargeStatus = params.get('charge');
-    if (chargeStatus === 'success') {
-      setChargeResult('success');
-      toast.success(t('settings.smsChargeSuccess'));
-      // URLパラメータをクリーンアップ
-      const cleanUrl = window.location.pathname + '?tab=notifications';
-      window.history.replaceState({}, '', cleanUrl);
-    } else if (chargeStatus === 'canceled') {
-      setChargeResult('canceled');
-      toast.info(t('settings.smsChargeCanceled'));
-      const cleanUrl = window.location.pathname + '?tab=notifications';
-      window.history.replaceState({}, '', cleanUrl);
-    }
-  }, [searchString, t]);
+  const prevBalanceRef = useRef<number | null>(null);
+  const shouldAnimateRef = useRef(false);
 
   // SMS残高取得
   const { data: balanceData, isLoading: balanceLoading, refetch: refetchBalance } = trpc.stripe.getSmsBalance.useQuery(
     { storeId: storeId! },
     { enabled: !!storeId }
   );
+
+  // カウントアップアニメーション
+  const { displayValue: animatedBalance, isAnimating, triggerAnimation } = useAnimatedCounter(
+    balanceData?.balance ?? 0,
+    { duration: 1500 }
+  );
+
+  // Stripe Checkoutからのリダイレクト結果を検出
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const chargeStatus = params.get('charge');
+    if (chargeStatus === 'success') {
+      setChargeResult('success');
+      shouldAnimateRef.current = true;
+      toast.success(t('settings.smsChargeSuccess'));
+      // URLパラメータをクリーンアップ
+      const cleanUrl = window.location.pathname + '?tab=notifications';
+      window.history.replaceState({}, '', cleanUrl);
+      // 残高を再取得してアニメーションを発火
+      refetchBalance();
+    } else if (chargeStatus === 'canceled') {
+      setChargeResult('canceled');
+      toast.info(t('settings.smsChargeCanceled'));
+      const cleanUrl = window.location.pathname + '?tab=notifications';
+      window.history.replaceState({}, '', cleanUrl);
+    }
+  }, [searchString, t, refetchBalance]);
+
+  // 残高データが更新されたらアニメーションを発火
+  useEffect(() => {
+    const newBalance = balanceData?.balance ?? 0;
+    if (shouldAnimateRef.current && prevBalanceRef.current !== null && newBalance !== prevBalanceRef.current) {
+      triggerAnimation(prevBalanceRef.current);
+      shouldAnimateRef.current = false;
+    }
+    prevBalanceRef.current = newBalance;
+  }, [balanceData?.balance, triggerAnimation]);
   
   // SMS取引履歴取得
   const { data: transactionsData, isLoading: transactionsLoading } = trpc.stripe.getSmsTransactions.useQuery(
@@ -285,8 +305,19 @@ function SmsBalanceCard({ storeId, autoChargeEnabled, autoChargeThreshold, autoC
         )}
 
         <div className="mt-3">
-          <div className={`text-3xl font-bold ${isLowBalance ? 'text-destructive' : ''}`}>
-            ¥{balance.toLocaleString()}
+          <div className={`text-3xl font-bold transition-colors duration-500 ${
+            isAnimating
+              ? 'text-green-600 dark:text-green-400'
+              : isLowBalance
+                ? 'text-destructive'
+                : ''
+          }`}>
+            <span className={isAnimating ? 'inline-block animate-pulse' : ''}>
+              ¥{animatedBalance.toLocaleString()}
+            </span>
+            {isAnimating && (
+              <span className="ml-2 text-sm font-normal text-green-500 animate-bounce inline-block">↑</span>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             {formatMessage('settings.smsBalanceAvailable', {
