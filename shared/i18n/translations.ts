@@ -1114,6 +1114,7 @@ export const translations = {
     'dashboard.usageTicketTrend': '今月の発券数',
     'dashboard.usageGranularityDaily': '日別',
     'dashboard.usageGranularityWeekly': '週別',
+    'dashboard.usageGranularityMonthly': '月別',
   },
   en: {
     // Common
@@ -2216,6 +2217,7 @@ export const translations = {
     'dashboard.usageTicketTrend': 'Tickets issued this month',
     'dashboard.usageGranularityDaily': 'Daily',
     'dashboard.usageGranularityWeekly': 'Weekly',
+    'dashboard.usageGranularityMonthly': 'Monthly',
   },
   ko: {
     // Common
@@ -3319,6 +3321,7 @@ export const translations = {
     'dashboard.usageTicketTrend': '이번 달 발권 수',
     'dashboard.usageGranularityDaily': '일별',
     'dashboard.usageGranularityWeekly': '주별',
+    'dashboard.usageGranularityMonthly': '월별',
   },
   'zh-Hans': {
     // Common
@@ -4422,6 +4425,7 @@ export const translations = {
     'dashboard.usageTicketTrend': '本月发放数',
     'dashboard.usageGranularityDaily': '按日',
     'dashboard.usageGranularityWeekly': '按周',
+    'dashboard.usageGranularityMonthly': '按月',
   },
   'zh-Hant': {
     // Common
@@ -5525,6 +5529,7 @@ export const translations = {
     'dashboard.usageTicketTrend': '本月發放數',
     'dashboard.usageGranularityDaily': '按日',
     'dashboard.usageGranularityWeekly': '按週',
+    'dashboard.usageGranularityMonthly': '按月',
   },
 } as const;
 

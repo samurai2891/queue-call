@@ -554,6 +554,7 @@ describe("Dashboard Usage Trend - Granularity toggle translation keys", () => {
   const granularityKeys = [
     "dashboard.usageGranularityDaily",
     "dashboard.usageGranularityWeekly",
+    "dashboard.usageGranularityMonthly",
   ];
 
   it("all granularity translation keys exist in all supported locales", () => {
@@ -569,25 +570,209 @@ describe("Dashboard Usage Trend - Granularity toggle translation keys", () => {
   it("Japanese granularity translations are correct", () => {
     expect(t("ja", "dashboard.usageGranularityDaily")).toBe("日別");
     expect(t("ja", "dashboard.usageGranularityWeekly")).toBe("週別");
+    expect(t("ja", "dashboard.usageGranularityMonthly")).toBe("月別");
   });
 
   it("English granularity translations are correct", () => {
     expect(t("en", "dashboard.usageGranularityDaily")).toBe("Daily");
     expect(t("en", "dashboard.usageGranularityWeekly")).toBe("Weekly");
+    expect(t("en", "dashboard.usageGranularityMonthly")).toBe("Monthly");
   });
 
   it("Korean granularity translations are correct", () => {
     expect(t("ko", "dashboard.usageGranularityDaily")).toBe("일별");
     expect(t("ko", "dashboard.usageGranularityWeekly")).toBe("주별");
+    expect(t("ko", "dashboard.usageGranularityMonthly")).toBe("월별");
   });
 
   it("zh-Hans granularity translations are correct", () => {
     expect(t("zh-Hans", "dashboard.usageGranularityDaily")).toBe("按日");
     expect(t("zh-Hans", "dashboard.usageGranularityWeekly")).toBe("按周");
+    expect(t("zh-Hans", "dashboard.usageGranularityMonthly")).toBe("按月");
   });
 
   it("zh-Hant granularity translations are correct", () => {
     expect(t("zh-Hant", "dashboard.usageGranularityDaily")).toBe("按日");
     expect(t("zh-Hant", "dashboard.usageGranularityWeekly")).toBe("按週");
+    expect(t("zh-Hant", "dashboard.usageGranularityMonthly")).toBe("按月");
+  });
+});
+
+describe("Dashboard Usage Trend - Monthly aggregation logic", () => {
+  // Mirror the aggregateMonthly helper from Dashboard.tsx
+  function aggregateMonthly(
+    data: Array<{ date: string; actual: number | null; predicted: number | null }>,
+    isCumulative: boolean,
+    rawDaily: Array<{ date: string }>
+  ) {
+    if (data.length === 0 || rawDaily.length === 0) return [];
+    const months: Array<{ date: string; actual: number | null; predicted: number | null }> = [];
+    let currentMonth = '';
+    let monthActual = 0;
+    let monthPredicted = 0;
+    let hasActual = false;
+    let hasPredicted = false;
+
+    for (let i = 0; i < data.length; i++) {
+      let monthKey: string;
+      if (i < rawDaily.length && rawDaily[i].date.includes('-')) {
+        monthKey = rawDaily[i].date.substring(0, 7);
+      } else {
+        const parts = data[i].date.split('/');
+        const now = new Date();
+        monthKey = `${now.getFullYear()}-${parts[0].padStart(2, '0')}`;
+      }
+
+      if (currentMonth && monthKey !== currentMonth) {
+        const [y, m] = currentMonth.split('-');
+        months.push({
+          date: `${y}/${m}`,
+          actual: hasActual ? monthActual : null,
+          predicted: hasPredicted ? monthPredicted : null,
+        });
+        monthActual = 0;
+        monthPredicted = 0;
+        hasActual = false;
+        hasPredicted = false;
+      }
+      currentMonth = monthKey;
+
+      if (isCumulative) {
+        if (data[i].actual !== null) { monthActual = data[i].actual!; hasActual = true; }
+        if (data[i].predicted !== null) { monthPredicted = data[i].predicted!; hasPredicted = true; }
+      } else {
+        if (data[i].actual !== null) { monthActual += data[i].actual!; hasActual = true; }
+        if (data[i].predicted !== null) { monthPredicted += data[i].predicted!; hasPredicted = true; }
+      }
+    }
+
+    if (currentMonth) {
+      const [y, m] = currentMonth.split('-');
+      months.push({
+        date: `${y}/${m}`,
+        actual: hasActual ? monthActual : null,
+        predicted: hasPredicted ? monthPredicted : null,
+      });
+    }
+
+    return months;
+  }
+
+  it("aggregates single month of cumulative data (takes last value)", () => {
+    const rawDaily = [
+      { date: "2026-02-01" }, { date: "2026-02-02" }, { date: "2026-02-03" },
+    ];
+    const data = [
+      { date: "2/1", actual: 10, predicted: null },
+      { date: "2/2", actual: 12, predicted: null },
+      { date: "2/3", actual: 15, predicted: null },
+    ];
+    const monthly = aggregateMonthly(data, true, rawDaily);
+    expect(monthly).toHaveLength(1);
+    expect(monthly[0].actual).toBe(15); // last value (cumulative)
+    expect(monthly[0].date).toBe("2026/02");
+  });
+
+  it("aggregates single month of non-cumulative data (sums values)", () => {
+    const rawDaily = [
+      { date: "2026-02-01" }, { date: "2026-02-02" }, { date: "2026-02-03" },
+    ];
+    const data = [
+      { date: "2/1", actual: 5, predicted: null },
+      { date: "2/2", actual: 3, predicted: null },
+      { date: "2/3", actual: 7, predicted: null },
+    ];
+    const monthly = aggregateMonthly(data, false, rawDaily);
+    expect(monthly).toHaveLength(1);
+    expect(monthly[0].actual).toBe(15); // sum
+  });
+
+  it("aggregates data spanning two months", () => {
+    const rawDaily = [
+      { date: "2026-01-30" }, { date: "2026-01-31" },
+      { date: "2026-02-01" }, { date: "2026-02-02" },
+    ];
+    const data = [
+      { date: "1/30", actual: 8, predicted: null },
+      { date: "1/31", actual: 10, predicted: null },
+      { date: "2/1", actual: 12, predicted: null },
+      { date: "2/2", actual: 14, predicted: null },
+    ];
+    const monthly = aggregateMonthly(data, true, rawDaily);
+    expect(monthly).toHaveLength(2);
+    expect(monthly[0].actual).toBe(10); // Jan last value
+    expect(monthly[0].date).toBe("2026/01");
+    expect(monthly[1].actual).toBe(14); // Feb last value
+    expect(monthly[1].date).toBe("2026/02");
+  });
+
+  it("aggregates non-cumulative data spanning two months", () => {
+    const rawDaily = [
+      { date: "2026-01-30" }, { date: "2026-01-31" },
+      { date: "2026-02-01" }, { date: "2026-02-02" },
+    ];
+    const data = [
+      { date: "1/30", actual: 5, predicted: null },
+      { date: "1/31", actual: 3, predicted: null },
+      { date: "2/1", actual: 7, predicted: null },
+      { date: "2/2", actual: 2, predicted: null },
+    ];
+    const monthly = aggregateMonthly(data, false, rawDaily);
+    expect(monthly).toHaveLength(2);
+    expect(monthly[0].actual).toBe(8); // Jan sum: 5+3
+    expect(monthly[1].actual).toBe(9); // Feb sum: 7+2
+  });
+
+  it("handles predicted values in monthly aggregation", () => {
+    const rawDaily = [
+      { date: "2026-02-25" }, { date: "2026-02-26" }, { date: "2026-02-27" }, { date: "2026-02-28" },
+    ];
+    const data = [
+      { date: "2/25", actual: 10, predicted: null },
+      { date: "2/26", actual: 12, predicted: null },
+      { date: "2/27", actual: 14, predicted: 14 },
+      { date: "2/28", actual: null, predicted: 16 },
+    ];
+    const monthly = aggregateMonthly(data, true, rawDaily);
+    expect(monthly).toHaveLength(1);
+    expect(monthly[0].actual).toBe(14);
+    expect(monthly[0].predicted).toBe(16);
+  });
+
+  it("returns empty array for empty input", () => {
+    const monthly = aggregateMonthly([], true, []);
+    expect(monthly).toHaveLength(0);
+  });
+
+  it("handles single day input", () => {
+    const rawDaily = [{ date: "2026-03-15" }];
+    const data = [{ date: "3/15", actual: 42, predicted: null }];
+    const monthly = aggregateMonthly(data, true, rawDaily);
+    expect(monthly).toHaveLength(1);
+    expect(monthly[0].actual).toBe(42);
+    expect(monthly[0].date).toBe("2026/03");
+  });
+
+  it("aggregates data spanning three months", () => {
+    const rawDaily = [
+      { date: "2025-12-30" }, { date: "2025-12-31" },
+      { date: "2026-01-01" }, { date: "2026-01-15" },
+      { date: "2026-02-01" },
+    ];
+    const data = [
+      { date: "12/30", actual: 1, predicted: null },
+      { date: "12/31", actual: 2, predicted: null },
+      { date: "1/1", actual: 3, predicted: null },
+      { date: "1/15", actual: 4, predicted: null },
+      { date: "2/1", actual: 5, predicted: null },
+    ];
+    const monthly = aggregateMonthly(data, false, rawDaily);
+    expect(monthly).toHaveLength(3);
+    expect(monthly[0].actual).toBe(3); // Dec: 1+2
+    expect(monthly[0].date).toBe("2025/12");
+    expect(monthly[1].actual).toBe(7); // Jan: 3+4
+    expect(monthly[1].date).toBe("2026/01");
+    expect(monthly[2].actual).toBe(5); // Feb: 5
+    expect(monthly[2].date).toBe("2026/02");
   });
 });
