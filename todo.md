@@ -1371,3 +1371,10 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] stripe.tsのgetSmsAnalyticsでstartDateをISO文字列に変換してからSQLに渡す（toISOString().slice(0,19).replace('T',' ')）
 - [x] 同様の問題がある他のDate使用箇所も確認→他にはなし
 - [x] テスト実行・確認（全352件パス）
+
+### Webプッシュ通知 重大問題修正（H-1〜H-3）
+- [x] H-1: notifyTicketCalledのプッシュペイロードにurl/ticketTokenを追加（通知タップで正しいチケットページに遷移）
+- [x] H-2: push_subscriptionsの重複防止（createPushSubscriptionをupsertに変更）
+- [x] H-3: notifyTicketCalledの結果をcallNext/callSpecific/recallのレスポンスに含め、Staff.tsxでトースト表示
+- [x] テスト実行・確認（全352件パス）
+- [x] 多言語翻訳キー追加（5言語、6キー）

@@ -1035,8 +1035,9 @@ const ticketRouter = router({
       const recallMaxCount = notificationSettings?.recallMaxCount;
       const shouldNotify = pushEnabled || twilioConfigured;
  
+      let notificationResult: { push: boolean; sms: boolean; smsReason?: string } | undefined;
       if (shouldNotify) {
-        await notifyTicketCalled(nextTicket.id, input.storeId, storeName, nextTicket.number, {
+        notificationResult = await notifyTicketCalled(nextTicket.id, input.storeId, storeName, nextTicket.number, {
           pushEnabled,
           pushTemplate,
           twilioConfig: twilioConfigured ? twilioConfig : undefined,
@@ -1048,11 +1049,9 @@ const ticketRouter = router({
           storeSlug: store?.slug,
           requestId: ctx.requestId,
         });
- 
- 
       }
  
-      return nextTicket;
+      return { ...nextTicket, notificationResult };
  
     }),
  
@@ -1113,8 +1112,9 @@ const ticketRouter = router({
       const recallMaxCount = notificationSettings?.recallMaxCount;
       const shouldNotify = pushEnabled || twilioConfigured;
 
+      let notificationResult: { push: boolean; sms: boolean; smsReason?: string } | undefined;
       if (shouldNotify) {
-        await notifyTicketCalled(ticket.id, session.storeId, storeName, ticket.number, {
+        notificationResult = await notifyTicketCalled(ticket.id, session.storeId, storeName, ticket.number, {
           pushEnabled,
           pushTemplate,
           twilioConfig: twilioConfigured ? twilioConfig : undefined,
@@ -1126,8 +1126,6 @@ const ticketRouter = router({
           storeSlug: store?.slug,
           requestId: ctx.requestId,
         });
-
-
       }
 
       const waitingCount = await db.getWaitingCount(session.storeId);
@@ -1137,7 +1135,7 @@ const ticketRouter = router({
         calledTicket: { number: ticket.number, ticketToken: ticket.ticketToken },
       });
 
-      return { success: true };
+      return { success: true, notificationResult };
     }),
 
   // Recall ticket
@@ -1197,8 +1195,9 @@ const ticketRouter = router({
       const recallMaxCount = notificationSettings?.recallMaxCount;
       const shouldNotify = pushEnabled || twilioConfigured;
 
+      let notificationResult: { push: boolean; sms: boolean; smsReason?: string } | undefined;
       if (shouldNotify) {
-        await notifyTicketCalled(ticket.id, session.storeId, storeName, ticket.number, {
+        notificationResult = await notifyTicketCalled(ticket.id, session.storeId, storeName, ticket.number, {
           pushEnabled,
           pushTemplate,
           twilioConfig: twilioConfigured ? twilioConfig : undefined,
@@ -1210,8 +1209,6 @@ const ticketRouter = router({
           storeSlug: store?.slug,
           requestId: ctx.requestId,
         });
-
-
       }
 
       const waitingCount = await db.getWaitingCount(session.storeId);
@@ -1221,7 +1218,7 @@ const ticketRouter = router({
         calledTicket: { number: ticket.number, ticketToken: ticket.ticketToken },
       });
 
-      return { success: true };
+      return { success: true, notificationResult };
     }),
 
   // Skip ticket

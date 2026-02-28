@@ -200,6 +200,15 @@ function StaffContent() {
     },
   });
 
+  const showNotificationFeedback = (result?: { push: boolean; sms: boolean; smsReason?: string }) => {
+    if (!result) return;
+    if (result.push) toast.success(t('staff.notifPushSent'), { duration: 3000 });
+    else if (result.push === false) toast.warning(t('staff.notifPushFailed'), { duration: 4000 });
+    if (result.sms) toast.success(t('staff.notifSmsSent'), { duration: 3000 });
+    else if (result.sms === false && result.smsReason) toast.warning(`${t('staff.notifSmsFailed')}: ${result.smsReason}`, { duration: 4000 });
+    if (!result.push && !result.sms) toast.info(t('staff.notifNone'), { duration: 3000 });
+  };
+
   const callNextMutation = trpc.staff.callNext.useMutation({
     onMutate: async () => {
       // Optimistically move the first WAITING ticket to CALLED status to prevent double-call
@@ -211,8 +220,9 @@ function StaffContent() {
         );
       });
     },
-    onSuccess: (ticket) => {
-      toast.success(`${t('staff.call')}: #${ticket.number}`);
+    onSuccess: (data) => {
+      toast.success(`${t('staff.call')}: #${data.number}`);
+      showNotificationFeedback(data.notificationResult);
       refetchWaitingList();
     },
     onError: (error: any) => {
@@ -237,8 +247,9 @@ function StaffContent() {
   });
  
   const recallMutation = trpc.staff.recall.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success(t('staff.recall'));
+      showNotificationFeedback(data.notificationResult);
       refetchWaitingList();
     },
     onError: (error: any) => {

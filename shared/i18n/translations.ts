@@ -277,8 +277,13 @@ export const translations = {
     'staff.manualAddDescription': 'キオスクが使えない時に受付を追加します',
     'staff.manualAddAction': 'チケットを追加',
     'staff.manualAddDisabled': '受付停止中は追加できません',
-    'staff.manualAddSuccess': 'チケットを追加しました',
-    
+'staff.manualAddSuccess': 'チケットを追加しました',
+    'staff.notifPushSent': 'プッシュ通知送信済み',
+    'staff.notifSmsSent': 'SMS通知送信済み',
+    'staff.notifPushFailed': 'プッシュ通知の送信に失敗しました',
+    'staff.notifSmsFailed': 'SMS通知の送信に失敗しました',
+    'staff.notifNone': '通知は送信されませんでした',
+     
     // Settings
 
     'settings.title': '店舗設定',
@@ -1242,8 +1247,13 @@ export const translations = {
     'staff.manualAddDescription': 'Add tickets when the kiosk is unavailable',
     'staff.manualAddAction': 'Add ticket',
     'staff.manualAddDisabled': 'Cannot add while intake is paused',
-    'staff.manualAddSuccess': 'Ticket added',
-    
+'staff.manualAddSuccess': 'Ticket added',
+    'staff.notifPushSent': 'Push notification sent',
+    'staff.notifSmsSent': 'SMS notification sent',
+    'staff.notifPushFailed': 'Push notification failed',
+    'staff.notifSmsFailed': 'SMS notification failed',
+    'staff.notifNone': 'No notification was sent',
+     
     // Settings
 
     'settings.title': 'Store Settings',
@@ -2208,8 +2218,13 @@ export const translations = {
     'staff.manualAddDescription': '키오스크가 작동하지 않을 때 접수를 추가합니다',
     'staff.manualAddAction': '티켓 추가',
     'staff.manualAddDisabled': '접수 중단 시 추가할 수 없습니다',
-    'staff.manualAddSuccess': '티켓을 추가했습니다',
-    
+'staff.manualAddSuccess': '티켓을 추가했습니다',
+    'staff.notifPushSent': '푸시 알림 전송 완료',
+    'staff.notifSmsSent': 'SMS 알림 전송 완료',
+    'staff.notifPushFailed': '푸시 알림 전송 실패',
+    'staff.notifSmsFailed': 'SMS 알림 전송 실패',
+    'staff.notifNone': '알림이 전송되지 않았습니다',
+     
     // Settings
 
     'settings.title': '매장 설정',
@@ -3174,8 +3189,13 @@ export const translations = {
     'staff.manualAddDescription': '当取号机不可用时手动添加',
     'staff.manualAddAction': '添加排队号',
     'staff.manualAddDisabled': '暂停取号时无法添加',
-    'staff.manualAddSuccess': '已添加排队号',
-    
+'staff.manualAddSuccess': '已添加排队号',
+    'staff.notifPushSent': '推送通知已发送',
+    'staff.notifSmsSent': '短信通知已发送',
+    'staff.notifPushFailed': '推送通知发送失败',
+    'staff.notifSmsFailed': '短信通知发送失败',
+    'staff.notifNone': '未发送任何通知',
+     
     // Settings
 
     'settings.title': '店铺设置',
@@ -4140,8 +4160,13 @@ export const translations = {
     'staff.manualAddDescription': '當自助機無法使用時手動新增',
     'staff.manualAddAction': '新增排隊號',
     'staff.manualAddDisabled': '暫停取號時無法新增',
-    'staff.manualAddSuccess': '已新增排隊號',
-    
+'staff.manualAddSuccess': '已新增排隊號',
+    'staff.notifPushSent': '推送通知已發送',
+    'staff.notifSmsSent': '簡訊通知已發送',
+    'staff.notifPushFailed': '推送通知發送失敗',
+    'staff.notifSmsFailed': '簡訊通知發送失敗',
+    'staff.notifNone': '未發送任何通知',
+     
     // Settings
 
     'settings.title': '店鋪設定',

@@ -565,7 +565,29 @@ export async function createPushSubscription(data: InsertPushSubscription): Prom
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.insert(pushSubscriptions).values(data);
+  // Check for existing subscription with same ticketId + endpoint to prevent duplicates
+  const existing = await db.select({ id: pushSubscriptions.id })
+    .from(pushSubscriptions)
+    .where(
+      and(
+        eq(pushSubscriptions.ticketId, data.ticketId),
+        eq(pushSubscriptions.endpoint, data.endpoint)
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    // Update existing subscription (keys may have been refreshed)
+    await db.update(pushSubscriptions)
+      .set({
+        p256dh: data.p256dh,
+        auth: data.auth,
+        createdAt: new Date(),
+      })
+      .where(eq(pushSubscriptions.id, existing[0].id));
+  } else {
+    await db.insert(pushSubscriptions).values(data);
+  }
 }
 
 export async function getPushSubscriptionsByTicket(ticketId: number) {

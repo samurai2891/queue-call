@@ -491,6 +491,8 @@ export async function notifyTicketCalled(
         type: 'called',
         ticketId,
         ticketNumber,
+        url: options?.ticketUrl || '/',
+        ticketToken: undefined, // included in url
       },
     }, logContext);
   }

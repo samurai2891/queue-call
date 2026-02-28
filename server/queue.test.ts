@@ -45,7 +45,7 @@ vi.mock('./sse', () => ({
 
 // Mock notifications
 vi.mock('./notifications', () => ({
-  notifyTicketCalled: vi.fn(),
+  notifyTicketCalled: vi.fn().mockResolvedValue({ push: false, sms: false }),
 }));
 
 // Mock bcrypt
