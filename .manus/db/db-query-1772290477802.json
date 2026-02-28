@@ -1,0 +1,54 @@
+{
+  "query": "SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'sms_transactions' ORDER BY ORDINAL_POSITION;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user zN6v3835fExzWSq.4b780e52d435 --database 9PkSnVJ3696qvv2NFCWti9 --execute SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'sms_transactions' ORDER BY ORDINAL_POSITION;",
+  "rows": [
+    {
+      "COLUMN_NAME": "id",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "storeId",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "type",
+      "DATA_TYPE": "enum"
+    },
+    {
+      "COLUMN_NAME": "amount",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "balanceAfter",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "stripePaymentIntentId",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "stripeCheckoutSessionId",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "ticketId",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "smsMessageSid",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "description",
+      "DATA_TYPE": "text"
+    },
+    {
+      "COLUMN_NAME": "createdAt",
+      "DATA_TYPE": "timestamp"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\tDATA_TYPE\nid\tint\nstoreId\tint\ntype\tenum\namount\tint\nbalanceAfter\tint\nstripePaymentIntentId\tvarchar\nstripeCheckoutSessionId\tvarchar\nticketId\tint\nsmsMessageSid\tvarchar\ndescription\ttext\ncreatedAt\ttimestamp\n",
+  "stderr": "",
+  "execution_time_ms": 1515
+}

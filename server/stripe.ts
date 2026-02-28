@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql, and, asc } from "drizzle-orm";
 import { getDb } from "./db";
 import { stores, smsTransactions, type Store } from "../drizzle/schema";
 import { notifyOwner } from "./_core/notification";
@@ -514,6 +514,7 @@ export async function getSmsAnalytics(
   const db = await getDb();
   if (!db) return { dataPoints: [], summary: { totalSendCount: 0, totalChargeCount: 0, totalSendCost: 0, totalChargeAmount: 0, avgDailySendCount: 0, avgDailySendCost: 0 } };
 
+  try {
   // 期間に応じた日数を設定
   const lookbackDays = period === 'monthly' ? Math.max(days, 365) : period === 'weekly' ? Math.max(days, 90) : days;
   const startDate = new Date();
@@ -522,12 +523,13 @@ export async function getSmsAnalytics(
   const startDateStr = startDate.toISOString().slice(0, 19).replace('T', ' ');
 
   // 生データを取得（日別集計）
+  const dateExpr = sql<string>`DATE(${smsTransactions.createdAt})`;
   const rawData = await db
     .select({
-      date: sql<string>`DATE(${smsTransactions.createdAt})`,
+      date: dateExpr.as('tx_date'),
       type: smsTransactions.type,
       count: sql<number>`COUNT(*)`,
-      totalAmount: sql<number>`SUM(ABS(${smsTransactions.amount}))`,
+      totalAmount: sql<number>`COALESCE(SUM(ABS(${smsTransactions.amount})), 0)`,
     })
     .from(smsTransactions)
     .where(
@@ -536,8 +538,8 @@ export async function getSmsAnalytics(
         sql`${smsTransactions.createdAt} >= ${startDateStr}`
       )
     )
-    .groupBy(sql`DATE(${smsTransactions.createdAt})`, smsTransactions.type)
-    .orderBy(sql`DATE(${smsTransactions.createdAt}) ASC`);
+    .groupBy(sql`tx_date`, smsTransactions.type)
+    .orderBy(asc(sql`tx_date`));
 
   // 日別データをマップに変換
   const dailyMap = new Map<string, { sendCount: number; chargeCount: number; sendCost: number; chargeAmount: number }>();
@@ -635,6 +637,10 @@ export async function getSmsAnalytics(
       avgDailySendCost: Math.round((totalSendCost / activeDays) * 10) / 10,
     },
   };
+  } catch (error) {
+    console.error('[getSmsAnalytics] Error:', error);
+    return { dataPoints: [], summary: { totalSendCount: 0, totalChargeCount: 0, totalSendCost: 0, totalChargeAmount: 0, avgDailySendCount: 0, avgDailySendCost: 0 } };
+  }
 }
 
 export { stripe };

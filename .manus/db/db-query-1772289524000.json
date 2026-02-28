@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, slug, name, staffPinHash, managerPinHash FROM stores WHERE slug = 'test';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user zN6v3835fExzWSq.4b780e52d435 --database 9PkSnVJ3696qvv2NFCWti9 --execute SELECT id, slug, name, staffPinHash, managerPinHash FROM stores WHERE slug = 'test';",
+  "rows": [
+    {
+      "id": "1",
+      "slug": "test",
+      "name": "テスト",
+      "staffPinHash": "$2b$10$YkaHuGccdTxfcB5CNvs5JO6PWLY2Lo0Xmfo7ghY9M7/hUPsbAs60q",
+      "managerPinHash": "$2b$10$rXbCDDAKJQiZAP5.aGYCCeVWIQVLE74SqV2c3UjommwPu04uanB.2"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tslug\tname\tstaffPinHash\tmanagerPinHash\n1\ttest\tテスト\t$2b$10$YkaHuGccdTxfcB5CNvs5JO6PWLY2Lo0Xmfo7ghY9M7/hUPsbAs60q\t$2b$10$rXbCDDAKJQiZAP5.aGYCCeVWIQVLE74SqV2c3UjommwPu04uanB.2\n",
+  "stderr": "",
+  "execution_time_ms": 1537
+}

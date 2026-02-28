@@ -50,6 +50,15 @@ function StoreTopContent() {
     }
   }, [queueStatus]);
 
+  // Business hours check — must be before any early returns (React hooks rule)
+  const businessHoursStatus = useMemo(() => {
+    return checkBusinessHours(store?.settings?.businessHours as any);
+  }, [store?.settings?.businessHours]);
+
+  const todayHoursText = useMemo(() => {
+    return getTodayBusinessHoursText(store?.settings?.businessHours as any);
+  }, [store?.settings?.businessHours]);
+
   // SSE for real-time updates
   useSSE({
     scope: 'board',
@@ -97,16 +106,6 @@ function StoreTopContent() {
   }
 
   const isPaused = store.intakeStatus === 'paused';
-
-  // Business hours check
-  const businessHoursStatus = useMemo(() => {
-    return checkBusinessHours(store.settings?.businessHours as any);
-  }, [store.settings?.businessHours]);
-
-  const todayHoursText = useMemo(() => {
-    return getTodayBusinessHoursText(store.settings?.businessHours as any);
-  }, [store.settings?.businessHours]);
-
   const isOutsideBusinessHours = !businessHoursStatus.isOpen;
   const isEffectivelyPaused = isPaused || isOutsideBusinessHours;
 

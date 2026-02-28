@@ -31,6 +31,111 @@ import {
   ReferenceLine,
 } from "recharts";
 
+// Format date for chart
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+};
+
+// Format hour for chart
+const formatHour = (hour: number) => `${hour}:00`;
+
+// Helper: aggregate daily data into weekly buckets
+const aggregateWeekly = (data: Array<{ date: string; actual: number | null; predicted: number | null }>, isCumulative: boolean) => {
+  if (data.length === 0) return [];
+  const weeks: Array<{ date: string; actual: number | null; predicted: number | null }> = [];
+  let weekActual = 0;
+  let weekPredicted = 0;
+  let weekStart = '';
+  let count = 0;
+  let hasActual = false;
+  let hasPredicted = false;
+
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i];
+    if (count === 0) weekStart = item.date;
+
+    if (isCumulative) {
+      if (item.actual !== null) { weekActual = item.actual; hasActual = true; }
+      if (item.predicted !== null) { weekPredicted = item.predicted; hasPredicted = true; }
+    } else {
+      if (item.actual !== null) { weekActual += item.actual; hasActual = true; }
+      if (item.predicted !== null) { weekPredicted += item.predicted; hasPredicted = true; }
+    }
+    count++;
+
+    if (count === 7 || i === data.length - 1) {
+      const weekEnd = item.date;
+      weeks.push({
+        date: count >= 3 ? `${weekStart}~${weekEnd}` : weekEnd,
+        actual: hasActual ? weekActual : null,
+        predicted: hasPredicted ? weekPredicted : null,
+      });
+      weekActual = 0;
+      weekPredicted = 0;
+      count = 0;
+      hasActual = false;
+      hasPredicted = false;
+    }
+  }
+  return weeks;
+};
+
+// Helper: aggregate daily data into monthly buckets
+const aggregateMonthly = (data: Array<{ date: string; actual: number | null; predicted: number | null }>, isCumulative: boolean, rawDaily?: Array<{ date: string }>) => {
+  if (data.length === 0 || !rawDaily || rawDaily.length === 0) return [];
+  const months: Array<{ date: string; actual: number | null; predicted: number | null }> = [];
+  let currentMonth = '';
+  let monthActual = 0;
+  let monthPredicted = 0;
+  let hasActual = false;
+  let hasPredicted = false;
+
+  for (let i = 0; i < data.length; i++) {
+    let monthKey: string;
+    if (i < rawDaily.length && rawDaily[i].date.includes('-')) {
+      monthKey = rawDaily[i].date.substring(0, 7);
+    } else {
+      const parts = data[i].date.split('/');
+      const now = new Date();
+      monthKey = `${now.getFullYear()}-${parts[0].padStart(2, '0')}`;
+    }
+
+    if (currentMonth && monthKey !== currentMonth) {
+      const [y, m] = currentMonth.split('-');
+      months.push({
+        date: `${y}/${m}`,
+        actual: hasActual ? monthActual : null,
+        predicted: hasPredicted ? monthPredicted : null,
+      });
+      monthActual = 0;
+      monthPredicted = 0;
+      hasActual = false;
+      hasPredicted = false;
+    }
+    currentMonth = monthKey;
+
+    if (isCumulative) {
+      if (data[i].actual !== null) { monthActual = data[i].actual!; hasActual = true; }
+      if (data[i].predicted !== null) { monthPredicted = data[i].predicted!; hasPredicted = true; }
+    } else {
+      if (data[i].actual !== null) { monthActual += data[i].actual!; hasActual = true; }
+      if (data[i].predicted !== null) { monthPredicted += data[i].predicted!; hasPredicted = true; }
+    }
+  }
+
+  if (currentMonth) {
+    const [y, m] = currentMonth.split('-');
+    months.push({
+      date: `${y}/${m}`,
+      actual: hasActual ? monthActual : null,
+      predicted: hasPredicted ? monthPredicted : null,
+    });
+  }
+
+  return months;
+};
+
 // Crowd level colors
 const crowdLevelColors: Record<string, string> = {
   empty: 'bg-green-100 text-green-800',
@@ -222,6 +327,134 @@ export default function Dashboard() {
     { enabled: !!storeId }
   );
 
+  // Prepare usage trend chart data with linear regression prediction (MUST be before early returns)
+  const usageTrendChartData = useMemo(() => {
+    if (!usageTrend?.daily || usageTrend.daily.length === 0) return { menu: [], feed: [], tickets: [], weeklyMenu: [], weeklyFeed: [], weeklyTickets: [], monthlyMenu: [], monthlyFeed: [], monthlyTickets: [] };
+
+    const daily = usageTrend.daily;
+    const n = daily.length;
+
+    const linearRegression = (data: number[]) => {
+      const len = data.length;
+      if (len < 2) return { slope: 0, intercept: data[0] || 0 };
+      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+      for (let i = 0; i < len; i++) {
+        sumX += i;
+        sumY += data[i];
+        sumXY += i * data[i];
+        sumXX += i * i;
+      }
+      const slope = (len * sumXY - sumX * sumY) / (len * sumXX - sumX * sumX);
+      const intercept = (sumY - slope * sumX) / len;
+      return { slope, intercept };
+    };
+
+    const futureDays = 7;
+
+    const menuValues = daily.map(d => d.menuCount);
+    const menuReg = linearRegression(menuValues);
+    const menuData: Array<{ date: string; actual: number | null; predicted: number | null }> = daily.map((d) => ({
+      date: formatDate(d.date),
+      actual: d.menuCount,
+      predicted: null,
+    }));
+    for (let i = 1; i <= futureDays; i++) {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + i);
+      const predicted = Math.max(0, Math.round(menuReg.slope * (n - 1 + i) + menuReg.intercept));
+      menuData.push({
+        date: `${futureDate.getMonth() + 1}/${futureDate.getDate()}`,
+        actual: null as number | null,
+        predicted,
+      });
+    }
+    if (menuData.length > n) {
+      menuData[n - 1] = { ...menuData[n - 1], predicted: menuData[n - 1].actual };
+    }
+
+    const feedValues = daily.map(d => d.feedCount);
+    const feedReg = linearRegression(feedValues);
+    const feedData: Array<{ date: string; actual: number | null; predicted: number | null }> = daily.map((d) => ({
+      date: formatDate(d.date),
+      actual: d.feedCount,
+      predicted: null,
+    }));
+    for (let i = 1; i <= futureDays; i++) {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + i);
+      const predicted = Math.max(0, Math.round(feedReg.slope * (n - 1 + i) + feedReg.intercept));
+      feedData.push({
+        date: `${futureDate.getMonth() + 1}/${futureDate.getDate()}`,
+        actual: null as number | null,
+        predicted,
+      });
+    }
+    if (feedData.length > n) {
+      feedData[n - 1] = { ...feedData[n - 1], predicted: feedData[n - 1].actual };
+    }
+
+    const ticketValues = daily.map(d => d.ticketCount);
+    const ticketReg = linearRegression(ticketValues);
+    const ticketData: Array<{ date: string; actual: number | null; predicted: number | null }> = daily.map((d) => ({
+      date: formatDate(d.date),
+      actual: d.ticketCount,
+      predicted: null,
+    }));
+    for (let i = 1; i <= futureDays; i++) {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + i);
+      const predicted = Math.max(0, Math.round(ticketReg.slope * (n - 1 + i) + ticketReg.intercept));
+      ticketData.push({
+        date: `${futureDate.getMonth() + 1}/${futureDate.getDate()}`,
+        actual: null as number | null,
+        predicted,
+      });
+    }
+    if (ticketData.length > n) {
+      ticketData[n - 1] = { ...ticketData[n - 1], predicted: ticketData[n - 1].actual };
+    }
+
+    const estimateDaysToLimit = (currentValue: number, slope: number, limit: number | null) => {
+      if (limit === null || limit === 0) return null;
+      if (currentValue >= limit) return 0;
+      if (slope <= 0) return null;
+      return Math.ceil((limit - currentValue) / slope);
+    };
+
+    const menuDaysToLimit = estimateDaysToLimit(menuValues[n - 1], menuReg.slope, usageTrend.limits.menuLimit);
+    const feedDaysToLimit = estimateDaysToLimit(feedValues[n - 1], feedReg.slope, usageTrend.limits.feedLimit);
+
+    const weeklyMenu = aggregateWeekly(menuData, true);
+    const weeklyFeed = aggregateWeekly(feedData, true);
+    const weeklyTickets = aggregateWeekly(ticketData, false);
+
+    const monthlyMenu = aggregateMonthly(menuData, true, daily);
+    const monthlyFeed = aggregateMonthly(feedData, true, daily);
+    const monthlyTickets = aggregateMonthly(ticketData, false, daily);
+
+    return {
+      menu: menuData,
+      feed: feedData,
+      tickets: ticketData,
+      weeklyMenu,
+      weeklyFeed,
+      weeklyTickets,
+      monthlyMenu,
+      monthlyFeed,
+      monthlyTickets,
+      menuDaysToLimit,
+      feedDaysToLimit,
+      menuSlope: menuReg.slope,
+      feedSlope: feedReg.slope,
+      ticketSlope: ticketReg.slope,
+    };
+  }, [usageTrend]);
+
+  // Find peak hour (MUST be before early returns)
+  const peakHour = hourlyStats?.reduce((max: { hour: number; count: number; avgWaitMinutes: number | null } | undefined, curr: { hour: number; count: number; avgWaitMinutes: number | null }) => 
+    (curr.count > (max?.count || 0)) ? curr : max
+  , hourlyStats[0]);
+
   // Loading state
   if (loading || storesLoading) {
     return (
@@ -277,15 +510,6 @@ export default function Dashboard() {
     );
   }
 
-  // Format date for chart
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return `${date.getMonth() + 1}/${date.getDate()}`;
-  };
-
-  // Format hour for chart
-  const formatHour = (hour: number) => `${hour}:00`;
-
   // Prepare chart data
   const visitorChartData = dailyVisitors?.map((d) => ({
     date: formatDate(d.date!),
@@ -307,247 +531,6 @@ export default function Dashboard() {
     count: d.count,
     avgWait: Math.round(d.avgWaitMinutes || 0),
   })) || [];
-
-  // Helper: aggregate daily data into monthly buckets
-  const aggregateMonthly = (data: Array<{ date: string; actual: number | null; predicted: number | null }>, isCumulative: boolean, rawDaily?: Array<{ date: string }>) => {
-    if (data.length === 0 || !rawDaily || rawDaily.length === 0) return [];
-    const months: Array<{ date: string; actual: number | null; predicted: number | null }> = [];
-    // Group by YYYY-MM using the raw date strings from API
-    let currentMonth = '';
-    let monthActual = 0;
-    let monthPredicted = 0;
-    let hasActual = false;
-    let hasPredicted = false;
-
-    for (let i = 0; i < data.length; i++) {
-      // Derive month key from the raw daily date (YYYY-MM-DD) if available, otherwise from formatted date
-      let monthKey: string;
-      if (i < rawDaily.length && rawDaily[i].date.includes('-')) {
-        // Raw date is YYYY-MM-DD
-        monthKey = rawDaily[i].date.substring(0, 7); // YYYY-MM
-      } else {
-        // Predicted future dates: formatted as M/D, derive month
-        const parts = data[i].date.split('/');
-        const now = new Date();
-        monthKey = `${now.getFullYear()}-${parts[0].padStart(2, '0')}`;
-      }
-
-      if (currentMonth && monthKey !== currentMonth) {
-        // Flush previous month
-        const [y, m] = currentMonth.split('-');
-        months.push({
-          date: `${y}/${m}`,
-          actual: hasActual ? monthActual : null,
-          predicted: hasPredicted ? monthPredicted : null,
-        });
-        monthActual = 0;
-        monthPredicted = 0;
-        hasActual = false;
-        hasPredicted = false;
-      }
-      currentMonth = monthKey;
-
-      if (isCumulative) {
-        if (data[i].actual !== null) { monthActual = data[i].actual!; hasActual = true; }
-        if (data[i].predicted !== null) { monthPredicted = data[i].predicted!; hasPredicted = true; }
-      } else {
-        if (data[i].actual !== null) { monthActual += data[i].actual!; hasActual = true; }
-        if (data[i].predicted !== null) { monthPredicted += data[i].predicted!; hasPredicted = true; }
-      }
-    }
-
-    // Flush last month
-    if (currentMonth) {
-      const [y, m] = currentMonth.split('-');
-      months.push({
-        date: `${y}/${m}`,
-        actual: hasActual ? monthActual : null,
-        predicted: hasPredicted ? monthPredicted : null,
-      });
-    }
-
-    return months;
-  };
-
-  // Helper: aggregate daily data into weekly buckets
-  const aggregateWeekly = (data: Array<{ date: string; actual: number | null; predicted: number | null }>, isCumulative: boolean) => {
-    if (data.length === 0) return [];
-    const weeks: Array<{ date: string; actual: number | null; predicted: number | null }> = [];
-    let weekActual = 0;
-    let weekPredicted = 0;
-    let weekStart = '';
-    let count = 0;
-    let hasActual = false;
-    let hasPredicted = false;
-
-    for (let i = 0; i < data.length; i++) {
-      const item = data[i];
-      if (count === 0) weekStart = item.date;
-
-      if (isCumulative) {
-        // For cumulative data (menu, feed), take the last value in the week
-        if (item.actual !== null) { weekActual = item.actual; hasActual = true; }
-        if (item.predicted !== null) { weekPredicted = item.predicted; hasPredicted = true; }
-      } else {
-        // For non-cumulative data (tickets), sum the values
-        if (item.actual !== null) { weekActual += item.actual; hasActual = true; }
-        if (item.predicted !== null) { weekPredicted += item.predicted; hasPredicted = true; }
-      }
-      count++;
-
-      if (count === 7 || i === data.length - 1) {
-        const weekEnd = item.date;
-        weeks.push({
-          date: count >= 3 ? `${weekStart}~${weekEnd}` : weekEnd,
-          actual: hasActual ? weekActual : null,
-          predicted: hasPredicted ? weekPredicted : null,
-        });
-        weekActual = 0;
-        weekPredicted = 0;
-        count = 0;
-        hasActual = false;
-        hasPredicted = false;
-      }
-    }
-    return weeks;
-  };
-
-  // Prepare usage trend chart data with linear regression prediction
-  const usageTrendChartData = useMemo(() => {
-    if (!usageTrend?.daily || usageTrend.daily.length === 0) return { menu: [], feed: [], tickets: [], weeklyMenu: [], weeklyFeed: [], weeklyTickets: [], monthlyMenu: [], monthlyFeed: [], monthlyTickets: [] };
-
-    const daily = usageTrend.daily;
-    const n = daily.length;
-
-    // Linear regression helper: returns slope and intercept
-    const linearRegression = (data: number[]) => {
-      const len = data.length;
-      if (len < 2) return { slope: 0, intercept: data[0] || 0 };
-      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-      for (let i = 0; i < len; i++) {
-        sumX += i;
-        sumY += data[i];
-        sumXY += i * data[i];
-        sumXX += i * i;
-      }
-      const slope = (len * sumXY - sumX * sumY) / (len * sumXX - sumX * sumX);
-      const intercept = (sumY - slope * sumX) / len;
-      return { slope, intercept };
-    };
-
-    // Predict future days (7 days ahead)
-    const futureDays = 7;
-
-    // Menu trend with prediction
-    const menuValues = daily.map(d => d.menuCount);
-    const menuReg = linearRegression(menuValues);
-    const menuData: Array<{ date: string; actual: number | null; predicted: number | null }> = daily.map((d) => ({
-      date: formatDate(d.date),
-      actual: d.menuCount,
-      predicted: null,
-    }));
-    for (let i = 1; i <= futureDays; i++) {
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + i);
-      const predicted = Math.max(0, Math.round(menuReg.slope * (n - 1 + i) + menuReg.intercept));
-      menuData.push({
-        date: `${futureDate.getMonth() + 1}/${futureDate.getDate()}`,
-        actual: null as number | null,
-        predicted,
-      });
-    }
-    // Add bridge point: last actual value = first predicted value
-    if (menuData.length > n) {
-      menuData[n - 1] = { ...menuData[n - 1], predicted: menuData[n - 1].actual };
-    }
-
-    // Feed trend with prediction
-    const feedValues = daily.map(d => d.feedCount);
-    const feedReg = linearRegression(feedValues);
-    const feedData: Array<{ date: string; actual: number | null; predicted: number | null }> = daily.map((d) => ({
-      date: formatDate(d.date),
-      actual: d.feedCount,
-      predicted: null,
-    }));
-    for (let i = 1; i <= futureDays; i++) {
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + i);
-      const predicted = Math.max(0, Math.round(feedReg.slope * (n - 1 + i) + feedReg.intercept));
-      feedData.push({
-        date: `${futureDate.getMonth() + 1}/${futureDate.getDate()}`,
-        actual: null as number | null,
-        predicted,
-      });
-    }
-    if (feedData.length > n) {
-      feedData[n - 1] = { ...feedData[n - 1], predicted: feedData[n - 1].actual };
-    }
-
-    // Ticket trend (daily count, not cumulative)
-    const ticketValues = daily.map(d => d.ticketCount);
-    const ticketReg = linearRegression(ticketValues);
-    const ticketData: Array<{ date: string; actual: number | null; predicted: number | null }> = daily.map((d) => ({
-      date: formatDate(d.date),
-      actual: d.ticketCount,
-      predicted: null,
-    }));
-    for (let i = 1; i <= futureDays; i++) {
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + i);
-      const predicted = Math.max(0, Math.round(ticketReg.slope * (n - 1 + i) + ticketReg.intercept));
-      ticketData.push({
-        date: `${futureDate.getMonth() + 1}/${futureDate.getDate()}`,
-        actual: null as number | null,
-        predicted,
-      });
-    }
-    if (ticketData.length > n) {
-      ticketData[n - 1] = { ...ticketData[n - 1], predicted: ticketData[n - 1].actual };
-    }
-
-    // Estimate days until limit reached
-    const estimateDaysToLimit = (currentValue: number, slope: number, limit: number | null) => {
-      if (limit === null || limit === 0) return null; // unlimited
-      if (currentValue >= limit) return 0;
-      if (slope <= 0) return null; // not increasing
-      return Math.ceil((limit - currentValue) / slope);
-    };
-
-    const menuDaysToLimit = estimateDaysToLimit(menuValues[n - 1], menuReg.slope, usageTrend.limits.menuLimit);
-    const feedDaysToLimit = estimateDaysToLimit(feedValues[n - 1], feedReg.slope, usageTrend.limits.feedLimit);
-
-    // Aggregate weekly data
-    const weeklyMenu = aggregateWeekly(menuData, true);
-    const weeklyFeed = aggregateWeekly(feedData, true);
-    const weeklyTickets = aggregateWeekly(ticketData, false);
-
-    // Aggregate monthly data
-    const monthlyMenu = aggregateMonthly(menuData, true, daily);
-    const monthlyFeed = aggregateMonthly(feedData, true, daily);
-    const monthlyTickets = aggregateMonthly(ticketData, false, daily);
-
-    return {
-      menu: menuData,
-      feed: feedData,
-      tickets: ticketData,
-      weeklyMenu,
-      weeklyFeed,
-      weeklyTickets,
-      monthlyMenu,
-      monthlyFeed,
-      monthlyTickets,
-      menuDaysToLimit,
-      feedDaysToLimit,
-      menuSlope: menuReg.slope,
-      feedSlope: feedReg.slope,
-      ticketSlope: ticketReg.slope,
-    };
-  }, [usageTrend]);
-
-  // Find peak hour
-  const peakHour = hourlyStats?.reduce((max: { hour: number; count: number; avgWaitMinutes: number | null } | undefined, curr: { hour: number; count: number; avgWaitMinutes: number | null }) => 
-    (curr.count > (max?.count || 0)) ? curr : max
-  , hourlyStats[0]);
 
   return (
     <div className="min-h-screen bg-background">
