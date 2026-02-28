@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json, index } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -198,7 +198,11 @@ export const tickets = mysqlTable("tickets", {
   
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ([
+  index("idx_tickets_store_status").on(table.storeId, table.status),
+  index("idx_tickets_store_daykey").on(table.storeId, table.dayKey),
+  index("idx_tickets_store_created").on(table.storeId, table.createdAt),
+]));
 
 export type Ticket = typeof tickets.$inferSelect;
 export type InsertTicket = typeof tickets.$inferInsert;
@@ -472,7 +476,10 @@ export const reservations = mysqlTable("reservations", {
   
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ([
+  index("idx_reservations_store_date").on(table.storeId, table.reservationDate),
+  index("idx_reservations_store_status").on(table.storeId, table.status),
+]));
 
 export type Reservation = typeof reservations.$inferSelect;
 export type InsertReservation = typeof reservations.$inferInsert;

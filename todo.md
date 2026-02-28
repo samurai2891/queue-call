@@ -1241,11 +1241,13 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] フロントエンドのuseSSEフックにsessionTokenパラメータを追加
 - [x] テスト12件追加、全207テストパス、TSエラーゼロ
 
-### R2: データベースインデックスの追加（High / パフォーマンス）
-- [ ] ticketsテーブルに (storeId, status) 複合インデックスを追加
-- [ ] ticketsテーブルに (storeId, dayKey) 複合インデックスを追加
-- [ ] reservationsテーブルに (storeId, date) 複合インデックスを追加
-- [ ] pnpm db:pushでマイグレーション実行
+### R2: データベースインデックスの追加（High / パフォーマンス）（完了）
+- [x] ticketsテーブルに (storeId, status) 複合インデックスを追加
+- [x] ticketsテーブルに (storeId, dayKey) 複合インデックスを追加
+- [x] ticketsテーブルに (storeId, createdAt) 複合インデックスを追加
+- [x] reservationsテーブルに (storeId, reservationDate) 複合インデックスを追加
+- [x] reservationsテーブルに (storeId, status) 複合インデックスを追加
+- [x] pnpm db:pushでマイグレーション実行済み、全207テストパス、TSエラーゼロ
 
 ### R3: index.htmlの修正（Medium / SEO・UX）
 - [ ] html lang属性を "en" → "ja" に修正
