@@ -74,10 +74,10 @@ const LOCALE_OPTIONS = [
 
 // SMSチャージ金額オプション
 const SMS_CHARGE_OPTIONS = [
-  { amount: 5000, label: '¥5,000', messages: 250 },
-  { amount: 10000, label: '¥10,000', messages: 500 },
-  { amount: 30000, label: '¥30,000', messages: 1500 },
-  { amount: 50000, label: '¥50,000', messages: 2500 },
+  { amount: 5000, label: '¥5,000', messages: 200 },
+  { amount: 10000, label: '¥10,000', messages: 400 },
+  { amount: 30000, label: '¥30,000', messages: 1200 },
+  { amount: 50000, label: '¥50,000', messages: 2000 },
 ];
 
 const MIN_SMS_CHARGE_AMOUNT = 500;
