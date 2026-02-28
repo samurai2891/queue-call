@@ -18,7 +18,7 @@ vi.mock('./db', () => ({
 vi.mock('./stripe', () => ({
   consumeSmsBalance: vi.fn(() => Promise.resolve({ success: true })),
   getSmsBalance: vi.fn(() => Promise.resolve(1000)),
-  getSmsTransactions: vi.fn(() => Promise.resolve([])),
+  getSmsTransactions: vi.fn(() => Promise.resolve({ transactions: [], total: 0 })),
 }));
 
 describe('SMS Features', () => {

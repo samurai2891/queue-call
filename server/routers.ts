@@ -2043,14 +2043,14 @@ const stripeRouter = router({
 
   // Get SMS transaction history (protected)
   getSmsTransactions: protectedProcedure
-    .input(z.object({ storeId: z.number(), limit: z.number().optional() }))
+    .input(z.object({ storeId: z.number(), limit: z.number().optional(), offset: z.number().optional() }))
     .query(async ({ ctx, input }) => {
       const store = await db.getStoreById(input.storeId);
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
 
-      return await getSmsTransactions(input.storeId, input.limit);
+      return await getSmsTransactions(input.storeId, input.limit, input.offset);
     }),
 
   // Create checkout session for SMS charge (protected)

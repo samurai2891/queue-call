@@ -125,37 +125,47 @@ describe('SMS Balance Functions', () => {
   });
   
   describe('getSmsTransactions', () => {
-    it('should return transaction history', async () => {
+    it('should return transaction history with total count', async () => {
       const storeId = 1;
       const mockTransactions = [
         { id: 1, storeId, type: 'charge', amount: 5000, balanceAfter: 5000 },
         { id: 2, storeId, type: 'consume', amount: -20, balanceAfter: 4980 },
       ];
       
-      mockDb.limit.mockResolvedValueOnce(mockTransactions);
+      // First call for count query
+      mockDb.where.mockResolvedValueOnce([{ count: 2 }]);
+      // Second call for offset().then transactions
+      mockDb.offset = vi.fn().mockResolvedValueOnce(mockTransactions);
+      mockDb.limit.mockReturnThis();
       
-      const transactions = await stripeModule.getSmsTransactions(storeId);
+      const result = await stripeModule.getSmsTransactions(storeId);
       
-      expect(transactions).toEqual(mockTransactions);
+      expect(result.transactions).toEqual(mockTransactions);
+      expect(result.total).toBe(2);
     });
     
-    it('should return empty array when database is not available', async () => {
+    it('should return empty result when database is not available', async () => {
       vi.mocked(getDb).mockResolvedValueOnce(null);
       
-      const transactions = await stripeModule.getSmsTransactions(1);
+      const result = await stripeModule.getSmsTransactions(1);
       
-      expect(transactions).toEqual([]);
+      expect(result).toEqual({ transactions: [], total: 0 });
     });
     
-    it('should respect limit parameter', async () => {
+    it('should respect limit and offset parameters', async () => {
       const storeId = 1;
       const limit = 5;
+      const offset = 10;
       
-      mockDb.limit.mockResolvedValueOnce([]);
+      mockDb.where.mockResolvedValueOnce([{ count: 15 }]);
+      mockDb.offset = vi.fn().mockResolvedValueOnce([]);
+      mockDb.limit.mockReturnThis();
       
-      await stripeModule.getSmsTransactions(storeId, limit);
+      const result = await stripeModule.getSmsTransactions(storeId, limit, offset);
       
       expect(mockDb.limit).toHaveBeenCalledWith(limit);
+      expect(mockDb.offset).toHaveBeenCalledWith(offset);
+      expect(result.total).toBe(15);
     });
   });
   

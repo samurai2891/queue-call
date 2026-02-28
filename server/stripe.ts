@@ -177,8 +177,17 @@ export async function consumeSmsBalance(params: {
     description: `SMS送信 (チケット#${ticketId})`,
   });
 
-  // 残高アラート
-  if (newBalance <= 1000 && newBalance > 0) {
+  // 残高アラート + 自動チャージチェック
+  const autoCharge = store.settings?.smsAutoCharge;
+  const threshold = autoCharge?.thresholdBalance ?? 0;
+  const autoChargeAmount = autoCharge?.chargeAmount ?? 0;
+
+  if (autoCharge?.enabled && threshold > 0 && autoChargeAmount > 0 && newBalance <= threshold) {
+    // 自動チャージをトリガー（非同期で実行、失敗してもSMS送信自体はブロックしない）
+    triggerAutoCharge(storeId, store.name, autoChargeAmount).catch((err: unknown) => {
+      console.error(`[AutoCharge] Failed for store ${storeId}:`, err);
+    });
+  } else if (newBalance <= 1000 && newBalance > 0) {
     await notifyOwner({
       title: "SMS残高が少なくなっています",
       content: `店舗「${store.name}」のSMS残高が ${newBalance.toLocaleString()}円 です。チャージをお願いします。`,
@@ -207,18 +216,24 @@ export async function getSmsBalance(storeId: number): Promise<number> {
 /**
  * SMS取引履歴を取得
  */
-export async function getSmsTransactions(storeId: number, limit = 50) {
+export async function getSmsTransactions(storeId: number, limit = 50, offset = 0) {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) return { transactions: [], total: 0 };
+
+  const [countResult] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(smsTransactions)
+    .where(eq(smsTransactions.storeId, storeId));
 
   const transactions = await db
     .select()
     .from(smsTransactions)
     .where(eq(smsTransactions.storeId, storeId))
     .orderBy(sql`${smsTransactions.createdAt} DESC`)
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 
-  return transactions;
+  return { transactions, total: Number(countResult?.count ?? 0) };
 }
 
 /**
@@ -305,6 +320,63 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> 
     title: "サブスクリプション支払いが完了しました",
     content: `店舗「${store.name}」のサブスクリプション支払い ${amountPaid.toLocaleString()}円 が完了しました。\nSMS残高に ${amountPaid.toLocaleString()}円 がチャージされました。\n現在の残高: ${newBalance.toLocaleString()}円`,
   });
+}
+
+/**
+ * 自動チャージをトリガー
+ * SMS残高が閾値を下回ったときに呼び出される
+ * Stripe Checkoutセッションを作成し、オーナーに通知する
+ */
+export async function triggerAutoCharge(
+  storeId: number,
+  storeName: string,
+  chargeAmount: number
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  // 重複防止: 過去1時間以内に自動チャージが実行されていないか確認
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const recentAutoCharge = await db
+    .select()
+    .from(smsTransactions)
+    .where(
+      sql`${smsTransactions.storeId} = ${storeId} AND ${smsTransactions.type} = 'charge' AND ${smsTransactions.description} LIKE '%自動チャージ%' AND ${smsTransactions.createdAt} > ${oneHourAgo}`
+    )
+    .limit(1);
+
+  if (recentAutoCharge.length > 0) {
+    console.log(`[AutoCharge] Skipping: auto-charge already triggered within the last hour for store ${storeId}`);
+    return;
+  }
+
+  try {
+    // Stripe Checkoutセッションを作成（オーナーが支払いを完了する必要がある）
+    const session = await createCheckoutSession({
+      storeId,
+      storeName,
+      amount: chargeAmount,
+      successUrl: `${process.env.VITE_FRONTEND_FORGE_API_URL || ''}/admin/settings?tab=notifications&charge=success`,
+      cancelUrl: `${process.env.VITE_FRONTEND_FORGE_API_URL || ''}/admin/settings?tab=notifications&charge=canceled`,
+    });
+
+    // オーナーに通知
+    await notifyOwner({
+      title: "自動チャージ: SMS残高が閾値を下回りました",
+      content: `店舗「${storeName}」のSMS残高が設定した閾値を下回りました。\n自動チャージ金額: ${chargeAmount.toLocaleString()}円\n以下のリンクから支払いを完了してください:\n${session.url}`,
+    });
+
+    console.log(`[AutoCharge] Triggered for store ${storeId}: ${chargeAmount} yen. Checkout URL: ${session.url}`);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[AutoCharge] Failed to create checkout session for store ${storeId}:`, errMsg);
+    
+    // 失敗時もオーナーに通知
+    await notifyOwner({
+      title: "自動チャージに失敗しました",
+      content: `店舗「${storeName}」の自動チャージに失敗しました。\n手動でチャージしてください。\nエラー: ${errMsg}`,
+    });
+  }
 }
 
 /**

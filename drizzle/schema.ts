@@ -102,6 +102,12 @@ export interface StoreSettings {
     smsTemplateRecall?: string;
   };
 
+  smsAutoCharge?: {
+    enabled?: boolean;          // 自動チャージの有効/無効
+    thresholdBalance?: number;  // この残高を下回ったら自動チャージ（円）
+    chargeAmount?: number;      // 自動チャージ金額（円）
+  };
+
   menu?: {
     switchStyle?: "icons" | "tabs";
     defaultView?: "feed" | "list";

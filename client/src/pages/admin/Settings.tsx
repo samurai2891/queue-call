@@ -1,4 +1,4 @@
-import { useParams, useLocation } from 'wouter';
+import { useParams, useLocation, useSearch } from 'wouter';
 import { useState, useEffect, useMemo } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
@@ -85,8 +85,16 @@ const SMS_COST_PER_MESSAGE = 20; // 1通あたり20円
 
 
 // SMS残高カードコンポーネント
-function SmsBalanceCard({ storeId }: { storeId?: number }) {
+function SmsBalanceCard({ storeId, autoChargeEnabled, autoChargeThreshold, autoChargeAmount, onAutoChargeChange }: {
+  storeId?: number;
+  autoChargeEnabled?: boolean;
+  autoChargeThreshold?: number;
+  autoChargeAmount?: number;
+  onAutoChargeChange?: (field: string, value: any) => void;
+}) {
   const { t } = useLocale();
+  const [, navigate] = useLocation();
+  const searchString = useSearch();
   const formatMessage = (key: string, params: Record<string, string | number>) => {
     return Object.entries(params).reduce(
       (message, [param, value]) => message.replace(`{${param}}`, String(value)),
@@ -99,9 +107,28 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
   const [chargePromptDismissed, setChargePromptDismissed] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
   const [lowBalanceThreshold, setLowBalanceThreshold] = useState(1000);
+  const [chargeResult, setChargeResult] = useState<'success' | 'canceled' | null>(null);
 
 
   
+  // Stripe Checkoutからのリダイレクト結果を検出
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const chargeStatus = params.get('charge');
+    if (chargeStatus === 'success') {
+      setChargeResult('success');
+      toast.success(t('settings.smsChargeSuccess'));
+      // URLパラメータをクリーンアップ
+      const cleanUrl = window.location.pathname + '?tab=notifications';
+      window.history.replaceState({}, '', cleanUrl);
+    } else if (chargeStatus === 'canceled') {
+      setChargeResult('canceled');
+      toast.info(t('settings.smsChargeCanceled'));
+      const cleanUrl = window.location.pathname + '?tab=notifications';
+      window.history.replaceState({}, '', cleanUrl);
+    }
+  }, [searchString, t]);
+
   // SMS残高取得
   const { data: balanceData, isLoading: balanceLoading, refetch: refetchBalance } = trpc.stripe.getSmsBalance.useQuery(
     { storeId: storeId! },
@@ -109,10 +136,11 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
   );
   
   // SMS取引履歴取得
-  const { data: transactions, isLoading: transactionsLoading } = trpc.stripe.getSmsTransactions.useQuery(
+  const { data: transactionsData, isLoading: transactionsLoading } = trpc.stripe.getSmsTransactions.useQuery(
     { storeId: storeId!, limit: 5 },
     { enabled: !!storeId }
   );
+  const transactions = transactionsData?.transactions;
   
   // Stripe Checkoutセッション作成
   const createCheckoutSession = trpc.stripe.createCheckoutSession.useMutation({
@@ -206,6 +234,56 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
           </Button>
         </div>
         
+        {/* チャージ結果バナー */}
+        {chargeResult === 'success' && (
+          <div className="mt-3 p-3 rounded-lg bg-green-50 border border-green-200 dark:bg-green-950/30 dark:border-green-800">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
+                <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                {t('settings.smsChargeSuccess')}
+              </p>
+            </div>
+            <p className="text-xs text-green-700 dark:text-green-300 mt-1 ml-7">
+              {t('settings.smsChargeSuccessHelp')}
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-1 ml-5 text-green-700 dark:text-green-300 hover:text-green-900"
+              onClick={() => setChargeResult(null)}
+            >
+              {t('common.close')}
+            </Button>
+          </div>
+        )}
+        {chargeResult === 'canceled' && (
+          <div className="mt-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 dark:bg-yellow-950/30 dark:border-yellow-800">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-5 rounded-full bg-yellow-500 flex items-center justify-center">
+                <X className="h-3 w-3 text-white" />
+              </div>
+              <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                {t('settings.smsChargeCanceled')}
+              </p>
+            </div>
+            <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1 ml-7">
+              {t('settings.smsChargeCanceledHelp')}
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-1 ml-5 text-yellow-700 dark:text-yellow-300 hover:text-yellow-900"
+              onClick={() => { setChargeResult(null); setShowChargePrompt(true); }}
+            >
+              {t('settings.smsChargeRetry')}
+            </Button>
+          </div>
+        )}
+
         <div className="mt-3">
           <div className={`text-3xl font-bold ${isLowBalance ? 'text-destructive' : ''}`}>
             ¥{balance.toLocaleString()}
@@ -454,6 +532,79 @@ function SmsBalanceCard({ storeId }: { storeId?: number }) {
                 </div>
               ))}
             </div>
+            {/* 全取引履歴へのリンク */}
+            <Button
+              variant="link"
+              size="sm"
+              className="mt-2 p-0 h-auto text-xs"
+              onClick={() => navigate(`/admin/sms-transactions`)}
+            >
+              {t('settings.smsViewAllTransactions')}
+              <ExternalLink className="h-3 w-3 ml-1" />
+            </Button>
+          </div>
+        )}
+        
+        {/* 自動チャージ設定 */}
+        {onAutoChargeChange && (
+          <div className="pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm font-medium">{t('settings.smsAutoCharge')}</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {t('settings.smsAutoChargeDescription')}
+                </p>
+              </div>
+              <Switch
+                checked={autoChargeEnabled ?? false}
+                onCheckedChange={(checked) => onAutoChargeChange('smsAutoChargeEnabled', checked)}
+              />
+            </div>
+            
+            {autoChargeEnabled && (
+              <div className="mt-3 space-y-3 pl-1">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">{t('settings.smsAutoChargeThreshold')}</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">¥</span>
+                    <Input
+                      type="number"
+                      min={500}
+                      max={50000}
+                      step={500}
+                      value={autoChargeThreshold ?? 1000}
+                      onChange={(e) => onAutoChargeChange('smsAutoChargeThreshold', Number(e.target.value))}
+                      className="w-32 h-8 text-sm"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.smsAutoChargeThresholdHelp')}
+                  </p>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">{t('settings.smsAutoChargeAmount')}</Label>
+                  <Select
+                    value={String(autoChargeAmount ?? 5000)}
+                    onValueChange={(val) => onAutoChargeChange('smsAutoChargeAmount', Number(val))}
+                  >
+                    <SelectTrigger className="w-48 h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SMS_CHARGE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.amount} value={String(opt.amount)}>
+                          {opt.label}（{formatMessage('settings.smsChargeMessageCount', { count: opt.messages })}）
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.smsAutoChargeAmountHelp')}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -524,6 +675,11 @@ function SettingsContent() {
     // Notifications
     pushEnabled: true,
     smsEnabled: false,
+    
+    // SMS Auto Charge
+    smsAutoChargeEnabled: false,
+    smsAutoChargeThreshold: 1000,
+    smsAutoChargeAmount: 5000,
     recallLimitSeconds: 60,
     recallMaxCount: 3,
     pushTemplateCalled: t('settings.pushTemplateDefaultCalled'),
@@ -746,6 +902,10 @@ function SettingsContent() {
         
         pushEnabled: settings.notifications?.pushEnabled ?? true,
         smsEnabled: settings.notifications?.smsEnabled || false,
+        
+        smsAutoChargeEnabled: settings.smsAutoCharge?.enabled ?? false,
+        smsAutoChargeThreshold: settings.smsAutoCharge?.thresholdBalance ?? 1000,
+        smsAutoChargeAmount: settings.smsAutoCharge?.chargeAmount ?? 5000,
         recallLimitSeconds: settings.notifications?.recallLimitSeconds || 60,
         recallMaxCount: settings.notifications?.recallMaxCount || 3,
         pushTemplateCalled: settings.notifications?.pushTemplateCalled || t('settings.pushTemplateDefaultCalled'),
@@ -993,6 +1153,11 @@ function SettingsContent() {
         enabled: formData.businessHoursEnabled,
         timezone: formData.businessHoursTimezone,
         schedule: formData.businessHoursSchedule,
+      },
+      smsAutoCharge: {
+        enabled: formData.smsAutoChargeEnabled,
+        thresholdBalance: formData.smsAutoChargeThreshold,
+        chargeAmount: formData.smsAutoChargeAmount,
       },
     };
 
@@ -2072,7 +2237,13 @@ function SettingsContent() {
                   {formData.smsEnabled && (
                     <div className="space-y-4 ml-4">
                       {/* SMS残高表示 */}
-                      <SmsBalanceCard storeId={store?.id} />
+                      <SmsBalanceCard
+                        storeId={store?.id}
+                        autoChargeEnabled={formData.smsAutoChargeEnabled}
+                        autoChargeThreshold={formData.smsAutoChargeThreshold}
+                        autoChargeAmount={formData.smsAutoChargeAmount}
+                        onAutoChargeChange={updateField}
+                      />
                       
                       <div className="space-y-2">
                         <Label htmlFor="smsTemplateCalled">{t('settings.smsTemplateCalled')}</Label>
