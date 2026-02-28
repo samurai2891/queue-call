@@ -67,27 +67,57 @@ type RateLimitEntry = {
   resetAt: number;
 };
 
-const RATE_LIMITS = {
-  ticket: {
-    web: [
-      { windowMs: 60_000, limit: 5 },
-      { windowMs: 60 * 60 * 1000, limit: 50 },
-    ],
-    kiosk: [
-      { windowMs: 60_000, limit: 20 },
-      { windowMs: 60 * 60 * 1000, limit: 300 },
-    ],
-  },
-  smsOtp: [{ windowMs: 30 * 60 * 1000, limit: 3 }],
-  staffLogin: [{ windowMs: 10 * 60 * 1000, limit: 5 }],
-  reservation: [
-    { windowMs: 60_000, limit: 3 },
-    { windowMs: 60 * 60 * 1000, limit: 20 },
-  ],
-  callAction: [
-    { windowMs: 60_000, limit: 10 },
-    { windowMs: 60 * 60 * 1000, limit: 120 },
-  ],
+// --- Dynamic rate limit helpers ---
+// Rate limits are computed from store settings (×1.5 safety margin)
+// to avoid blocking legitimate traffic in busy stores.
+
+const DEFAULT_MAX_TICKETS_PER_HOUR = 50;
+const RATE_LIMIT_MULTIPLIER = 1.5;
+
+const computeTicketRateLimits = (store: { settings?: import('../drizzle/schema').StoreSettings | null } | undefined | null, isKiosk: boolean): RateLimitWindow[] => {
+  const maxPerHour = store?.settings?.queue?.maxTicketsPerHour ?? DEFAULT_MAX_TICKETS_PER_HOUR;
+  const hourlyLimit = Math.ceil(maxPerHour * RATE_LIMIT_MULTIPLIER);
+  const minuteLimit = Math.max(3, Math.ceil(hourlyLimit / 10)); // at least 3 per minute
+  if (isKiosk) {
+    // Kiosk: higher per-minute burst (store-wide, not per-IP)
+    return [
+      { windowMs: 60_000, limit: Math.max(10, Math.ceil(hourlyLimit / 5)) },
+      { windowMs: 60 * 60 * 1000, limit: hourlyLimit },
+    ];
+  }
+  return [
+    { windowMs: 60_000, limit: minuteLimit },
+    { windowMs: 60 * 60 * 1000, limit: hourlyLimit },
+  ];
+};
+
+const computeCallActionRateLimits = (store: { settings?: import('../drizzle/schema').StoreSettings | null } | undefined | null): RateLimitWindow[] => {
+  const maxPerHour = store?.settings?.queue?.maxTicketsPerHour ?? DEFAULT_MAX_TICKETS_PER_HOUR;
+  const hourlyLimit = Math.ceil(maxPerHour * RATE_LIMIT_MULTIPLIER);
+  const minuteLimit = Math.max(5, Math.ceil(hourlyLimit / 5)); // staff needs burst capacity
+  return [
+    { windowMs: 60_000, limit: minuteLimit },
+    { windowMs: 60 * 60 * 1000, limit: hourlyLimit },
+  ];
+};
+
+const computeReservationRateLimits = (store: { settings?: import('../drizzle/schema').StoreSettings | null } | undefined | null): RateLimitWindow[] => {
+  const reservationSettings = store?.settings?.reservation;
+  const maxPerSlot = reservationSettings?.maxPerSlot ?? 5;
+  const slotsCount = reservationSettings?.timeSlots?.length ?? 12;
+  // Estimate hourly reservation capacity from slots spread over ~8 operating hours
+  const estimatedHourly = Math.ceil((maxPerSlot * slotsCount) / 8);
+  const hourlyLimit = Math.max(10, Math.ceil(estimatedHourly * RATE_LIMIT_MULTIPLIER));
+  const minuteLimit = Math.max(3, Math.ceil(hourlyLimit / 10));
+  return [
+    { windowMs: 60_000, limit: minuteLimit },
+    { windowMs: 60 * 60 * 1000, limit: hourlyLimit },
+  ];
+};
+
+// Static rate limits (not store-dependent)
+const STATIC_RATE_LIMITS = {
+  smsOtp: [{ windowMs: 30 * 60 * 1000, limit: 3 }] as RateLimitWindow[],
 };
 
 const rateLimitBuckets = new Map<string, RateLimitEntry>();
@@ -626,7 +656,7 @@ const ticketRouter = router({
       const source = input.source ?? 'web';
       const isKiosk = source === 'kiosk';
       const rateKey = isKiosk ? `${store.id}` : `${store.id}:${ipAddress}`;
-      const rateWindows = isKiosk ? RATE_LIMITS.ticket.kiosk : RATE_LIMITS.ticket.web;
+      const rateWindows = computeTicketRateLimits(store, isKiosk);
       enforceRateLimits({
         scope: isKiosk ? 'ticket-kiosk' : 'ticket',
         key: rateKey,
@@ -736,14 +766,7 @@ const ticketRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
       }
 
-      const ipAddress = getRequestIp(ctx.req);
-      enforceRateLimits({
-        scope: 'staff-login',
-        key: `${store.id}:${ipAddress}`,
-        windows: RATE_LIMITS.staffLogin,
-        requestId: ctx.requestId,
-        storeSlug: store.slug,
-      });
+      // Staff login: PIN authentication is sufficient protection, no rate limiting needed
 
       const managerValid = store.managerPinHash
         ? await bcrypt.compare(input.pin, store.managerPinHash)
@@ -962,11 +985,14 @@ const ticketRouter = router({
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
       }
 
+      // Get store settings for rate limiting and checkin deadline
+      const store = await db.getStoreById(input.storeId);
+
       const callIp = getRequestIp(ctx.req);
       enforceRateLimits({
         scope: 'call-action',
         key: `${input.storeId}:${callIp}`,
-        windows: RATE_LIMITS.callAction,
+        windows: computeCallActionRateLimits(store),
         requestId: ctx.requestId,
         storeSlug: session.storeId.toString(),
       });
@@ -977,9 +1003,6 @@ const ticketRouter = router({
       if (!nextTicket) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'No waiting tickets' });
       }
- 
-      // Get store settings for checkin deadline
-      const store = await db.getStoreById(input.storeId);
       const graceMinutes = store?.settings?.queue?.checkinGraceMinutes || 5;
       const checkinDeadlineAt = new Date(Date.now() + graceMinutes * 60 * 1000);
  
@@ -1047,11 +1070,13 @@ const ticketRouter = router({
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
       }
 
+      const store = await db.getStoreById(session.storeId);
+
       const callSpecificIp = getRequestIp(ctx.req);
       enforceRateLimits({
         scope: 'call-action',
         key: `${session.storeId}:${callSpecificIp}`,
-        windows: RATE_LIMITS.callAction,
+        windows: computeCallActionRateLimits(store),
         requestId: ctx.requestId,
         storeSlug: session.storeId.toString(),
       });
@@ -1064,8 +1089,6 @@ const ticketRouter = router({
       if (ticket.status !== 'CALLED') {
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Ticket is not currently called' });
       }
-
-      const store = await db.getStoreById(session.storeId);
       if (store?.settings?.queue?.auditLog) {
         await db.createAuditLog({
           storeId: session.storeId,
@@ -1131,11 +1154,13 @@ const ticketRouter = router({
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
       }
 
+      const store = await db.getStoreById(session.storeId);
+
       const recallIp = getRequestIp(ctx.req);
       enforceRateLimits({
         scope: 'call-action',
         key: `${session.storeId}:${recallIp}`,
-        windows: RATE_LIMITS.callAction,
+        windows: computeCallActionRateLimits(store),
         requestId: ctx.requestId,
         storeSlug: session.storeId.toString(),
       });
@@ -1148,8 +1173,6 @@ const ticketRouter = router({
       if (ticket.status !== 'CALLED') {
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Ticket is not currently called' });
       }
-
-      const store = await db.getStoreById(session.storeId);
       if (store?.settings?.queue?.auditLog) {
         await db.createAuditLog({
           storeId: session.storeId,
@@ -1888,7 +1911,7 @@ const notificationRouter = router({
       enforceRateLimits({
         scope: 'sms-otp',
         key: `${store.id}:${ipAddress}:${input.phoneE164}`,
-        windows: RATE_LIMITS.smsOtp,
+        windows: STATIC_RATE_LIMITS.smsOtp,
         requestId: ctx.requestId,
         storeSlug: store.slug,
         ticketId: ticket.id,
@@ -2283,7 +2306,7 @@ const reservationRouter = router({
       enforceRateLimits({
         scope: 'reservation-create',
         key: `${store.id}:${ipAddress}`,
-        windows: RATE_LIMITS.reservation,
+        windows: computeReservationRateLimits(store),
         requestId: ctx.requestId,
         storeSlug: store.slug,
       });

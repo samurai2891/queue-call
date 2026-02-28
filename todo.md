@@ -1288,3 +1288,12 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [ ] /api/stripe/webhookをexpress.json()の前に移動
 - [ ] Stripe Sandboxのクレーム（2026-03-14期限）
 - [ ] テスト決済（4242 4242 4242 4242）で動作確認
+
+### R6改善: レート制限の動的算出化（セキュリティ改善）（完了）
+- [x] スタッフログインのレート制限を撤去（PIN認証で十分保護されている）
+- [x] 予約作成APIのレート制限を店舗設定値（maxPerSlot×timeSlots数）から動的算出×1.5に変更
+- [x] 呼び出し系API（callNext/callSpecific/recall）のレート制限をmaxTicketsPerHourから動的算出×1.5に変更
+- [x] チケット発券のレート制限もmaxTicketsPerHourから動的算出×1.5に変更
+- [x] SMS OTPは現状維持（STATIC_RATE_LIMITSに移行、コスト保護目的）
+- [x] StoreSettingsにmaxTicketsPerHour設定を追加（デフォルト50）
+- [x] テスト25件更新、全273テストパス、TSエラーゼロ

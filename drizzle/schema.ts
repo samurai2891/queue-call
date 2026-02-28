@@ -80,6 +80,7 @@ export interface StoreSettings {
     reorderMaxMove?: number;
     reorderReasonRequired?: boolean;
     auditLog?: boolean;
+    maxTicketsPerHour?: number; // 1時間あたりの想定最大発券数（レート制限算出用、デフォルト50）
     showEstimatedWaitTime?: boolean; // 店舗トップページに予測待ち時間を表示
     showCrowdLevel?: boolean; // 店舗トップページに混雑状況を表示
     crowdLevelThresholds?: { // 混雑レベルの閾値
