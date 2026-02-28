@@ -1249,12 +1249,16 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] reservationsテーブルに (storeId, status) 複合インデックスを追加
 - [x] pnpm db:pushでマイグレーション実行済み、全207テストパス、TSエラーゼロ
 
-### R3: index.htmlの修正（Medium / SEO・UX）
-- [ ] html lang属性を "en" → "ja" に修正
-- [ ] favicon linkタグを追加
-- [ ] meta descriptionタグを追加
-- [ ] OGPタグ（og:title, og:description, og:image）を追加
-- [ ] テンプレートのコメントブロック（Google Fonts）を削除
+### R3: index.htmlの修正（Medium / SEO・UX）（完了）
+- [x] html lang属性を "en" → "ja" に修正
+- [x] favicon linkタグを追加（favicon.ico, favicon-32x32.png, apple-touch-icon.png）
+- [x] meta descriptionタグを追加
+- [x] theme-color metaタグを追加
+- [x] OGPタグ（og:type, og:title, og:description, og:image, og:locale, og:site_name）を追加
+- [x] Twitter Cardタグ（summary_large_image）を追加
+- [x] テンプレートのコメントブロック（Google Fonts）を削除
+- [x] OGP画像（1200x630）を生成しCDNにアップロード
+- [x] テスト9件追加、全216テストパス、TSエラーゼロ
 
 ### R4: 古いチケットデータの自動削除ジョブ（Medium / 運用）
 - [ ] 一定期間（90日）経過した完了・キャンセル済みチケットの自動削除ジョブを追加
