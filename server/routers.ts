@@ -1257,6 +1257,109 @@ const ticketRouter = router({
       return { success: true };
     }),
 
+  // Bulk mark as done
+  bulkDone: publicProcedure
+    .input(z.object({
+      sessionToken: z.string(),
+      ticketIds: z.array(z.number()).min(1).max(50),
+    }))
+    .mutation(async ({ input }) => {
+      const session = await db.getStaffSession(input.sessionToken);
+      if (!session) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
+      }
+
+      const results: { id: number; success: boolean; error?: string }[] = [];
+
+      for (const ticketId of input.ticketIds) {
+        const ticket = await db.getTicketById(ticketId);
+        if (!ticket || ticket.storeId !== session.storeId) {
+          results.push({ id: ticketId, success: false, error: 'Not found' });
+          continue;
+        }
+        if (!ticketStatusTransitions[ticket.status as TicketStatus]?.includes('DONE')) {
+          results.push({ id: ticketId, success: false, error: `Cannot transition from ${ticket.status}` });
+          continue;
+        }
+        await db.updateTicketStatus(ticket.id, 'DONE');
+        broadcastTicketUpdate(session.storeId, ticket.ticketToken, {
+          status: 'DONE',
+          number: ticket.number,
+        });
+        results.push({ id: ticketId, success: true });
+      }
+
+      // Broadcast queue update once after all operations
+      const waitingCount = await db.getWaitingCount(session.storeId);
+      const calledTicket = await db.getCalledTicket(session.storeId);
+      broadcastQueueUpdate(session.storeId, {
+        currentNumber: calledTicket?.number || 0,
+        waitingCount,
+      });
+
+      const successCount = results.filter(r => r.success).length;
+      return { success: true, processed: results.length, successCount, results };
+    }),
+
+  // Bulk skip
+  bulkSkip: publicProcedure
+    .input(z.object({
+      sessionToken: z.string(),
+      ticketIds: z.array(z.number()).min(1).max(50),
+      reason: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const session = await db.getStaffSession(input.sessionToken);
+      if (!session) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
+      }
+
+      const store = await db.getStoreById(session.storeId);
+      const results: { id: number; success: boolean; error?: string }[] = [];
+
+      for (const ticketId of input.ticketIds) {
+        const ticket = await db.getTicketById(ticketId);
+        if (!ticket || ticket.storeId !== session.storeId) {
+          results.push({ id: ticketId, success: false, error: 'Not found' });
+          continue;
+        }
+        if (!ticketStatusTransitions[ticket.status as TicketStatus]?.includes('SKIPPED')) {
+          results.push({ id: ticketId, success: false, error: `Cannot transition from ${ticket.status}` });
+          continue;
+        }
+        await db.updateTicketStatus(ticket.id, 'SKIPPED');
+
+        // Audit log
+        if (store?.settings?.queue?.auditLog) {
+          await db.createAuditLog({
+            storeId: session.storeId,
+            ticketId: ticket.id,
+            staffSessionId: session.id,
+            action: 'SKIP',
+            reason: input.reason || 'Bulk skip',
+            performedBy: session.role,
+          });
+        }
+
+        broadcastTicketUpdate(session.storeId, ticket.ticketToken, {
+          status: 'SKIPPED',
+          number: ticket.number,
+        });
+        results.push({ id: ticketId, success: true });
+      }
+
+      // Broadcast queue update once after all operations
+      const waitingCount = await db.getWaitingCount(session.storeId);
+      const calledTicket = await db.getCalledTicket(session.storeId);
+      broadcastQueueUpdate(session.storeId, {
+        currentNumber: calledTicket?.number || 0,
+        waitingCount,
+      });
+
+      const successCount = results.filter(r => r.success).length;
+      return { success: true, processed: results.length, successCount, results };
+    }),
+
   // Toggle intake status
   toggleIntake: publicProcedure
     .input(z.object({ 

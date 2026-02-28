@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -41,7 +42,9 @@ import {
   AlertCircle,
   RefreshCw,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  ListChecks,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSSE } from '@/hooks/useSSE';
@@ -93,6 +96,11 @@ function StaffContent() {
   const [manualNote, setManualNote] = useState('');
   const [showManualForm, setShowManualForm] = useState(false);
   const [businessHoursOverride, setBusinessHoursOverride] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkSkipDialogOpen, setBulkSkipDialogOpen] = useState(false);
+  const [bulkSkipReason, setBulkSkipReason] = useState('');
+  const [bulkDoneDialogOpen, setBulkDoneDialogOpen] = useState(false);
 
 
   const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
@@ -282,6 +290,40 @@ function StaffContent() {
     },
   });
 
+  const bulkDoneMutation = trpc.staff.bulkDone.useMutation({
+    onMutate: async (variables) => {
+      setTickets(prev => prev.filter(t => !variables.ticketIds.includes(t.id)));
+    },
+    onSuccess: (data) => {
+      toast.success(`${data.successCount}${t('staff.bulkDoneSuccess')}`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      refetchWaitingList();
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+      refetchWaitingList();
+    },
+  });
+
+  const bulkSkipMutation = trpc.staff.bulkSkip.useMutation({
+    onMutate: async (variables) => {
+      setTickets(prev => prev.filter(t => !variables.ticketIds.includes(t.id)));
+    },
+    onSuccess: (data) => {
+      toast.success(`${data.successCount}${t('staff.bulkSkipSuccess')}`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      setBulkSkipDialogOpen(false);
+      setBulkSkipReason('');
+      refetchWaitingList();
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+      refetchWaitingList();
+    },
+  });
+
   const toggleIntakeMutation = trpc.staff.toggleIntake.useMutation({
     onSuccess: () => {
       const newStatus = intakeStatus === 'open' ? 'paused' : 'open';
@@ -394,6 +436,51 @@ function StaffContent() {
   const handleDone = (ticketId: number) => {
     if (!sessionToken) return;
     doneMutation.mutate({ sessionToken, ticketId });
+  };
+
+  const toggleSelection = (ticketId: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(ticketId)) {
+        next.delete(ticketId);
+      } else {
+        next.add(ticketId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const selectableIds = tickets.map(t => t.id);
+    if (selectedIds.size === selectableIds.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableIds));
+    }
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDone = () => {
+    setBulkDoneDialogOpen(true);
+  };
+
+  const confirmBulkDone = () => {
+    if (!sessionToken) return;
+    bulkDoneMutation.mutate({ sessionToken, ticketIds: Array.from(selectedIds) });
+    setBulkDoneDialogOpen(false);
+  };
+
+  const handleBulkSkip = () => {
+    setBulkSkipDialogOpen(true);
+  };
+
+  const confirmBulkSkip = () => {
+    if (!sessionToken) return;
+    bulkSkipMutation.mutate({ sessionToken, ticketIds: Array.from(selectedIds), reason: bulkSkipReason || undefined });
   };
 
   const handleToggleIntake = () => {
@@ -767,11 +854,60 @@ function StaffContent() {
       {/* Ticket List */}
       <div className="flex-1 container pb-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold">{t('staff.waitingList')}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-semibold">{t('staff.waitingList')}</h2>
+            {tickets.length > 0 && (
+              <Button
+                variant={selectionMode ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
+              >
+                {selectionMode ? <X className="h-4 w-4 mr-1" /> : <ListChecks className="h-4 w-4 mr-1" />}
+                {selectionMode ? t('staff.selectionModeOff') : t('staff.selectionMode')}
+              </Button>
+            )}
+          </div>
           <Button variant="ghost" size="sm" onClick={() => refetchWaitingList()}>
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* Bulk Action Bar */}
+        {selectionMode && (
+          <div className="flex items-center justify-between mb-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" onClick={toggleSelectAll}>
+                {selectedIds.size === tickets.length ? t('staff.deselectAll') : t('staff.selectAll')}
+              </Button>
+              <span className="text-sm font-medium">
+                {selectedIds.size}{t('staff.selectedCount')}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBulkSkip}
+                disabled={selectedIds.size === 0 || bulkSkipMutation.isPending || bulkDoneMutation.isPending}
+              >
+                <SkipForward className="h-4 w-4 mr-1" />
+                {t('staff.bulkSkip')}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleBulkDone}
+                disabled={selectedIds.size === 0 || bulkDoneMutation.isPending || bulkSkipMutation.isPending}
+              >
+                {bulkDoneMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                )}
+                {t('staff.bulkDone')}
+              </Button>
+            </div>
+          </div>
+        )}
 
         <ScrollArea className="h-[calc(100vh-400px)]">
           {tickets.length === 0 ? (
@@ -787,10 +923,22 @@ function StaffContent() {
                 const canMoveDown = canReorder && ticket.status === 'WAITING' && waitingIndex !== undefined && waitingIndex < lastWaitingIndex;
 
                 return (
-                  <Card key={ticket.id} className={ticket.status === 'CALLED' ? 'ring-2 ring-primary' : ''}>
+                  <Card
+                    key={ticket.id}
+                    className={`${ticket.status === 'CALLED' ? 'ring-2 ring-primary' : ''} ${selectionMode && selectedIds.has(ticket.id) ? 'bg-primary/5 ring-1 ring-primary/30' : ''} ${selectionMode ? 'cursor-pointer' : ''}`}
+                    onClick={selectionMode ? () => toggleSelection(ticket.id) : undefined}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-4">
+                          {selectionMode && (
+                            <Checkbox
+                              checked={selectedIds.has(ticket.id)}
+                              onCheckedChange={() => toggleSelection(ticket.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-1"
+                            />
+                          )}
                           <div className="text-3xl font-bold tabular-nums">#{ticket.number}</div>
                           <div>
                             <div className="flex items-center gap-2">
@@ -923,6 +1071,69 @@ function StaffContent() {
               disabled={moveTicketMutation.isPending || (reorderReasonRequired && !reorderReason.trim())}
             >
               {t('common.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Done Confirm Dialog */}
+      <AlertDialog open={bulkDoneDialogOpen} onOpenChange={setBulkDoneDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('staff.bulkDone')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('staff.bulkDoneConfirm')}
+              <br />
+              <span className="text-xs text-muted-foreground">{t('staff.bulkActionDesc')}</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkDone}
+              disabled={bulkDoneMutation.isPending}
+            >
+              {bulkDoneMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : null}
+              {t('staff.bulkDone')} ({selectedIds.size})
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Skip Confirm Dialog */}
+      <AlertDialog open={bulkSkipDialogOpen} onOpenChange={(open) => {
+        setBulkSkipDialogOpen(open);
+        if (!open) setBulkSkipReason('');
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('staff.bulkSkip')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('staff.bulkSkipConfirm')}
+              <div className="space-y-3 mt-3">
+                <Label htmlFor="bulkSkipReason">{t('staff.reorderReason')}</Label>
+                <Input
+                  id="bulkSkipReason"
+                  placeholder={t('staff.reorderReasonPlaceholder')}
+                  value={bulkSkipReason}
+                  onChange={(e) => setBulkSkipReason(e.target.value)}
+                />
+              </div>
+              <span className="text-xs text-muted-foreground mt-2 block">{t('staff.bulkActionDesc')}</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkSkip}
+              disabled={bulkSkipMutation.isPending}
+            >
+              {bulkSkipMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : null}
+              {t('staff.bulkSkip')} ({selectedIds.size})
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
