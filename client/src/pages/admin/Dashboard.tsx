@@ -11,6 +11,7 @@ import { exportToCSV, generateFilename } from "@/lib/csvExport";
 import { exportToPDF, generatePDFFilename } from "@/lib/pdfExport";
 import { PlanBadge } from "@/components/PlanGate";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
+import { ZoomableAreaChart } from "@/components/ZoomableAreaChart";
 import { useState, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -1249,55 +1250,20 @@ export default function Dashboard() {
                     {t('dashboard.noData')}
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart data={usageTrendGranularity === 'monthly' ? usageTrendChartData.monthlyMenu : usageTrendGranularity === 'weekly' ? usageTrendChartData.weeklyMenu : usageTrendChartData.menu}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="date" className="text-xs" interval={usageTrendGranularity !== 'daily' ? 0 : Math.max(0, Math.floor(usageTrendChartData.menu.length / 10))} angle={usageTrendGranularity !== 'daily' ? -25 : 0} textAnchor={usageTrendGranularity !== 'daily' ? 'end' : 'middle'} height={usageTrendGranularity !== 'daily' ? 50 : 30} />
-                      <YAxis className="text-xs" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                          border: 'none',
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-                          padding: '12px 16px',
-                        }}
-                        itemStyle={{ color: '#fff', fontSize: '14px', padding: '4px 0' }}
-                        labelStyle={{ color: '#fff', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}
-                      />
-                      {usageTrend?.limits.menuLimit && (
-                        <ReferenceLine
-                          y={usageTrend.limits.menuLimit}
-                          stroke="oklch(0.65 0.25 25)"
-                          strokeDasharray="5 5"
-                          strokeWidth={2}
-                          label={{ value: `${t('dashboard.usageLimitLine')} (${usageTrend.limits.menuLimit})`, position: 'insideTopRight', fill: 'oklch(0.65 0.25 25)', fontSize: 12 }}
-                        />
-                      )}
-                      <Area
-                        type="monotone"
-                        dataKey="actual"
-                        name={t('dashboard.usageActual')}
-                        stroke="oklch(0.55 0.22 250)"
-                        fill="oklch(0.55 0.22 250 / 0.15)"
-                        strokeWidth={2}
-                        dot={{ fill: 'oklch(0.55 0.22 250)', strokeWidth: 0, r: 2 }}
-                        connectNulls={false}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="predicted"
-                        name={t('dashboard.usagePredicted')}
-                        stroke="oklch(0.55 0.22 250)"
-                        fill="oklch(0.55 0.22 250 / 0.05)"
-                        strokeWidth={2}
-                        strokeDasharray="6 3"
-                        dot={{ fill: 'oklch(0.55 0.22 250)', strokeWidth: 0, r: 2 }}
-                        connectNulls={false}
-                      />
-                      <Legend />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  <ZoomableAreaChart
+                    data={usageTrendGranularity === 'monthly' ? usageTrendChartData.monthlyMenu : usageTrendGranularity === 'weekly' ? usageTrendChartData.weeklyMenu : usageTrendChartData.menu}
+                    actualColor="oklch(0.55 0.22 250)"
+                    actualFill="oklch(0.55 0.22 250 / 0.15)"
+                    predictedFill="oklch(0.55 0.22 250 / 0.05)"
+                    limitValue={usageTrend?.limits.menuLimit}
+                    limitLabel={usageTrend?.limits.menuLimit ? `${t('dashboard.usageLimitLine')} (${usageTrend.limits.menuLimit})` : undefined}
+                    actualLabel={t('dashboard.usageActual')}
+                    predictedLabel={t('dashboard.usagePredicted')}
+                    granularity={usageTrendGranularity}
+                    totalDataLength={usageTrendChartData.menu.length}
+                    resetLabel={t('dashboard.zoomReset')}
+                    zoomHintLabel={t('dashboard.zoomHint')}
+                  />
                 )}
               </CardContent>
             </Card>
@@ -1318,55 +1284,20 @@ export default function Dashboard() {
                     {t('dashboard.noData')}
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart data={usageTrendGranularity === 'monthly' ? usageTrendChartData.monthlyFeed : usageTrendGranularity === 'weekly' ? usageTrendChartData.weeklyFeed : usageTrendChartData.feed}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="date" className="text-xs" interval={usageTrendGranularity !== 'daily' ? 0 : Math.max(0, Math.floor(usageTrendChartData.feed.length / 10))} angle={usageTrendGranularity !== 'daily' ? -25 : 0} textAnchor={usageTrendGranularity !== 'daily' ? 'end' : 'middle'} height={usageTrendGranularity !== 'daily' ? 50 : 30} />
-                      <YAxis className="text-xs" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                          border: 'none',
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-                          padding: '12px 16px',
-                        }}
-                        itemStyle={{ color: '#fff', fontSize: '14px', padding: '4px 0' }}
-                        labelStyle={{ color: '#fff', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}
-                      />
-                      {usageTrend?.limits.feedLimit && (
-                        <ReferenceLine
-                          y={usageTrend.limits.feedLimit}
-                          stroke="oklch(0.65 0.25 25)"
-                          strokeDasharray="5 5"
-                          strokeWidth={2}
-                          label={{ value: `${t('dashboard.usageLimitLine')} (${usageTrend.limits.feedLimit})`, position: 'insideTopRight', fill: 'oklch(0.65 0.25 25)', fontSize: 12 }}
-                        />
-                      )}
-                      <Area
-                        type="monotone"
-                        dataKey="actual"
-                        name={t('dashboard.usageActual')}
-                        stroke="oklch(0.55 0.22 160)"
-                        fill="oklch(0.55 0.22 160 / 0.15)"
-                        strokeWidth={2}
-                        dot={{ fill: 'oklch(0.55 0.22 160)', strokeWidth: 0, r: 2 }}
-                        connectNulls={false}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="predicted"
-                        name={t('dashboard.usagePredicted')}
-                        stroke="oklch(0.55 0.22 160)"
-                        fill="oklch(0.55 0.22 160 / 0.05)"
-                        strokeWidth={2}
-                        strokeDasharray="6 3"
-                        dot={{ fill: 'oklch(0.55 0.22 160)', strokeWidth: 0, r: 2 }}
-                        connectNulls={false}
-                      />
-                      <Legend />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  <ZoomableAreaChart
+                    data={usageTrendGranularity === 'monthly' ? usageTrendChartData.monthlyFeed : usageTrendGranularity === 'weekly' ? usageTrendChartData.weeklyFeed : usageTrendChartData.feed}
+                    actualColor="oklch(0.55 0.22 160)"
+                    actualFill="oklch(0.55 0.22 160 / 0.15)"
+                    predictedFill="oklch(0.55 0.22 160 / 0.05)"
+                    limitValue={usageTrend?.limits.feedLimit}
+                    limitLabel={usageTrend?.limits.feedLimit ? `${t('dashboard.usageLimitLine')} (${usageTrend.limits.feedLimit})` : undefined}
+                    actualLabel={t('dashboard.usageActual')}
+                    predictedLabel={t('dashboard.usagePredicted')}
+                    granularity={usageTrendGranularity}
+                    totalDataLength={usageTrendChartData.feed.length}
+                    resetLabel={t('dashboard.zoomReset')}
+                    zoomHintLabel={t('dashboard.zoomHint')}
+                  />
                 )}
               </CardContent>
             </Card>
@@ -1386,55 +1317,20 @@ export default function Dashboard() {
                   {t('dashboard.noData')}
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={usageTrendGranularity === 'monthly' ? usageTrendChartData.monthlyTickets : usageTrendGranularity === 'weekly' ? usageTrendChartData.weeklyTickets : usageTrendChartData.tickets}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" className="text-xs" interval={usageTrendGranularity !== 'daily' ? 0 : Math.max(0, Math.floor(usageTrendChartData.tickets.length / 10))} angle={usageTrendGranularity !== 'daily' ? -25 : 0} textAnchor={usageTrendGranularity !== 'daily' ? 'end' : 'middle'} height={usageTrendGranularity !== 'daily' ? 50 : 30} />
-                    <YAxis className="text-xs" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                        border: 'none',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-                        padding: '12px 16px',
-                      }}
-                      itemStyle={{ color: '#fff', fontSize: '14px', padding: '4px 0' }}
-                      labelStyle={{ color: '#fff', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}
-                    />
-                    {usageTrend?.limits.monthlyTicketLimit && (
-                      <ReferenceLine
-                        y={Math.round(usageTrend.limits.monthlyTicketLimit / 30)}
-                        stroke="oklch(0.65 0.25 25)"
-                        strokeDasharray="5 5"
-                        strokeWidth={2}
-                        label={{ value: `${t('dashboard.usageDailyAvgLimit')} (${Math.round(usageTrend.limits.monthlyTicketLimit / 30)}/日)`, position: 'insideTopRight', fill: 'oklch(0.65 0.25 25)', fontSize: 12 }}
-                      />
-                    )}
-                    <Area
-                      type="monotone"
-                      dataKey="actual"
-                      name={t('dashboard.usageActual')}
-                      stroke="oklch(0.55 0.22 290)"
-                      fill="oklch(0.55 0.22 290 / 0.15)"
-                      strokeWidth={2}
-                      dot={{ fill: 'oklch(0.55 0.22 290)', strokeWidth: 0, r: 2 }}
-                      connectNulls={false}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="predicted"
-                      name={t('dashboard.usagePredicted')}
-                      stroke="oklch(0.55 0.22 290)"
-                      fill="oklch(0.55 0.22 290 / 0.05)"
-                      strokeWidth={2}
-                      strokeDasharray="6 3"
-                      dot={{ fill: 'oklch(0.55 0.22 290)', strokeWidth: 0, r: 2 }}
-                      connectNulls={false}
-                    />
-                    <Legend />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <ZoomableAreaChart
+                  data={usageTrendGranularity === 'monthly' ? usageTrendChartData.monthlyTickets : usageTrendGranularity === 'weekly' ? usageTrendChartData.weeklyTickets : usageTrendChartData.tickets}
+                  actualColor="oklch(0.55 0.22 290)"
+                  actualFill="oklch(0.55 0.22 290 / 0.15)"
+                  predictedFill="oklch(0.55 0.22 290 / 0.05)"
+                  limitValue={usageTrend?.limits.monthlyTicketLimit ? Math.round(usageTrend.limits.monthlyTicketLimit / 30) : undefined}
+                  limitLabel={usageTrend?.limits.monthlyTicketLimit ? `${t('dashboard.usageDailyAvgLimit')} (${Math.round(usageTrend.limits.monthlyTicketLimit / 30)}/日)` : undefined}
+                  actualLabel={t('dashboard.usageActual')}
+                  predictedLabel={t('dashboard.usagePredicted')}
+                  granularity={usageTrendGranularity}
+                  totalDataLength={usageTrendChartData.tickets.length}
+                  resetLabel={t('dashboard.zoomReset')}
+                  zoomHintLabel={t('dashboard.zoomHint')}
+                />
               )}
             </CardContent>
           </Card>

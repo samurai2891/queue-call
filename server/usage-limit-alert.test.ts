@@ -776,3 +776,99 @@ describe("Dashboard Usage Trend - Monthly aggregation logic", () => {
     expect(monthly[2].date).toBe("2026/02");
   });
 });
+
+describe("ZoomableAreaChart - Zoom logic", () => {
+  // Simulate the zoom filtering logic used in ZoomableAreaChart
+  const filterZoomedData = (
+    data: Array<{ date: string; actual: number | null; predicted: number | null }>,
+    zoomLeft: string | null,
+    zoomRight: string | null
+  ) => {
+    if (!zoomLeft || !zoomRight) return data;
+    const leftIdx = data.findIndex((d) => d.date === zoomLeft);
+    const rightIdx = data.findIndex((d) => d.date === zoomRight);
+    if (leftIdx === -1 || rightIdx === -1) return data;
+    const start = Math.min(leftIdx, rightIdx);
+    const end = Math.max(leftIdx, rightIdx);
+    return data.slice(start, end + 1);
+  };
+
+  const sampleData = [
+    { date: "2/20", actual: 5, predicted: null },
+    { date: "2/21", actual: 8, predicted: null },
+    { date: "2/22", actual: 12, predicted: null },
+    { date: "2/23", actual: 15, predicted: null },
+    { date: "2/24", actual: 18, predicted: null },
+    { date: "2/25", actual: 20, predicted: null },
+    { date: "2/26", actual: 22, predicted: null },
+    { date: "2/27", actual: null, predicted: 25 },
+    { date: "2/28", actual: null, predicted: 28 },
+  ];
+
+  it("returns full data when no zoom is set", () => {
+    const result = filterZoomedData(sampleData, null, null);
+    expect(result).toHaveLength(9);
+    expect(result).toEqual(sampleData);
+  });
+
+  it("returns filtered data when zoom range is set", () => {
+    const result = filterZoomedData(sampleData, "2/22", "2/25");
+    expect(result).toHaveLength(4);
+    expect(result[0].date).toBe("2/22");
+    expect(result[3].date).toBe("2/25");
+  });
+
+  it("handles reversed zoom range (right-to-left drag)", () => {
+    const result = filterZoomedData(sampleData, "2/25", "2/22");
+    expect(result).toHaveLength(4);
+    expect(result[0].date).toBe("2/22");
+    expect(result[3].date).toBe("2/25");
+  });
+
+  it("returns full data when zoom labels don't match", () => {
+    const result = filterZoomedData(sampleData, "3/1", "3/5");
+    expect(result).toHaveLength(9);
+  });
+
+  it("handles zoom to single adjacent points", () => {
+    const result = filterZoomedData(sampleData, "2/20", "2/21");
+    expect(result).toHaveLength(2);
+    expect(result[0].actual).toBe(5);
+    expect(result[1].actual).toBe(8);
+  });
+
+  it("includes predicted data points in zoom range", () => {
+    const result = filterZoomedData(sampleData, "2/26", "2/28");
+    expect(result).toHaveLength(3);
+    expect(result[0].actual).toBe(22);
+    expect(result[1].predicted).toBe(25);
+    expect(result[2].predicted).toBe(28);
+  });
+});
+
+describe("ZoomableAreaChart - Translation keys", () => {
+  const zoomKeys = [
+    'dashboard.zoomReset',
+    'dashboard.zoomHint',
+  ] as const;
+
+  SUPPORTED_LOCALES.forEach((locale) => {
+    it(`locale '${locale}' has all zoom translation keys`, () => {
+      zoomKeys.forEach((key) => {
+        const value = t(locale, key);
+        expect(value).not.toBe(key); // Should not fall back to key itself
+        expect(value.length).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  it("Japanese zoom translations are correct", () => {
+    expect(t("ja", "dashboard.zoomReset")).toBe("全体表示に戻す");
+    expect(t("ja", "dashboard.zoomHint")).toBe("ドラッグで範囲を選択して拡大");
+  });
+
+  it("English zoom translations are correct", () => {
+    expect(t("en", "dashboard.zoomReset")).toBe("Reset zoom");
+    expect(t("en", "dashboard.zoomHint")).toBe("Drag to select a range to zoom in");
+  });
+});

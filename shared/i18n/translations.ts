@@ -1115,6 +1115,8 @@ export const translations = {
     'dashboard.usageGranularityDaily': '日別',
     'dashboard.usageGranularityWeekly': '週別',
     'dashboard.usageGranularityMonthly': '月別',
+    'dashboard.zoomReset': '全体表示に戻す',
+    'dashboard.zoomHint': 'ドラッグで範囲を選択して拡大',
   },
   en: {
     // Common
@@ -2218,6 +2220,8 @@ export const translations = {
     'dashboard.usageGranularityDaily': 'Daily',
     'dashboard.usageGranularityWeekly': 'Weekly',
     'dashboard.usageGranularityMonthly': 'Monthly',
+    'dashboard.zoomReset': 'Reset zoom',
+    'dashboard.zoomHint': 'Drag to select a range to zoom in',
   },
   ko: {
     // Common
@@ -3322,6 +3326,8 @@ export const translations = {
     'dashboard.usageGranularityDaily': '일별',
     'dashboard.usageGranularityWeekly': '주별',
     'dashboard.usageGranularityMonthly': '월별',
+    'dashboard.zoomReset': '전체 보기로 돌아가기',
+    'dashboard.zoomHint': '드래그하여 범위를 선택하면 확대됩니다',
   },
   'zh-Hans': {
     // Common
@@ -4426,6 +4432,8 @@ export const translations = {
     'dashboard.usageGranularityDaily': '按日',
     'dashboard.usageGranularityWeekly': '按周',
     'dashboard.usageGranularityMonthly': '按月',
+    'dashboard.zoomReset': '恢复全部显示',
+    'dashboard.zoomHint': '拖动选择范围以放大查看',
   },
   'zh-Hant': {
     // Common
@@ -5530,6 +5538,8 @@ export const translations = {
     'dashboard.usageGranularityDaily': '按日',
     'dashboard.usageGranularityWeekly': '按週',
     'dashboard.usageGranularityMonthly': '按月',
+    'dashboard.zoomReset': '恢復全部顯示',
+    'dashboard.zoomHint': '拖曳選擇範圍以放大查看',
   },
 } as const;
 
