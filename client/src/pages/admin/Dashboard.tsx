@@ -132,6 +132,7 @@ export default function Dashboard() {
   const [hourlyDays, setHourlyDays] = useState(30);
   const [heatmapDays, setHeatmapDays] = useState(30);
   const [usageTrendDays, setUsageTrendDays] = useState(30);
+  const [usageTrendGranularity, setUsageTrendGranularity] = useState<'daily' | 'weekly'>('daily');
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const dashboardContentRef = useRef<HTMLDivElement>(null);
 
@@ -306,9 +307,52 @@ export default function Dashboard() {
     avgWait: Math.round(d.avgWaitMinutes || 0),
   })) || [];
 
+  // Helper: aggregate daily data into weekly buckets
+  const aggregateWeekly = (data: Array<{ date: string; actual: number | null; predicted: number | null }>, isCumulative: boolean) => {
+    if (data.length === 0) return [];
+    const weeks: Array<{ date: string; actual: number | null; predicted: number | null }> = [];
+    let weekActual = 0;
+    let weekPredicted = 0;
+    let weekStart = '';
+    let count = 0;
+    let hasActual = false;
+    let hasPredicted = false;
+
+    for (let i = 0; i < data.length; i++) {
+      const item = data[i];
+      if (count === 0) weekStart = item.date;
+
+      if (isCumulative) {
+        // For cumulative data (menu, feed), take the last value in the week
+        if (item.actual !== null) { weekActual = item.actual; hasActual = true; }
+        if (item.predicted !== null) { weekPredicted = item.predicted; hasPredicted = true; }
+      } else {
+        // For non-cumulative data (tickets), sum the values
+        if (item.actual !== null) { weekActual += item.actual; hasActual = true; }
+        if (item.predicted !== null) { weekPredicted += item.predicted; hasPredicted = true; }
+      }
+      count++;
+
+      if (count === 7 || i === data.length - 1) {
+        const weekEnd = item.date;
+        weeks.push({
+          date: count >= 3 ? `${weekStart}~${weekEnd}` : weekEnd,
+          actual: hasActual ? weekActual : null,
+          predicted: hasPredicted ? weekPredicted : null,
+        });
+        weekActual = 0;
+        weekPredicted = 0;
+        count = 0;
+        hasActual = false;
+        hasPredicted = false;
+      }
+    }
+    return weeks;
+  };
+
   // Prepare usage trend chart data with linear regression prediction
   const usageTrendChartData = useMemo(() => {
-    if (!usageTrend?.daily || usageTrend.daily.length === 0) return { menu: [], feed: [], tickets: [] };
+    if (!usageTrend?.daily || usageTrend.daily.length === 0) return { menu: [], feed: [], tickets: [], weeklyMenu: [], weeklyFeed: [], weeklyTickets: [] };
 
     const daily = usageTrend.daily;
     const n = daily.length;
@@ -410,10 +454,18 @@ export default function Dashboard() {
     const menuDaysToLimit = estimateDaysToLimit(menuValues[n - 1], menuReg.slope, usageTrend.limits.menuLimit);
     const feedDaysToLimit = estimateDaysToLimit(feedValues[n - 1], feedReg.slope, usageTrend.limits.feedLimit);
 
+    // Aggregate weekly data
+    const weeklyMenu = aggregateWeekly(menuData, true);
+    const weeklyFeed = aggregateWeekly(feedData, true);
+    const weeklyTickets = aggregateWeekly(ticketData, false);
+
     return {
       menu: menuData,
       feed: feedData,
       tickets: ticketData,
+      weeklyMenu,
+      weeklyFeed,
+      weeklyTickets,
       menuDaysToLimit,
       feedDaysToLimit,
       menuSlope: menuReg.slope,
@@ -989,25 +1041,51 @@ export default function Dashboard() {
 
         {/* Usage Trend Section */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
               {t('dashboard.usageTrendTitle')}
             </h2>
-            <Select value={usageTrendDays.toString()} onValueChange={(v) => setUsageTrendDays(parseInt(v))}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">{t('dashboard.heatmapDays7')}</SelectItem>
-                <SelectItem value="30" disabled={planLimits && planLimits.analyticsDays < 30}>
-                  {t('dashboard.heatmapDays30')}{planLimits && planLimits.analyticsDays < 30 && ' (Standard以上)'}
-                </SelectItem>
-                <SelectItem value="90" disabled={planLimits && planLimits.analyticsDays < 90}>
-                  {t('dashboard.heatmapDays90')}{planLimits && planLimits.analyticsDays < 90 && ' (Pro)'}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              {/* Daily / Weekly toggle */}
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                <button
+                  onClick={() => setUsageTrendGranularity('daily')}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                    usageTrendGranularity === 'daily'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {t('dashboard.usageGranularityDaily')}
+                </button>
+                <button
+                  onClick={() => setUsageTrendGranularity('weekly')}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                    usageTrendGranularity === 'weekly'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {t('dashboard.usageGranularityWeekly')}
+                </button>
+              </div>
+              {/* Period selector */}
+              <Select value={usageTrendDays.toString()} onValueChange={(v) => setUsageTrendDays(parseInt(v))}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">{t('dashboard.heatmapDays7')}</SelectItem>
+                  <SelectItem value="30" disabled={planLimits && planLimits.analyticsDays < 30}>
+                    {t('dashboard.heatmapDays30')}{planLimits && planLimits.analyticsDays < 30 && ' (Standard以上)'}
+                  </SelectItem>
+                  <SelectItem value="90" disabled={planLimits && planLimits.analyticsDays < 90}>
+                    {t('dashboard.heatmapDays90')}{planLimits && planLimits.analyticsDays < 90 && ' (Pro)'}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Prediction Summary Cards */}
@@ -1087,15 +1165,15 @@ export default function Dashboard() {
               <CardContent>
                 {usageTrendLoading ? (
                   <Skeleton className="h-64 w-full" />
-                ) : usageTrendChartData.menu.length === 0 ? (
+                ) : (usageTrendGranularity === 'weekly' ? usageTrendChartData.weeklyMenu : usageTrendChartData.menu).length === 0 ? (
                   <div className="h-64 flex items-center justify-center text-muted-foreground">
                     {t('dashboard.noData')}
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart data={usageTrendChartData.menu}>
+                    <AreaChart data={usageTrendGranularity === 'weekly' ? usageTrendChartData.weeklyMenu : usageTrendChartData.menu}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="date" className="text-xs" interval={Math.max(0, Math.floor(usageTrendChartData.menu.length / 10))} />
+                      <XAxis dataKey="date" className="text-xs" interval={usageTrendGranularity === 'weekly' ? 0 : Math.max(0, Math.floor(usageTrendChartData.menu.length / 10))} angle={usageTrendGranularity === 'weekly' ? -25 : 0} textAnchor={usageTrendGranularity === 'weekly' ? 'end' : 'middle'} height={usageTrendGranularity === 'weekly' ? 50 : 30} />
                       <YAxis className="text-xs" />
                       <Tooltip
                         contentStyle={{
@@ -1156,15 +1234,15 @@ export default function Dashboard() {
               <CardContent>
                 {usageTrendLoading ? (
                   <Skeleton className="h-64 w-full" />
-                ) : usageTrendChartData.feed.length === 0 ? (
+                ) : (usageTrendGranularity === 'weekly' ? usageTrendChartData.weeklyFeed : usageTrendChartData.feed).length === 0 ? (
                   <div className="h-64 flex items-center justify-center text-muted-foreground">
                     {t('dashboard.noData')}
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart data={usageTrendChartData.feed}>
+                    <AreaChart data={usageTrendGranularity === 'weekly' ? usageTrendChartData.weeklyFeed : usageTrendChartData.feed}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="date" className="text-xs" interval={Math.max(0, Math.floor(usageTrendChartData.feed.length / 10))} />
+                      <XAxis dataKey="date" className="text-xs" interval={usageTrendGranularity === 'weekly' ? 0 : Math.max(0, Math.floor(usageTrendChartData.feed.length / 10))} angle={usageTrendGranularity === 'weekly' ? -25 : 0} textAnchor={usageTrendGranularity === 'weekly' ? 'end' : 'middle'} height={usageTrendGranularity === 'weekly' ? 50 : 30} />
                       <YAxis className="text-xs" />
                       <Tooltip
                         contentStyle={{
@@ -1224,15 +1302,15 @@ export default function Dashboard() {
             <CardContent>
               {usageTrendLoading ? (
                 <Skeleton className="h-64 w-full" />
-              ) : usageTrendChartData.tickets.length === 0 ? (
+              ) : (usageTrendGranularity === 'weekly' ? usageTrendChartData.weeklyTickets : usageTrendChartData.tickets).length === 0 ? (
                 <div className="h-64 flex items-center justify-center text-muted-foreground">
                   {t('dashboard.noData')}
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={usageTrendChartData.tickets}>
+                  <AreaChart data={usageTrendGranularity === 'weekly' ? usageTrendChartData.weeklyTickets : usageTrendChartData.tickets}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" className="text-xs" interval={Math.max(0, Math.floor(usageTrendChartData.tickets.length / 10))} />
+                    <XAxis dataKey="date" className="text-xs" interval={usageTrendGranularity === 'weekly' ? 0 : Math.max(0, Math.floor(usageTrendChartData.tickets.length / 10))} angle={usageTrendGranularity === 'weekly' ? -25 : 0} textAnchor={usageTrendGranularity === 'weekly' ? 'end' : 'middle'} height={usageTrendGranularity === 'weekly' ? 50 : 30} />
                     <YAxis className="text-xs" />
                     <Tooltip
                       contentStyle={{

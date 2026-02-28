@@ -1112,6 +1112,8 @@ export const translations = {
     'dashboard.usageNoLimitRisk': '現在のペースでは上限到達の心配はありません',
     'dashboard.usageMonthlyTickets': '月間チケット数',
     'dashboard.usageTicketTrend': '今月の発券数',
+    'dashboard.usageGranularityDaily': '日別',
+    'dashboard.usageGranularityWeekly': '週別',
   },
   en: {
     // Common
@@ -2212,6 +2214,8 @@ export const translations = {
     'dashboard.usageNoLimitRisk': 'No risk of reaching the limit at current pace',
     'dashboard.usageMonthlyTickets': 'Monthly Tickets',
     'dashboard.usageTicketTrend': 'Tickets issued this month',
+    'dashboard.usageGranularityDaily': 'Daily',
+    'dashboard.usageGranularityWeekly': 'Weekly',
   },
   ko: {
     // Common
@@ -3313,6 +3317,8 @@ export const translations = {
     'dashboard.usageNoLimitRisk': '현재 속도로는 한도 도달 우려가 없습니다',
     'dashboard.usageMonthlyTickets': '월간 티켓 수',
     'dashboard.usageTicketTrend': '이번 달 발권 수',
+    'dashboard.usageGranularityDaily': '일별',
+    'dashboard.usageGranularityWeekly': '주별',
   },
   'zh-Hans': {
     // Common
@@ -4414,6 +4420,8 @@ export const translations = {
     'dashboard.usageNoLimitRisk': '按当前速度无达到上限的风险',
     'dashboard.usageMonthlyTickets': '月度票券数',
     'dashboard.usageTicketTrend': '本月发放数',
+    'dashboard.usageGranularityDaily': '按日',
+    'dashboard.usageGranularityWeekly': '按周',
   },
   'zh-Hant': {
     // Common
@@ -5515,6 +5523,8 @@ export const translations = {
     'dashboard.usageNoLimitRisk': '按當前速度無達到上限的風險',
     'dashboard.usageMonthlyTickets': '月度票券數',
     'dashboard.usageTicketTrend': '本月發放數',
+    'dashboard.usageGranularityDaily': '按日',
+    'dashboard.usageGranularityWeekly': '按週',
   },
 } as const;
 

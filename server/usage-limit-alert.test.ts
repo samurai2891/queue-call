@@ -405,3 +405,189 @@ describe("Dashboard Usage Trend - Translation keys", () => {
     expect(t("en", "dashboard.usageLimitReached")).toContain("reached");
   });
 });
+
+describe("Dashboard Usage Trend - Weekly aggregation logic", () => {
+  // Mirror the aggregateWeekly helper from Dashboard.tsx
+  function aggregateWeekly(
+    data: Array<{ date: string; actual: number | null; predicted: number | null }>,
+    isCumulative: boolean
+  ) {
+    if (data.length === 0) return [];
+    const weeks: Array<{ date: string; actual: number | null; predicted: number | null }> = [];
+    let weekActual = 0;
+    let weekPredicted = 0;
+    let weekStart = '';
+    let count = 0;
+    let hasActual = false;
+    let hasPredicted = false;
+
+    for (let i = 0; i < data.length; i++) {
+      const item = data[i];
+      if (count === 0) weekStart = item.date;
+
+      if (isCumulative) {
+        if (item.actual !== null) { weekActual = item.actual; hasActual = true; }
+        if (item.predicted !== null) { weekPredicted = item.predicted; hasPredicted = true; }
+      } else {
+        if (item.actual !== null) { weekActual += item.actual; hasActual = true; }
+        if (item.predicted !== null) { weekPredicted += item.predicted; hasPredicted = true; }
+      }
+      count++;
+
+      if (count === 7 || i === data.length - 1) {
+        const weekEnd = item.date;
+        weeks.push({
+          date: count >= 3 ? `${weekStart}~${weekEnd}` : weekEnd,
+          actual: hasActual ? weekActual : null,
+          predicted: hasPredicted ? weekPredicted : null,
+        });
+        weekActual = 0;
+        weekPredicted = 0;
+        count = 0;
+        hasActual = false;
+        hasPredicted = false;
+      }
+    }
+    return weeks;
+  }
+
+  it("aggregates 7 days into 1 week for cumulative data (takes last value)", () => {
+    const daily = [
+      { date: "3/1", actual: 10, predicted: null },
+      { date: "3/2", actual: 11, predicted: null },
+      { date: "3/3", actual: 12, predicted: null },
+      { date: "3/4", actual: 13, predicted: null },
+      { date: "3/5", actual: 14, predicted: null },
+      { date: "3/6", actual: 15, predicted: null },
+      { date: "3/7", actual: 16, predicted: null },
+    ];
+    const weekly = aggregateWeekly(daily, true);
+    expect(weekly).toHaveLength(1);
+    expect(weekly[0].actual).toBe(16); // last value in week
+    expect(weekly[0].date).toBe("3/1~3/7");
+  });
+
+  it("aggregates 7 days into 1 week for non-cumulative data (sums values)", () => {
+    const daily = [
+      { date: "3/1", actual: 5, predicted: null },
+      { date: "3/2", actual: 3, predicted: null },
+      { date: "3/3", actual: 7, predicted: null },
+      { date: "3/4", actual: 2, predicted: null },
+      { date: "3/5", actual: 8, predicted: null },
+      { date: "3/6", actual: 4, predicted: null },
+      { date: "3/7", actual: 6, predicted: null },
+    ];
+    const weekly = aggregateWeekly(daily, false);
+    expect(weekly).toHaveLength(1);
+    expect(weekly[0].actual).toBe(35); // sum of all values
+  });
+
+  it("aggregates 14 days into 2 weeks", () => {
+    const daily = Array.from({ length: 14 }, (_, i) => ({
+      date: `3/${i + 1}`,
+      actual: i + 1,
+      predicted: null,
+    }));
+    const weekly = aggregateWeekly(daily, true);
+    expect(weekly).toHaveLength(2);
+    expect(weekly[0].actual).toBe(7); // last of first week (cumulative)
+    expect(weekly[1].actual).toBe(14); // last of second week
+  });
+
+  it("handles partial week at end (30 days = 4 full weeks + 2 days)", () => {
+    const daily = Array.from({ length: 30 }, (_, i) => ({
+      date: `day${i + 1}`,
+      actual: 1,
+      predicted: null,
+    }));
+    const weekly = aggregateWeekly(daily, false);
+    expect(weekly).toHaveLength(5); // 4 full + 1 partial
+    expect(weekly[0].actual).toBe(7); // sum of 7 days
+    expect(weekly[4].actual).toBe(2); // partial week: 2 days
+  });
+
+  it("handles predicted values in weekly aggregation", () => {
+    const daily = [
+      { date: "3/1", actual: 10, predicted: null },
+      { date: "3/2", actual: 11, predicted: null },
+      { date: "3/3", actual: 12, predicted: null },
+      { date: "3/4", actual: 13, predicted: null },
+      { date: "3/5", actual: 14, predicted: null },
+      { date: "3/6", actual: 15, predicted: 15 },
+      { date: "3/7", actual: null, predicted: 16 },
+      { date: "3/8", actual: null, predicted: 17 },
+    ];
+    const weekly = aggregateWeekly(daily, true);
+    expect(weekly).toHaveLength(2);
+    expect(weekly[0].actual).toBe(15);
+    expect(weekly[0].predicted).toBe(16); // cumulative: takes last predicted in week (3/7=16)
+    expect(weekly[1].actual).toBeNull();
+    expect(weekly[1].predicted).toBe(17);
+  });
+
+  it("returns empty array for empty input", () => {
+    const weekly = aggregateWeekly([], true);
+    expect(weekly).toHaveLength(0);
+  });
+
+  it("handles single day input", () => {
+    const daily = [{ date: "3/1", actual: 5, predicted: null }];
+    const weekly = aggregateWeekly(daily, true);
+    expect(weekly).toHaveLength(1);
+    expect(weekly[0].actual).toBe(5);
+    // Single day: count < 3, so date is just the end date
+    expect(weekly[0].date).toBe("3/1");
+  });
+
+  it("uses range format for weeks with 3+ days", () => {
+    const daily = [
+      { date: "3/1", actual: 1, predicted: null },
+      { date: "3/2", actual: 2, predicted: null },
+      { date: "3/3", actual: 3, predicted: null },
+    ];
+    const weekly = aggregateWeekly(daily, true);
+    expect(weekly[0].date).toBe("3/1~3/3");
+  });
+});
+
+describe("Dashboard Usage Trend - Granularity toggle translation keys", () => {
+  const granularityKeys = [
+    "dashboard.usageGranularityDaily",
+    "dashboard.usageGranularityWeekly",
+  ];
+
+  it("all granularity translation keys exist in all supported locales", () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      for (const key of granularityKeys) {
+        const value = t(locale, key);
+        expect(value).not.toBe(key);
+        expect(value.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("Japanese granularity translations are correct", () => {
+    expect(t("ja", "dashboard.usageGranularityDaily")).toBe("日別");
+    expect(t("ja", "dashboard.usageGranularityWeekly")).toBe("週別");
+  });
+
+  it("English granularity translations are correct", () => {
+    expect(t("en", "dashboard.usageGranularityDaily")).toBe("Daily");
+    expect(t("en", "dashboard.usageGranularityWeekly")).toBe("Weekly");
+  });
+
+  it("Korean granularity translations are correct", () => {
+    expect(t("ko", "dashboard.usageGranularityDaily")).toBe("일별");
+    expect(t("ko", "dashboard.usageGranularityWeekly")).toBe("주별");
+  });
+
+  it("zh-Hans granularity translations are correct", () => {
+    expect(t("zh-Hans", "dashboard.usageGranularityDaily")).toBe("按日");
+    expect(t("zh-Hans", "dashboard.usageGranularityWeekly")).toBe("按周");
+  });
+
+  it("zh-Hant granularity translations are correct", () => {
+    expect(t("zh-Hant", "dashboard.usageGranularityDaily")).toBe("按日");
+    expect(t("zh-Hant", "dashboard.usageGranularityWeekly")).toBe("按週");
+  });
+});
