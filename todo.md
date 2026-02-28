@@ -1575,3 +1575,8 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] Reactフックルール違反: JoinQueue.tsx, KioskDisplay.tsxの追加修正完了（BUG-004, BUG-005）
 - [ ] Stripe Sandboxクレーム — ユーザー操作必要（期限3/14）
 - [ ] SMS実送信テスト — Twilio設定済み電話番号で確認必要
+
+---
+
+## BUG-006: Staff.tsx — `<p>` cannot contain nested `<div>`
+- [x] Staff.tsxで`<p>`タグ内に`<div>`がネストされている箇所を特定し修正 — AlertDialogDescriptionにasChildを追加し3箇所修正

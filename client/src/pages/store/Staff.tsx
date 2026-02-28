@@ -1181,15 +1181,17 @@ function StaffContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('staff.skip')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              <div className="space-y-3 mt-2">
-                <Label htmlFor="skipReason">{t('staff.reorderReason')}</Label>
-                <Input
-                  id="skipReason"
-                  placeholder={t('staff.reorderReasonPlaceholder')}
-                  value={skipReason}
-                  onChange={(e) => setSkipReason(e.target.value)}
-                />
+            <AlertDialogDescription asChild>
+              <div className="text-muted-foreground text-sm">
+                <div className="space-y-3 mt-2">
+                  <Label htmlFor="skipReason">{t('staff.reorderReason')}</Label>
+                  <Input
+                    id="skipReason"
+                    placeholder={t('staff.reorderReasonPlaceholder')}
+                    value={skipReason}
+                    onChange={(e) => setSkipReason(e.target.value)}
+                  />
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1207,15 +1209,17 @@ function StaffContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('staff.reorderConfirm')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              <div className="space-y-3 mt-2">
-                <Label htmlFor="reorderReason">{t('staff.reorderReason')}</Label>
-                <Input
-                  id="reorderReason"
-                  placeholder={t('staff.reorderReasonPlaceholder')}
-                  value={reorderReason}
-                  onChange={(e) => setReorderReason(e.target.value)}
-                />
+            <AlertDialogDescription asChild>
+              <div className="text-muted-foreground text-sm">
+                <div className="space-y-3 mt-2">
+                  <Label htmlFor="reorderReason">{t('staff.reorderReason')}</Label>
+                  <Input
+                    id="reorderReason"
+                    placeholder={t('staff.reorderReasonPlaceholder')}
+                    value={reorderReason}
+                    onChange={(e) => setReorderReason(e.target.value)}
+                  />
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1265,18 +1269,20 @@ function StaffContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('staff.bulkSkip')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('staff.bulkSkipConfirm')}
-              <div className="space-y-3 mt-3">
-                <Label htmlFor="bulkSkipReason">{t('staff.reorderReason')}</Label>
-                <Input
-                  id="bulkSkipReason"
-                  placeholder={t('staff.reorderReasonPlaceholder')}
-                  value={bulkSkipReason}
-                  onChange={(e) => setBulkSkipReason(e.target.value)}
-                />
+            <AlertDialogDescription asChild>
+              <div className="text-muted-foreground text-sm">
+                {t('staff.bulkSkipConfirm')}
+                <div className="space-y-3 mt-3">
+                  <Label htmlFor="bulkSkipReason">{t('staff.reorderReason')}</Label>
+                  <Input
+                    id="bulkSkipReason"
+                    placeholder={t('staff.reorderReasonPlaceholder')}
+                    value={bulkSkipReason}
+                    onChange={(e) => setBulkSkipReason(e.target.value)}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground mt-2 block">{t('staff.bulkActionDesc')}</span>
               </div>
-              <span className="text-xs text-muted-foreground mt-2 block">{t('staff.bulkActionDesc')}</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
