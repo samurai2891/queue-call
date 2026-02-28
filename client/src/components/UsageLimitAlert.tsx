@@ -8,7 +8,11 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 import {
   AlertTriangle,
   TrendingUp,
@@ -19,6 +23,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useLocale } from '@/contexts/LocaleContext';
+import type { TranslationKey } from '../../../shared/i18n/translations';
 import { useLocation } from 'wouter';
 import { trpc } from '@/lib/trpc';
 
@@ -52,6 +57,7 @@ interface DonutChartProps {
   label: string;
   current: number;
   limit: number;
+  tooltipText: string;
 }
 
 function DonutChart({
@@ -63,6 +69,7 @@ function DonutChart({
   label,
   current,
   limit,
+  tooltipText,
 }: DonutChartProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -73,7 +80,6 @@ function DonutChart({
   const [animatedOffset, setAnimatedOffset] = useState(circumference);
 
   useEffect(() => {
-    // 少し遅延してアニメーション開始
     const timer = setTimeout(() => {
       setAnimatedOffset(dashOffset);
     }, 150);
@@ -95,57 +101,64 @@ function DonutChart({
     : 'text-amber-600 dark:text-amber-400';
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg
-          width={size}
-          height={size}
-          viewBox={`0 0 ${size} ${size}`}
-          className="transform -rotate-90"
-        >
-          {/* 背景トラック */}
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            strokeWidth={strokeWidth}
-            className={trackColor}
-          />
-          {/* プログレス弧 */}
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            className={progressColor}
-            strokeDasharray={circumference}
-            strokeDashoffset={animatedOffset}
-            style={{
-              transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
-          />
-        </svg>
-        {/* 中央のパーセンテージ表示 */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`text-lg font-bold tabular-nums leading-none ${textColor}`}>
-            {percentage}%
-          </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex flex-col items-center gap-2 cursor-default">
+          <div className="relative" style={{ width: size, height: size }}>
+            <svg
+              width={size}
+              height={size}
+              viewBox={`0 0 ${size} ${size}`}
+              className="transform -rotate-90"
+            >
+              {/* 背景トラック */}
+              <circle
+                cx={center}
+                cy={center}
+                r={radius}
+                fill="none"
+                strokeWidth={strokeWidth}
+                className={trackColor}
+              />
+              {/* プログレス弧 */}
+              <circle
+                cx={center}
+                cy={center}
+                r={radius}
+                fill="none"
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
+                className={progressColor}
+                strokeDasharray={circumference}
+                strokeDashoffset={animatedOffset}
+                style={{
+                  transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
+              />
+            </svg>
+            {/* 中央のパーセンテージ表示 */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className={`text-lg font-bold tabular-nums leading-none ${textColor}`}>
+                {percentage}%
+              </span>
+            </div>
+          </div>
+          {/* ラベルと数値 */}
+          <div className="flex flex-col items-center gap-0.5">
+            <div className="flex items-center gap-1">
+              <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
+              <span className="text-xs font-medium text-foreground">{label}</span>
+            </div>
+            <span className={`text-xs font-semibold tabular-nums ${textColor}`}>
+              {current} / {limit}
+            </span>
+          </div>
         </div>
-      </div>
-      {/* ラベルと数値 */}
-      <div className="flex flex-col items-center gap-0.5">
-        <div className="flex items-center gap-1">
-          <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
-          <span className="text-xs font-medium text-foreground">{label}</span>
-        </div>
-        <span className={`text-xs font-semibold tabular-nums ${textColor}`}>
-          {current} / {limit}
-        </span>
-      </div>
-    </div>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={6}>
+        {tooltipText}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -227,6 +240,20 @@ function getDismissedLimits(storeId: number): string[] {
   } catch {
     return [];
   }
+}
+
+// ─── ツールチップテキスト生成ヘルパー ───
+
+function getTooltipText(
+  t: (key: TranslationKey) => string,
+  current: number,
+  limit: number,
+): string {
+  const remaining = limit - current;
+  if (remaining <= 0) {
+    return t('usageLimitAlert.tooltipAtLimit');
+  }
+  return t('usageLimitAlert.tooltipRemaining').replace('{remaining}', String(remaining));
 }
 
 // ─── メインコンポーネント ───
@@ -389,6 +416,7 @@ export function UsageLimitAlert({ storeId }: UsageLimitAlertProps) {
                 label={item.label}
                 current={item.current}
                 limit={item.limit}
+                tooltipText={getTooltipText(t, item.current, item.limit)}
               />
             ))}
           </div>

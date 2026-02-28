@@ -1094,6 +1094,8 @@ export const translations = {
     'usageLimitAlert.upgradeDescription': '上位プランにアップグレードすると、メニュー・スタッフ・フィードの登録数が無制限になり、さらに多くの機能が利用できます。',
     'usageLimitAlert.dismissButton': 'あとで確認する',
     'usageLimitAlert.upgradeButton': 'プランをアップグレード',
+    'usageLimitAlert.tooltipRemaining': 'あと{remaining}件追加可能',
+    'usageLimitAlert.tooltipAtLimit': '上限に達しています。追加するにはアップグレードが必要です',
   },
   en: {
     // Common
@@ -2176,6 +2178,8 @@ export const translations = {
     'usageLimitAlert.upgradeDescription': 'Upgrade to a higher plan for unlimited menu items, staff accounts, feed posts, and more features.',
     'usageLimitAlert.dismissButton': 'Remind me later',
     'usageLimitAlert.upgradeButton': 'Upgrade Plan',
+    'usageLimitAlert.tooltipRemaining': '{remaining} more can be added',
+    'usageLimitAlert.tooltipAtLimit': 'Limit reached. Upgrade to add more',
   },
   ko: {
     // Common
@@ -3259,6 +3263,8 @@ export const translations = {
     'usageLimitAlert.upgradeDescription': '상위 플랜으로 업그레이드하면 메뉴, 스태프, 피드 등록 수가 무제한이 되며 더 많은 기능을 이용할 수 있습니다.',
     'usageLimitAlert.dismissButton': '나중에 확인',
     'usageLimitAlert.upgradeButton': '플랜 업그레이드',
+    'usageLimitAlert.tooltipRemaining': '{remaining}개 더 추가 가능',
+    'usageLimitAlert.tooltipAtLimit': '한도에 도달했습니다. 추가하려면 업그레이드가 필요합니다',
   },
   'zh-Hans': {
     // Common
@@ -4342,6 +4348,8 @@ export const translations = {
     'usageLimitAlert.upgradeDescription': '升级到更高方案可获得无限菜单、员工、动态注册数以及更多功能。',
     'usageLimitAlert.dismissButton': '稍后再看',
     'usageLimitAlert.upgradeButton': '升级方案',
+    'usageLimitAlert.tooltipRemaining': '还可添加{remaining}个',
+    'usageLimitAlert.tooltipAtLimit': '已达上限，需要升级才能添加更多',
   },
   'zh-Hant': {
     // Common
@@ -5425,6 +5433,8 @@ export const translations = {
     'usageLimitAlert.upgradeDescription': '升級到更高方案可獲得無限菜單、員工、動態註冊數以及更多功能。',
     'usageLimitAlert.dismissButton': '稍後再看',
     'usageLimitAlert.upgradeButton': '升級方案',
+    'usageLimitAlert.tooltipRemaining': '還可新增{remaining}個',
+    'usageLimitAlert.tooltipAtLimit': '已達上限，需要升級才能新增更多',
   },
 } as const;
 

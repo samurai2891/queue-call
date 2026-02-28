@@ -11,7 +11,6 @@ describe("UsageLimitAlert - Plan limits for alert thresholds", () => {
     const info = getPlanLimitsInfo("free");
     expect(info.menuLimit).toBe(5);
     expect(info.staffLimit).toBe(1);
-    // feed uses the same limit as menu
     expect(info.menuLimit).toBe(5);
   });
 
@@ -29,12 +28,10 @@ describe("UsageLimitAlert - Plan limits for alert thresholds", () => {
 
   it("getPlanUsage response shape includes all fields needed for alert", () => {
     const info = getPlanLimitsInfo("free");
-    // Verify all fields that the alert component depends on exist
     expect(info).toHaveProperty("planId");
     expect(info).toHaveProperty("planName");
     expect(info).toHaveProperty("menuLimit");
     expect(info).toHaveProperty("staffLimit");
-    // Verify planId is correct
     expect(info.planId).toBe("free");
   });
 });
@@ -44,8 +41,6 @@ describe("UsageLimitAlert - Alert threshold calculation logic", () => {
 
   it("correctly identifies when menu usage is at 80% threshold on free plan", () => {
     const info = getPlanLimitsInfo("free");
-    // Free plan: menuLimit = 5
-    // 4 items = 80% → should trigger
     const menuUsage = 4;
     const percentage = menuUsage / info.menuLimit!;
     expect(percentage).toBeGreaterThanOrEqual(WARNING_THRESHOLD);
@@ -53,8 +48,6 @@ describe("UsageLimitAlert - Alert threshold calculation logic", () => {
 
   it("correctly identifies when menu usage is below 80% threshold on free plan", () => {
     const info = getPlanLimitsInfo("free");
-    // Free plan: menuLimit = 5
-    // 3 items = 60% → should NOT trigger
     const menuUsage = 3;
     const percentage = menuUsage / info.menuLimit!;
     expect(percentage).toBeLessThan(WARNING_THRESHOLD);
@@ -62,8 +55,6 @@ describe("UsageLimitAlert - Alert threshold calculation logic", () => {
 
   it("correctly identifies when staff usage is at limit on free plan", () => {
     const info = getPlanLimitsInfo("free");
-    // Free plan: staffLimit = 1
-    // 1 staff = 100% → should trigger
     const staffUsage = 1;
     const percentage = staffUsage / info.staffLimit!;
     expect(percentage).toBeGreaterThanOrEqual(WARNING_THRESHOLD);
@@ -71,8 +62,6 @@ describe("UsageLimitAlert - Alert threshold calculation logic", () => {
 
   it("correctly identifies when staff usage is at 80% threshold on standard plan", () => {
     const info = getPlanLimitsInfo("standard");
-    // Standard plan: staffLimit = 3
-    // 3 staff = 100% → should trigger
     const staffUsage = 3;
     const percentage = staffUsage / info.staffLimit!;
     expect(percentage).toBeGreaterThanOrEqual(WARNING_THRESHOLD);
@@ -80,14 +69,12 @@ describe("UsageLimitAlert - Alert threshold calculation logic", () => {
 
   it("does not trigger for pro plan (no numeric limits)", () => {
     const info = getPlanLimitsInfo("pro");
-    // Pro plan has null limits → no percentage calculation possible
     expect(info.menuLimit).toBeNull();
     expect(info.staffLimit).toBeNull();
   });
 });
 
 describe("UsageLimitAlert - Donut chart SVG calculation", () => {
-  // Mirror the DonutChart component's SVG math
   const size = 96;
   const strokeWidth = 8;
   const radius = (size - strokeWidth) / 2;
@@ -101,7 +88,6 @@ describe("UsageLimitAlert - Donut chart SVG calculation", () => {
   it("calculates correct dashOffset for 80% usage", () => {
     const percentage = 80;
     const dashOffset = circumference - (percentage / 100) * circumference;
-    // 20% of circumference should remain as gap
     expect(dashOffset).toBeCloseTo(circumference * 0.2, 1);
   });
 
@@ -118,7 +104,6 @@ describe("UsageLimitAlert - Donut chart SVG calculation", () => {
   });
 
   it("percentage is capped at 100 even if usage exceeds limit", () => {
-    // Simulating the Math.min(Math.round(pct * 100), 100) logic
     const current = 7;
     const limit = 5;
     const pct = current / limit;
@@ -149,6 +134,60 @@ describe("UsageLimitAlert - Average usage bar calculation", () => {
   });
 });
 
+describe("UsageLimitAlert - Tooltip text generation", () => {
+  // Mirror the getTooltipText helper logic
+  function getTooltipText(locale: string, current: number, limit: number): string {
+    const remaining = limit - current;
+    if (remaining <= 0) {
+      return t(locale as any, "usageLimitAlert.tooltipAtLimit");
+    }
+    return t(locale as any, "usageLimitAlert.tooltipRemaining").replace("{remaining}", String(remaining));
+  }
+
+  it("shows remaining count when below limit (Japanese)", () => {
+    const text = getTooltipText("ja", 3, 5);
+    expect(text).toContain("2");
+    expect(text).toContain("追加可能");
+  });
+
+  it("shows remaining count when below limit (English)", () => {
+    const text = getTooltipText("en", 3, 5);
+    expect(text).toContain("2");
+    expect(text).toContain("more can be added");
+  });
+
+  it("shows at-limit message when current equals limit (Japanese)", () => {
+    const text = getTooltipText("ja", 5, 5);
+    expect(text).toContain("上限");
+    expect(text).toContain("アップグレード");
+  });
+
+  it("shows at-limit message when current equals limit (English)", () => {
+    const text = getTooltipText("en", 5, 5);
+    expect(text).toContain("Limit reached");
+    expect(text).toContain("Upgrade");
+  });
+
+  it("shows at-limit message when current exceeds limit", () => {
+    const text = getTooltipText("ja", 7, 5);
+    expect(text).toContain("上限");
+  });
+
+  it("shows remaining=1 when one slot left", () => {
+    const text = getTooltipText("ja", 4, 5);
+    expect(text).toContain("1");
+    expect(text).toContain("追加可能");
+  });
+
+  it("correctly calculates remaining for standard plan staff limit", () => {
+    const info = getPlanLimitsInfo("standard");
+    // Standard plan: staffLimit = 3, simulate 2 staff
+    const text = getTooltipText("ja", 2, info.staffLimit!);
+    expect(text).toContain("1");
+    expect(text).toContain("追加可能");
+  });
+});
+
 describe("UsageLimitAlert - Translation keys", () => {
   const requiredKeys = [
     "usageLimitAlert.titleApproaching",
@@ -162,12 +201,14 @@ describe("UsageLimitAlert - Translation keys", () => {
     "usageLimitAlert.upgradeDescription",
     "usageLimitAlert.dismissButton",
     "usageLimitAlert.upgradeButton",
+    "usageLimitAlert.tooltipRemaining",
+    "usageLimitAlert.tooltipAtLimit",
   ];
 
   it("all required translation keys exist in Japanese", () => {
     for (const key of requiredKeys) {
       const value = t("ja", key);
-      expect(value).not.toBe(key); // Should not fall back to key itself
+      expect(value).not.toBe(key);
       expect(value.length).toBeGreaterThan(0);
     }
   });
@@ -190,11 +231,20 @@ describe("UsageLimitAlert - Translation keys", () => {
     }
   });
 
+  it("tooltipRemaining contains {remaining} placeholder in all locales", () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      const value = t(locale, "usageLimitAlert.tooltipRemaining");
+      expect(value).toContain("{remaining}");
+    }
+  });
+
   it("Japanese translations contain expected content", () => {
     expect(t("ja", "usageLimitAlert.titleApproaching")).toContain("上限");
     expect(t("ja", "usageLimitAlert.titleAtLimit")).toContain("上限");
     expect(t("ja", "usageLimitAlert.upgradeButton")).toContain("アップグレード");
     expect(t("ja", "usageLimitAlert.dismissButton")).toContain("あとで");
+    expect(t("ja", "usageLimitAlert.tooltipRemaining")).toContain("追加可能");
+    expect(t("ja", "usageLimitAlert.tooltipAtLimit")).toContain("アップグレード");
   });
 
   it("English translations contain expected content", () => {
@@ -202,5 +252,7 @@ describe("UsageLimitAlert - Translation keys", () => {
     expect(t("en", "usageLimitAlert.titleAtLimit")).toContain("limit");
     expect(t("en", "usageLimitAlert.upgradeButton")).toContain("Upgrade");
     expect(t("en", "usageLimitAlert.dismissButton")).toContain("later");
+    expect(t("en", "usageLimitAlert.tooltipRemaining")).toContain("more can be added");
+    expect(t("en", "usageLimitAlert.tooltipAtLimit")).toContain("Upgrade");
   });
 });
