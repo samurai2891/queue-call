@@ -579,15 +579,26 @@ function SmsBalanceCard({ storeId, autoChargeEnabled, autoChargeThreshold, autoC
               ))}
             </div>
             {/* 全取引履歴へのリンク */}
-            <Button
-              variant="link"
-              size="sm"
-              className="mt-2 p-0 h-auto text-xs"
-              onClick={() => navigate(`/admin/sms-transactions`)}
-            >
-              {t('settings.smsViewAllTransactions')}
-              <ExternalLink className="h-3 w-3 ml-1" />
-            </Button>
+            <div className="flex items-center gap-3 mt-2">
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 h-auto text-xs"
+                onClick={() => navigate(`/admin/sms-transactions`)}
+              >
+                {t('settings.smsViewAllTransactions')}
+                <ExternalLink className="h-3 w-3 ml-1" />
+              </Button>
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 h-auto text-xs"
+                onClick={() => navigate(`/admin/sms-analytics`)}
+              >
+                {t('settings.smsAnalyticsViewDashboard')}
+                <ExternalLink className="h-3 w-3 ml-1" />
+              </Button>
+            </div>
           </div>
         )}
         

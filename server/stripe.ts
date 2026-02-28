@@ -446,4 +446,152 @@ export function constructWebhookEvent(
   return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
 }
 
+/**
+ * SMS分析データを取得（日別・週別・月別の集計）
+ */
+export async function getSmsAnalytics(
+  storeId: number,
+  period: 'daily' | 'weekly' | 'monthly' = 'daily',
+  days = 30
+): Promise<{
+  dataPoints: Array<{
+    date: string;
+    sendCount: number;
+    chargeCount: number;
+    sendCost: number;
+    chargeAmount: number;
+  }>;
+  summary: {
+    totalSendCount: number;
+    totalChargeCount: number;
+    totalSendCost: number;
+    totalChargeAmount: number;
+    avgDailySendCount: number;
+    avgDailySendCost: number;
+  };
+}> {
+  const db = await getDb();
+  if (!db) return { dataPoints: [], summary: { totalSendCount: 0, totalChargeCount: 0, totalSendCost: 0, totalChargeAmount: 0, avgDailySendCount: 0, avgDailySendCost: 0 } };
+
+  // 期間に応じた日数を設定
+  const lookbackDays = period === 'monthly' ? Math.max(days, 365) : period === 'weekly' ? Math.max(days, 90) : days;
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - lookbackDays);
+
+  // 生データを取得（日別集計）
+  const rawData = await db
+    .select({
+      date: sql<string>`DATE(${smsTransactions.createdAt})`,
+      type: smsTransactions.type,
+      count: sql<number>`COUNT(*)`,
+      totalAmount: sql<number>`SUM(ABS(${smsTransactions.amount}))`,
+    })
+    .from(smsTransactions)
+    .where(
+      and(
+        eq(smsTransactions.storeId, storeId),
+        sql`${smsTransactions.createdAt} >= ${startDate}`
+      )
+    )
+    .groupBy(sql`DATE(${smsTransactions.createdAt})`, smsTransactions.type)
+    .orderBy(sql`DATE(${smsTransactions.createdAt}) ASC`);
+
+  // 日別データをマップに変換
+  const dailyMap = new Map<string, { sendCount: number; chargeCount: number; sendCost: number; chargeAmount: number }>();
+
+  for (const row of rawData) {
+    const dateStr = String(row.date);
+    if (!dailyMap.has(dateStr)) {
+      dailyMap.set(dateStr, { sendCount: 0, chargeCount: 0, sendCost: 0, chargeAmount: 0 });
+    }
+    const entry = dailyMap.get(dateStr)!;
+    const count = Number(row.count);
+    const amount = Number(row.totalAmount);
+
+    if (row.type === 'consume') {
+      entry.sendCount += count;
+      entry.sendCost += amount;
+    } else if (row.type === 'charge') {
+      entry.chargeCount += count;
+      entry.chargeAmount += amount;
+    }
+  }
+
+  // 期間に応じてグループ化
+  let dataPoints: Array<{ date: string; sendCount: number; chargeCount: number; sendCost: number; chargeAmount: number }>;
+
+  if (period === 'daily') {
+    // 日別: 欠損日も埋める
+    dataPoints = [];
+    const cursor = new Date(startDate);
+    const today = new Date();
+    while (cursor <= today) {
+      const dateStr = cursor.toISOString().slice(0, 10);
+      const entry = dailyMap.get(dateStr) || { sendCount: 0, chargeCount: 0, sendCost: 0, chargeAmount: 0 };
+      dataPoints.push({ date: dateStr, ...entry });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  } else if (period === 'weekly') {
+    // 週別: ISO週番号でグループ化
+    const weeklyMap = new Map<string, { sendCount: number; chargeCount: number; sendCost: number; chargeAmount: number }>();
+    Array.from(dailyMap.entries()).forEach(([dateStr, entry]) => {
+      const d = new Date(dateStr);
+      // 週の開始日（月曜日）を計算
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const weekStart = new Date(d);
+      weekStart.setDate(diff);
+      const weekKey = weekStart.toISOString().slice(0, 10);
+
+      if (!weeklyMap.has(weekKey)) {
+        weeklyMap.set(weekKey, { sendCount: 0, chargeCount: 0, sendCost: 0, chargeAmount: 0 });
+      }
+      const weekEntry = weeklyMap.get(weekKey)!;
+      weekEntry.sendCount += entry.sendCount;
+      weekEntry.chargeCount += entry.chargeCount;
+      weekEntry.sendCost += entry.sendCost;
+      weekEntry.chargeAmount += entry.chargeAmount;
+    });
+    dataPoints = Array.from(weeklyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, entry]) => ({ date, ...entry }));
+  } else {
+    // 月別: YYYY-MMでグループ化
+    const monthlyMap = new Map<string, { sendCount: number; chargeCount: number; sendCost: number; chargeAmount: number }>();
+    Array.from(dailyMap.entries()).forEach(([dateStr, entry]) => {
+      const monthKey = dateStr.slice(0, 7);
+      if (!monthlyMap.has(monthKey)) {
+        monthlyMap.set(monthKey, { sendCount: 0, chargeCount: 0, sendCost: 0, chargeAmount: 0 });
+      }
+      const monthEntry = monthlyMap.get(monthKey)!;
+      monthEntry.sendCount += entry.sendCount;
+      monthEntry.chargeCount += entry.chargeCount;
+      monthEntry.sendCost += entry.sendCost;
+      monthEntry.chargeAmount += entry.chargeAmount;
+    });
+    dataPoints = Array.from(monthlyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, entry]) => ({ date, ...entry }));
+  }
+
+  // サマリー計算
+  const totalSendCount = dataPoints.reduce((sum, d) => sum + d.sendCount, 0);
+  const totalChargeCount = dataPoints.reduce((sum, d) => sum + d.chargeCount, 0);
+  const totalSendCost = dataPoints.reduce((sum, d) => sum + d.sendCost, 0);
+  const totalChargeAmount = dataPoints.reduce((sum, d) => sum + d.chargeAmount, 0);
+  const activeDays = dataPoints.filter(d => d.sendCount > 0).length || 1;
+
+  return {
+    dataPoints,
+    summary: {
+      totalSendCount,
+      totalChargeCount,
+      totalSendCost,
+      totalChargeAmount,
+      avgDailySendCount: Math.round((totalSendCount / activeDays) * 10) / 10,
+      avgDailySendCost: Math.round((totalSendCost / activeDays) * 10) / 10,
+    },
+  };
+}
+
 export { stripe };

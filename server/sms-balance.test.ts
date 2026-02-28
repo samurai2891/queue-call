@@ -420,4 +420,117 @@ describe('SMS Balance Functions', () => {
     });
   });
 
+  describe('getSmsAnalytics', () => {
+    it('should return empty data when db is not available', async () => {
+      vi.mocked(getDb).mockResolvedValueOnce(null as any);
+
+      const result = await stripeModule.getSmsAnalytics(1, 'daily', 30);
+
+      expect(result.dataPoints).toEqual([]);
+      expect(result.summary.totalSendCount).toBe(0);
+      expect(result.summary.totalChargeCount).toBe(0);
+      expect(result.summary.totalSendCost).toBe(0);
+      expect(result.summary.totalChargeAmount).toBe(0);
+      expect(result.summary.avgDailySendCount).toBe(0);
+      expect(result.summary.avgDailySendCost).toBe(0);
+    });
+
+    it('should aggregate daily data correctly', async () => {
+      const mockRawData = [
+        { date: '2026-02-25', type: 'consume', count: 5, totalAmount: 100 },
+        { date: '2026-02-25', type: 'charge', count: 1, totalAmount: 1000 },
+        { date: '2026-02-26', type: 'consume', count: 3, totalAmount: 60 },
+      ];
+
+      mockDb.groupBy = vi.fn().mockReturnThis();
+      mockDb.orderBy.mockResolvedValueOnce(mockRawData);
+
+      const result = await stripeModule.getSmsAnalytics(1, 'daily', 30);
+
+      expect(result.dataPoints.length).toBeGreaterThan(0);
+      expect(result.summary.totalSendCount).toBe(8);
+      expect(result.summary.totalChargeCount).toBe(1);
+      expect(result.summary.totalSendCost).toBe(160);
+      expect(result.summary.totalChargeAmount).toBe(1000);
+    });
+
+    it('should aggregate weekly data correctly', async () => {
+      const mockRawData = [
+        { date: '2026-02-23', type: 'consume', count: 10, totalAmount: 200 },
+        { date: '2026-02-24', type: 'consume', count: 5, totalAmount: 100 },
+        { date: '2026-02-24', type: 'charge', count: 2, totalAmount: 2000 },
+      ];
+
+      mockDb.groupBy = vi.fn().mockReturnThis();
+      mockDb.orderBy.mockResolvedValueOnce(mockRawData);
+
+      const result = await stripeModule.getSmsAnalytics(1, 'weekly', 90);
+
+      expect(result.dataPoints.length).toBeGreaterThan(0);
+      expect(result.summary.totalSendCount).toBe(15);
+      expect(result.summary.totalChargeCount).toBe(2);
+      expect(result.summary.totalSendCost).toBe(300);
+      expect(result.summary.totalChargeAmount).toBe(2000);
+    });
+
+    it('should aggregate monthly data correctly', async () => {
+      const mockRawData = [
+        { date: '2026-01-15', type: 'consume', count: 20, totalAmount: 400 },
+        { date: '2026-01-20', type: 'charge', count: 1, totalAmount: 1000 },
+        { date: '2026-02-10', type: 'consume', count: 15, totalAmount: 300 },
+        { date: '2026-02-15', type: 'charge', count: 2, totalAmount: 3000 },
+      ];
+
+      mockDb.groupBy = vi.fn().mockReturnThis();
+      mockDb.orderBy.mockResolvedValueOnce(mockRawData);
+
+      const result = await stripeModule.getSmsAnalytics(1, 'monthly', 365);
+
+      expect(result.dataPoints.length).toBeGreaterThan(0);
+      expect(result.summary.totalSendCount).toBe(35);
+      expect(result.summary.totalChargeCount).toBe(3);
+      expect(result.summary.totalSendCost).toBe(700);
+      expect(result.summary.totalChargeAmount).toBe(4000);
+    });
+
+    it('should calculate average daily send count and cost', async () => {
+      const mockRawData = [
+        { date: '2026-02-25', type: 'consume', count: 10, totalAmount: 200 },
+        { date: '2026-02-26', type: 'consume', count: 20, totalAmount: 400 },
+      ];
+
+      mockDb.groupBy = vi.fn().mockReturnThis();
+      mockDb.orderBy.mockResolvedValueOnce(mockRawData);
+
+      const result = await stripeModule.getSmsAnalytics(1, 'daily', 30);
+
+      // 2 active days, 30 total sends, 600 total cost
+      expect(result.summary.avgDailySendCount).toBe(15);
+      expect(result.summary.avgDailySendCost).toBe(300);
+    });
+
+    it('should handle empty transaction data', async () => {
+      mockDb.groupBy = vi.fn().mockReturnThis();
+      mockDb.orderBy.mockResolvedValueOnce([]);
+
+      const result = await stripeModule.getSmsAnalytics(1, 'daily', 30);
+
+      // Should still have data points (filled dates) but all zeros
+      expect(result.dataPoints.length).toBeGreaterThan(0);
+      expect(result.summary.totalSendCount).toBe(0);
+      expect(result.summary.totalChargeCount).toBe(0);
+    });
+
+    it('should use default period and days when not specified', async () => {
+      mockDb.groupBy = vi.fn().mockReturnThis();
+      mockDb.orderBy.mockResolvedValueOnce([]);
+
+      const result = await stripeModule.getSmsAnalytics(1);
+
+      expect(result).toBeDefined();
+      expect(result.dataPoints).toBeDefined();
+      expect(result.summary).toBeDefined();
+    });
+  });
+
 });

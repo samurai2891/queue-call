@@ -9,7 +9,7 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { notifyTicketCalled } from "./notifications";
 import { broadcastQueueUpdate, broadcastTicketUpdate, broadcastIntakeStatus } from "./sse";
-import { createCheckoutSession, getSmsBalance, getSmsTransactions, CHARGE_PLANS, SMS_COST_PER_MESSAGE } from "./stripe";
+import { createCheckoutSession, getSmsBalance, getSmsTransactions, getSmsAnalytics, CHARGE_PLANS, SMS_COST_PER_MESSAGE } from "./stripe";
 import { checkBusinessHours } from "../shared/businessHours";
 
 
@@ -2058,6 +2058,22 @@ const stripeRouter = router({
       // UIの 'send' を DBの 'consume' にマッピング
       const dbType = input.type === 'send' ? 'consume' : input.type;
       return await getSmsTransactions(input.storeId, input.limit, input.offset, dbType);
+    }),
+
+  // Get SMS analytics data (protected)
+  getSmsAnalytics: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      period: z.enum(['daily', 'weekly', 'monthly']).optional(),
+      days: z.number().min(7).max(365).optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await db.getStoreById(input.storeId);
+      if (!store || store.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      return await getSmsAnalytics(input.storeId, input.period, input.days);
     }),
 
   // Create checkout session for SMS charge (protected)
