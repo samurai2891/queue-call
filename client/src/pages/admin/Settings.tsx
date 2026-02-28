@@ -107,7 +107,8 @@ function SmsBalanceCard({ storeId, autoChargeEnabled, autoChargeThreshold, autoC
   const [showChargePrompt, setShowChargePrompt] = useState(false);
   const [chargePromptDismissed, setChargePromptDismissed] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
-  const [lowBalanceThreshold, setLowBalanceThreshold] = useState(1000);
+  // 低残高閾値: 自動チャージ設定の閾値と連動（未設定時はデフォルト1000円）
+  const lowBalanceThreshold = autoChargeEnabled && autoChargeThreshold ? autoChargeThreshold : 1000;
   const [chargeResult, setChargeResult] = useState<'success' | 'canceled' | null>(null);
   const prevBalanceRef = useRef<number | null>(null);
   const shouldAnimateRef = useRef(false);
@@ -327,19 +328,34 @@ function SmsBalanceCard({ storeId, autoChargeEnabled, autoChargeThreshold, autoC
           </p>
 
           {isLowBalance && (
-            <div className={`mt-2 p-3 rounded-lg ${isCriticalBalance ? 'bg-destructive/10 border border-destructive/30' : 'bg-yellow-50 border border-yellow-200'}`}>
-              <p className={`text-sm font-medium ${isCriticalBalance ? 'text-destructive' : 'text-yellow-800'}`}>
+            <div className={`mt-2 p-3 rounded-lg ${isCriticalBalance ? 'bg-destructive/10 border border-destructive/30' : 'bg-yellow-50 border border-yellow-200 dark:bg-yellow-950/30 dark:border-yellow-800'}`}>
+              <p className={`text-sm font-medium ${isCriticalBalance ? 'text-destructive' : 'text-yellow-800 dark:text-yellow-200'}`}>
                 {isCriticalBalance
                   ? t('settings.smsBalanceCritical')
                   : t('settings.smsBalanceLow')}
-
               </p>
-              <p className={`text-xs mt-1 ${isCriticalBalance ? 'text-destructive/80' : 'text-yellow-700'}`}>
+              <p className={`text-xs mt-1 ${isCriticalBalance ? 'text-destructive/80' : 'text-yellow-700 dark:text-yellow-300'}`}>
                 {isCriticalBalance
                   ? t('settings.smsBalanceCriticalHelp')
                   : t('settings.smsBalanceLowHelp')}
-
               </p>
+              {/* 閾値情報 */}
+              <p className={`text-xs mt-1 ${isCriticalBalance ? 'text-destructive/60' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                {formatMessage('settings.smsLowBalanceThresholdInfo', { threshold: lowBalanceThreshold.toLocaleString() })}
+              </p>
+              {/* 自動チャージ未設定時の案内 */}
+              {!autoChargeEnabled && (
+                <p className={`text-xs mt-1 italic ${isCriticalBalance ? 'text-destructive/60' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                  {t('settings.smsAutoChargeRecommendation')}
+                </p>
+              )}
+              {/* 自動チャージ有効時のステータス表示 */}
+              {autoChargeEnabled && (
+                <div className={`text-xs mt-1 flex items-center gap-1 ${isCriticalBalance ? 'text-destructive/60' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                  <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+                  {t('settings.smsAutoChargeActiveStatus')}
+                </div>
+              )}
               <Button
                 size="sm"
                 variant={isCriticalBalance ? 'destructive' : 'outline'}
@@ -348,7 +364,6 @@ function SmsBalanceCard({ storeId, autoChargeEnabled, autoChargeThreshold, autoC
               >
                 <CreditCard className="h-4 w-4 mr-2" />
                 {t('settings.smsChargeNow')}
-
               </Button>
             </div>
           )}

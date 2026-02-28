@@ -226,4 +226,198 @@ describe('SMS Balance Functions', () => {
     });
   });
 
+  describe('LOW_BALANCE_DEFAULT_THRESHOLD', () => {
+    it('should be 1000 yen', () => {
+      expect(stripeModule.LOW_BALANCE_DEFAULT_THRESHOLD).toBe(1000);
+    });
+  });
+
+  describe('sendLowBalanceNotification', () => {
+    it('should send notification when no previous notification was sent', async () => {
+      const { notifyOwner } = await import('./_core/notification');
+      const store = {
+        id: 1,
+        name: 'Test Store',
+        smsBalance: 500,
+        lastLowBalanceNotifiedAt: null,
+        settings: null,
+      } as any;
+
+      await stripeModule.sendLowBalanceNotification(mockDb, store, 500);
+
+      expect(vi.mocked(notifyOwner)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(notifyOwner)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: expect.stringContaining('SMS残高が少なくなっています'),
+        })
+      );
+      // Should update lastLowBalanceNotifiedAt
+      expect(mockDb.update).toHaveBeenCalled();
+    });
+
+    it('should skip notification during cooldown period', async () => {
+      const { notifyOwner } = await import('./_core/notification');
+      const store = {
+        id: 1,
+        name: 'Test Store',
+        smsBalance: 500,
+        lastLowBalanceNotifiedAt: new Date(), // Just notified
+        settings: null,
+      } as any;
+
+      await stripeModule.sendLowBalanceNotification(mockDb, store, 500);
+
+      expect(vi.mocked(notifyOwner)).not.toHaveBeenCalled();
+    });
+
+    it('should send notification after cooldown period expires', async () => {
+      const { notifyOwner } = await import('./_core/notification');
+      const store = {
+        id: 1,
+        name: 'Test Store',
+        smsBalance: 500,
+        lastLowBalanceNotifiedAt: new Date(Date.now() - 7 * 60 * 60 * 1000), // 7 hours ago (> 6h cooldown)
+        settings: null,
+      } as any;
+
+      await stripeModule.sendLowBalanceNotification(mockDb, store, 500);
+
+      expect(vi.mocked(notifyOwner)).toHaveBeenCalledTimes(1);
+    });
+
+    it('should send critical notification when balance is zero', async () => {
+      const { notifyOwner } = await import('./_core/notification');
+      const store = {
+        id: 1,
+        name: 'Test Store',
+        smsBalance: 0,
+        lastLowBalanceNotifiedAt: null,
+        settings: null,
+      } as any;
+
+      await stripeModule.sendLowBalanceNotification(mockDb, store, 0);
+
+      expect(vi.mocked(notifyOwner)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: expect.stringContaining('SMS残高がなくなりました'),
+        })
+      );
+    });
+
+    it('should include auto-charge recommendation when auto-charge is disabled', async () => {
+      const { notifyOwner } = await import('./_core/notification');
+      const store = {
+        id: 1,
+        name: 'Test Store',
+        smsBalance: 500,
+        lastLowBalanceNotifiedAt: null,
+        settings: { smsAutoCharge: { enabled: false } },
+      } as any;
+
+      await stripeModule.sendLowBalanceNotification(mockDb, store, 500);
+
+      expect(vi.mocked(notifyOwner)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.stringContaining('自動チャージ'),
+        })
+      );
+    });
+
+    it('should not include auto-charge recommendation when auto-charge is enabled', async () => {
+      const { notifyOwner } = await import('./_core/notification');
+      const store = {
+        id: 1,
+        name: 'Test Store',
+        smsBalance: 500,
+        lastLowBalanceNotifiedAt: null,
+        settings: { smsAutoCharge: { enabled: true, thresholdBalance: 1000, chargeAmount: 5000 } },
+      } as any;
+
+      await stripeModule.sendLowBalanceNotification(mockDb, store, 500);
+
+      const callContent = vi.mocked(notifyOwner).mock.calls[0][0].content;
+      expect(callContent).not.toContain('自動チャージを設定すると');
+    });
+
+    it('should include remaining messages count in notification', async () => {
+      const { notifyOwner } = await import('./_core/notification');
+      const store = {
+        id: 1,
+        name: 'Test Store',
+        smsBalance: 500,
+        lastLowBalanceNotifiedAt: null,
+        settings: null,
+      } as any;
+
+      await stripeModule.sendLowBalanceNotification(mockDb, store, 500);
+
+      const callContent = vi.mocked(notifyOwner).mock.calls[0][0].content;
+      expect(callContent).toContain('25 通分'); // 500 / 20 = 25
+    });
+
+    it('should include settings URL in notification', async () => {
+      const { notifyOwner } = await import('./_core/notification');
+      const store = {
+        id: 1,
+        name: 'Test Store',
+        smsBalance: 500,
+        lastLowBalanceNotifiedAt: null,
+        settings: null,
+      } as any;
+
+      await stripeModule.sendLowBalanceNotification(mockDb, store, 500);
+
+      const callContent = vi.mocked(notifyOwner).mock.calls[0][0].content;
+      expect(callContent).toContain('/admin/settings?tab=notifications');
+    });
+  });
+
+  describe('consumeSmsBalance low balance notification integration', () => {
+    it('should use autoCharge threshold when autoCharge is configured', async () => {
+      const { notifyOwner } = await import('./_core/notification');
+      const storeId = 1;
+      const ticketId = 100;
+      // Balance after consume will be 2980, which is below autoCharge threshold of 3000
+      const initialBalance = 3000;
+      
+      mockDb.limit.mockResolvedValueOnce([{
+        id: storeId,
+        smsBalance: initialBalance,
+        name: 'Test Store',
+        lastLowBalanceNotifiedAt: null,
+        settings: {
+          smsAutoCharge: { enabled: false, thresholdBalance: 3000, chargeAmount: 5000 },
+        },
+      }]);
+      
+      const result = await stripeModule.consumeSmsBalance({ storeId, ticketId });
+      
+      expect(result.success).toBe(true);
+      // Should trigger low balance notification since 2980 <= 3000 threshold
+      expect(vi.mocked(notifyOwner)).toHaveBeenCalled();
+    });
+
+    it('should use default threshold when no autoCharge settings', async () => {
+      const { notifyOwner } = await import('./_core/notification');
+      const storeId = 1;
+      const ticketId = 100;
+      // Balance after consume will be 980, which is below default threshold of 1000
+      const initialBalance = 1000;
+      
+      mockDb.limit.mockResolvedValueOnce([{
+        id: storeId,
+        smsBalance: initialBalance,
+        name: 'Test Store',
+        lastLowBalanceNotifiedAt: null,
+        settings: null,
+      }]);
+      
+      const result = await stripeModule.consumeSmsBalance({ storeId, ticketId });
+      
+      expect(result.success).toBe(true);
+      // Should trigger low balance notification since 980 <= 1000 default threshold
+      expect(vi.mocked(notifyOwner)).toHaveBeenCalled();
+    });
+  });
+
 });

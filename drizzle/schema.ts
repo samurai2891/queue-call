@@ -60,6 +60,9 @@ export const stores = mysqlTable("stores", {
   // Stripe顧客ID
   stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
   
+  // 低残高通知の最終送信日時（重複通知防止）
+  lastLowBalanceNotifiedAt: timestamp("lastLowBalanceNotifiedAt"),
+  
   // 到着確認用PIN（15分ごとに更新）
   currentCheckinPin: varchar("currentCheckinPin", { length: 3 }),
   checkinPinUpdatedAt: timestamp("checkinPinUpdatedAt"),

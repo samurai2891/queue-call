@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import { eq, sql, and } from "drizzle-orm";
 import { getDb } from "./db";
-import { stores, smsTransactions } from "../drizzle/schema";
+import { stores, smsTransactions, type Store } from "../drizzle/schema";
 import { notifyOwner } from "./_core/notification";
 
 // Stripe初期化
@@ -13,6 +13,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 export const SMS_COST_PER_MESSAGE = 20; // 顧客への請求額
 export const SMS_ACTUAL_COST = 15; // Twilioへの実費（参考）
 export const SMS_MARGIN = 5; // マージン
+
+// 低残高通知のデフォルト閾値（円）— 自動チャージ設定がない場合に使用
+export const LOW_BALANCE_DEFAULT_THRESHOLD = 1000;
+
+// 低残高通知の最小送信間隔（ミリ秒）— 同じ店舗への重複通知を防止
+const LOW_BALANCE_NOTIFY_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6時間
 
 // チャージプラン
 export const CHARGE_PLANS = [
@@ -149,13 +155,8 @@ export async function consumeSmsBalance(params: {
 
   // 残高チェック
   if (store.smsBalance < SMS_COST_PER_MESSAGE) {
-    // 残高不足アラート
-    if (store.smsBalance <= 1000 && store.smsBalance > 0) {
-      await notifyOwner({
-        title: "SMS残高が少なくなっています",
-        content: `店舗「${store.name}」のSMS残高が ${store.smsBalance.toLocaleString()}円 です。チャージをお願いします。`,
-      });
-    }
+    // 残高不足時も低残高通知を送信（重複防止付き）
+    await sendLowBalanceNotification(db, store, store.smsBalance);
     return { success: false, newBalance: store.smsBalance, reason: "Insufficient balance" };
   }
 
@@ -179,7 +180,7 @@ export async function consumeSmsBalance(params: {
 
   // 残高アラート + 自動チャージチェック
   const autoCharge = store.settings?.smsAutoCharge;
-  const threshold = autoCharge?.thresholdBalance ?? 0;
+  const threshold = autoCharge?.thresholdBalance ?? LOW_BALANCE_DEFAULT_THRESHOLD;
   const autoChargeAmount = autoCharge?.chargeAmount ?? 0;
 
   if (autoCharge?.enabled && threshold > 0 && autoChargeAmount > 0 && newBalance <= threshold) {
@@ -187,19 +188,69 @@ export async function consumeSmsBalance(params: {
     triggerAutoCharge(storeId, store.name, autoChargeAmount).catch((err: unknown) => {
       console.error(`[AutoCharge] Failed for store ${storeId}:`, err);
     });
-  } else if (newBalance <= 1000 && newBalance > 0) {
-    await notifyOwner({
-      title: "SMS残高が少なくなっています",
-      content: `店舗「${store.name}」のSMS残高が ${newBalance.toLocaleString()}円 です。チャージをお願いします。`,
-    });
-  } else if (newBalance <= 0) {
-    await notifyOwner({
-      title: "SMS残高がなくなりました",
-      content: `店舗「${store.name}」のSMS残高が ${newBalance.toLocaleString()}円 になりました。SMS通知は送信されません。チャージをお願いします。`,
-    });
+  } else if (newBalance <= threshold) {
+    // 自動チャージ未設定時は低残高通知を送信（重複防止付き）
+    await sendLowBalanceNotification(db, store, newBalance);
   }
 
   return { success: true, newBalance };
+}
+
+/**
+ * 低残高通知を送信（重複防止付き）
+ * - lastLowBalanceNotifiedAt をチェックし、クールダウン期間内ならスキップ
+ * - 通知内容にチャージページへのリンクを含める
+ */
+export async function sendLowBalanceNotification(
+  db: any,
+  store: Store,
+  currentBalance: number
+): Promise<void> {
+  // 重複通知防止: クールダウン期間内ならスキップ
+  if (store.lastLowBalanceNotifiedAt) {
+    const elapsed = Date.now() - new Date(store.lastLowBalanceNotifiedAt).getTime();
+    if (elapsed < LOW_BALANCE_NOTIFY_COOLDOWN_MS) {
+      console.log(`[LowBalance] Skipping notification for store ${store.id}: cooldown active (${Math.round(elapsed / 60000)}min elapsed)`);
+      return;
+    }
+  }
+
+  // 通知タイムスタンプを更新
+  await db
+    .update(stores)
+    .set({ lastLowBalanceNotifiedAt: new Date() })
+    .where(eq(stores.id, store.id));
+
+  const settingsUrl = `${process.env.VITE_FRONTEND_FORGE_API_URL || ''}/admin/settings?tab=notifications`;
+  const autoCharge = store.settings?.smsAutoCharge;
+
+  if (currentBalance <= 0) {
+    await notifyOwner({
+      title: `⚠️ SMS残高がなくなりました`,
+      content: [
+        `店舗「${store.name}」のSMS残高が ${currentBalance.toLocaleString()}円 になりました。`,
+        `SMS通知は送信できません。今すぐチャージしてください。`,
+        ``,
+        `チャージページ: ${settingsUrl}`,
+        autoCharge?.enabled ? '' : `\n※ 自動チャージを設定すると、残高不足を防止できます。`,
+      ].filter(Boolean).join('\n'),
+    });
+  } else {
+    const threshold = autoCharge?.thresholdBalance ?? LOW_BALANCE_DEFAULT_THRESHOLD;
+    const remainingMessages = Math.floor(currentBalance / SMS_COST_PER_MESSAGE);
+    await notifyOwner({
+      title: `SMS残高が少なくなっています`,
+      content: [
+        `店舗「${store.name}」のSMS残高が ${currentBalance.toLocaleString()}円 です（閾値: ${threshold.toLocaleString()}円）。`,
+        `残り約 ${remainingMessages} 通分のSMSを送信できます。`,
+        ``,
+        `チャージページ: ${settingsUrl}`,
+        autoCharge?.enabled ? '' : `\n※ 自動チャージを設定すると、閾値を下回った際に自動でチャージされます。`,
+      ].filter(Boolean).join('\n'),
+    });
+  }
+
+  console.log(`[LowBalance] Notification sent for store ${store.id}: balance=${currentBalance}`);
 }
 
 /**
