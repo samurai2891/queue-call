@@ -8,7 +8,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import {
   AlertTriangle,
@@ -18,7 +17,6 @@ import {
   Newspaper,
   Crown,
   ArrowRight,
-  X,
 } from 'lucide-react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useLocation } from 'wouter';
@@ -43,26 +41,169 @@ interface ApproachingLimit {
   icon: React.ElementType;
 }
 
-/**
- * セッション内でアラートが表示済みかチェック
- */
+// ─── ドーナツチャート SVG コンポーネント ───
+
+interface DonutChartProps {
+  percentage: number;
+  size?: number;
+  strokeWidth?: number;
+  isAtLimit: boolean;
+  icon: React.ElementType;
+  label: string;
+  current: number;
+  limit: number;
+}
+
+function DonutChart({
+  percentage,
+  size = 96,
+  strokeWidth = 8,
+  isAtLimit,
+  icon: Icon,
+  label,
+  current,
+  limit,
+}: DonutChartProps) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference - (percentage / 100) * circumference;
+  const center = size / 2;
+
+  // アニメーション用のstate
+  const [animatedOffset, setAnimatedOffset] = useState(circumference);
+
+  useEffect(() => {
+    // 少し遅延してアニメーション開始
+    const timer = setTimeout(() => {
+      setAnimatedOffset(dashOffset);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [dashOffset]);
+
+  // 色の決定
+  const trackColor = isAtLimit
+    ? 'stroke-destructive/15'
+    : 'stroke-amber-200 dark:stroke-amber-900/40';
+  const progressColor = isAtLimit
+    ? 'stroke-destructive'
+    : 'stroke-amber-500';
+  const textColor = isAtLimit
+    ? 'text-destructive'
+    : 'text-amber-600 dark:text-amber-400';
+  const iconColor = isAtLimit
+    ? 'text-destructive'
+    : 'text-amber-600 dark:text-amber-400';
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          className="transform -rotate-90"
+        >
+          {/* 背景トラック */}
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            strokeWidth={strokeWidth}
+            className={trackColor}
+          />
+          {/* プログレス弧 */}
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            className={progressColor}
+            strokeDasharray={circumference}
+            strokeDashoffset={animatedOffset}
+            style={{
+              transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          />
+        </svg>
+        {/* 中央のパーセンテージ表示 */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className={`text-lg font-bold tabular-nums leading-none ${textColor}`}>
+            {percentage}%
+          </span>
+        </div>
+      </div>
+      {/* ラベルと数値 */}
+      <div className="flex flex-col items-center gap-0.5">
+        <div className="flex items-center gap-1">
+          <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
+          <span className="text-xs font-medium text-foreground">{label}</span>
+        </div>
+        <span className={`text-xs font-semibold tabular-nums ${textColor}`}>
+          {current} / {limit}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── 全体サマリーのミニバーチャート ───
+
+interface UsageSummaryBarProps {
+  items: ApproachingLimit[];
+}
+
+function UsageSummaryBar({ items }: UsageSummaryBarProps) {
+  const totalPercentage = items.length > 0
+    ? Math.round(items.reduce((sum, item) => sum + item.percentage, 0) / items.length)
+    : 0;
+
+  const hasAtLimit = items.some(i => i.percentage >= 100);
+  const barColor = hasAtLimit
+    ? 'bg-destructive'
+    : 'bg-amber-500';
+  const bgColor = hasAtLimit
+    ? 'bg-destructive/15'
+    : 'bg-amber-200 dark:bg-amber-900/40';
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground font-medium">
+          {hasAtLimit ? '⚠' : '📊'} 平均使用率
+        </span>
+        <span className={`font-bold tabular-nums ${
+          hasAtLimit ? 'text-destructive' : 'text-amber-600 dark:text-amber-400'
+        }`}>
+          {totalPercentage}%
+        </span>
+      </div>
+      <div className={`h-1.5 rounded-full ${bgColor} overflow-hidden`}>
+        <div
+          className={`h-full rounded-full ${barColor} transition-all duration-700 ease-out`}
+          style={{ width: `${Math.min(totalPercentage, 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── セッション管理ユーティリティ ───
+
 function isDismissedInSession(storeId: number): boolean {
   try {
     const key = `${SESSION_STORAGE_PREFIX}${storeId}`;
     const stored = sessionStorage.getItem(key);
     if (!stored) return false;
     const data = JSON.parse(stored);
-    // 同じセッション内で閉じた場合は再表示しない
-    // ただし使用量が増えた場合（新しいアイテムが追加された場合）は再表示
     return data.dismissed === true;
   } catch {
     return false;
   }
 }
 
-/**
- * セッション内でアラートを閉じたことを記録
- */
 function markDismissedInSession(storeId: number, dismissedLimits: string[]): void {
   try {
     const key = `${SESSION_STORAGE_PREFIX}${storeId}`;
@@ -76,9 +217,6 @@ function markDismissedInSession(storeId: number, dismissedLimits: string[]): voi
   }
 }
 
-/**
- * セッション内で閉じた時の制限キーを取得
- */
 function getDismissedLimits(storeId: number): string[] {
   try {
     const key = `${SESSION_STORAGE_PREFIX}${storeId}`;
@@ -90,6 +228,8 @@ function getDismissedLimits(storeId: number): string[] {
     return [];
   }
 }
+
+// ─── メインコンポーネント ───
 
 export function UsageLimitAlert({ storeId }: UsageLimitAlertProps) {
   const { t } = useLocale();
@@ -231,47 +371,34 @@ export function UsageLimitAlert({ storeId }: UsageLimitAlertProps) {
           </div>
         </DialogHeader>
 
-        <div className="py-4 space-y-4">
-          {approachingLimits.map((item) => {
-            const Icon = item.icon;
-            const isAtLimit = item.percentage >= 100;
+        {/* ドーナツチャートグリッド */}
+        <div className="py-4">
+          <div className={`grid gap-4 ${
+            approachingLimits.length === 1
+              ? 'grid-cols-1 max-w-[140px] mx-auto'
+              : approachingLimits.length === 2
+              ? 'grid-cols-2 max-w-[280px] mx-auto'
+              : 'grid-cols-3'
+          }`}>
+            {approachingLimits.map((item) => (
+              <DonutChart
+                key={item.key}
+                percentage={item.percentage}
+                isAtLimit={item.percentage >= 100}
+                icon={item.icon}
+                label={item.label}
+                current={item.current}
+                limit={item.limit}
+              />
+            ))}
+          </div>
 
-            return (
-              <div key={item.key} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Icon className={`h-4 w-4 ${
-                      isAtLimit ? 'text-destructive' : 'text-amber-600 dark:text-amber-400'
-                    }`} />
-                    <span className="text-sm font-medium">{item.label}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-sm font-semibold tabular-nums ${
-                      isAtLimit ? 'text-destructive' : 'text-amber-600 dark:text-amber-400'
-                    }`}>
-                      {item.current} / {item.limit}
-                    </span>
-                    <Badge
-                      variant={isAtLimit ? 'destructive' : 'outline'}
-                      className={`text-xs ${
-                        !isAtLimit ? 'border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400' : ''
-                      }`}
-                    >
-                      {item.percentage}%
-                    </Badge>
-                  </div>
-                </div>
-                <Progress
-                  value={item.percentage}
-                  className={`h-2 ${
-                    isAtLimit
-                      ? '[&>div]:bg-destructive'
-                      : '[&>div]:bg-amber-500'
-                  }`}
-                />
-              </div>
-            );
-          })}
+          {/* 平均使用率サマリーバー */}
+          {approachingLimits.length > 1 && (
+            <div className="mt-4 pt-3 border-t">
+              <UsageSummaryBar items={approachingLimits} />
+            </div>
+          )}
 
           {/* アップグレードの利点 */}
           <div className="mt-4 rounded-lg bg-primary/5 border border-primary/10 p-3">
@@ -316,10 +443,6 @@ export function UsageLimitAlert({ storeId }: UsageLimitAlertProps) {
  * 外部から使用量の変化を検知してアラートを再表示するために使用
  */
 export function useUsageLimitAlert(storeId: number | undefined) {
-  /**
-   * 使用量が変化した場合にセッションの閉じた記録をリセット
-   * （新しいアイテムが追加された場合に再表示するため）
-   */
   const resetDismissal = useCallback(() => {
     if (!storeId) return;
     try {

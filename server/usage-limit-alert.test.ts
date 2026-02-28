@@ -86,6 +86,69 @@ describe("UsageLimitAlert - Alert threshold calculation logic", () => {
   });
 });
 
+describe("UsageLimitAlert - Donut chart SVG calculation", () => {
+  // Mirror the DonutChart component's SVG math
+  const size = 96;
+  const strokeWidth = 8;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  it("calculates correct SVG circumference for default size", () => {
+    expect(radius).toBe(44);
+    expect(circumference).toBeCloseTo(276.46, 1);
+  });
+
+  it("calculates correct dashOffset for 80% usage", () => {
+    const percentage = 80;
+    const dashOffset = circumference - (percentage / 100) * circumference;
+    // 20% of circumference should remain as gap
+    expect(dashOffset).toBeCloseTo(circumference * 0.2, 1);
+  });
+
+  it("calculates correct dashOffset for 100% usage (full circle)", () => {
+    const percentage = 100;
+    const dashOffset = circumference - (percentage / 100) * circumference;
+    expect(dashOffset).toBeCloseTo(0, 1);
+  });
+
+  it("calculates correct dashOffset for 0% usage (empty)", () => {
+    const percentage = 0;
+    const dashOffset = circumference - (percentage / 100) * circumference;
+    expect(dashOffset).toBeCloseTo(circumference, 1);
+  });
+
+  it("percentage is capped at 100 even if usage exceeds limit", () => {
+    // Simulating the Math.min(Math.round(pct * 100), 100) logic
+    const current = 7;
+    const limit = 5;
+    const pct = current / limit;
+    const displayPercentage = Math.min(Math.round(pct * 100), 100);
+    expect(displayPercentage).toBe(100);
+  });
+});
+
+describe("UsageLimitAlert - Average usage bar calculation", () => {
+  it("calculates correct average for single item", () => {
+    const items = [{ percentage: 80 }];
+    const avg = Math.round(items.reduce((sum, i) => sum + i.percentage, 0) / items.length);
+    expect(avg).toBe(80);
+  });
+
+  it("calculates correct average for multiple items", () => {
+    const items = [{ percentage: 80 }, { percentage: 100 }, { percentage: 90 }];
+    const avg = Math.round(items.reduce((sum, i) => sum + i.percentage, 0) / items.length);
+    expect(avg).toBe(90);
+  });
+
+  it("returns 0 for empty items", () => {
+    const items: { percentage: number }[] = [];
+    const avg = items.length > 0
+      ? Math.round(items.reduce((sum, i) => sum + i.percentage, 0) / items.length)
+      : 0;
+    expect(avg).toBe(0);
+  });
+});
+
 describe("UsageLimitAlert - Translation keys", () => {
   const requiredKeys = [
     "usageLimitAlert.titleApproaching",
