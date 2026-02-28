@@ -82,7 +82,7 @@ const SMS_CHARGE_OPTIONS = [
 
 const MIN_SMS_CHARGE_AMOUNT = 500;
 const MAX_SMS_CHARGE_AMOUNT = 100000;
-const SMS_COST_PER_MESSAGE = 20; // 1通あたり20円
+const SMS_COST_PER_MESSAGE = 25; // 1通あたり25円
 
 
 // SMS残高カードコンポーネント

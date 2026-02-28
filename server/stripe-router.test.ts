@@ -11,7 +11,7 @@ vi.mock('./stripe', () => ({
   getSmsBalance: vi.fn(),
   getSmsTransactions: vi.fn(),
   CHARGE_PLANS: [],
-  SMS_COST_PER_MESSAGE: 20,
+  SMS_COST_PER_MESSAGE: 25,
 }));
 
 type AuthenticatedUser = NonNullable<TrpcContext['user']>;

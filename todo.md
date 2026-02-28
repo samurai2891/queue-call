@@ -1394,3 +1394,9 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] L-3: usePushNotificationのisSubscribed判定をブラウザ+サーバー両方で確認するよう改善（checkPushSubscription API追加）
 - [x] L-4: プッシュ/SMS/待ち時間アラートのフォールバックメッセージを5言語対応（ja/en/ko/zh-Hans/zh-Hant）
 - [x] テスト追加・実行（29テスト全パス、全405テスト全パス）
+
+### SMS単価を25円/通に変更（完了）
+- [x] SMS単価定義を20円→25円に変更（stripe.ts: SMS_COST_PER_MESSAGE, SMS_ACTUAL_COST, SMS_MARGIN）
+- [x] チャージプランの通数表記を25円ベースに更新（120/200/400/1,200通）
+- [x] フロントエンドのSMS単価表示を更新（Settings.tsx）
+- [x] 関連テストを更新・実行（全405テスト全パス）

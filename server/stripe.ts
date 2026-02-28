@@ -10,9 +10,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 });
 
 // SMS料金設定（円）
-export const SMS_COST_PER_MESSAGE = 20; // 顧客への請求額
-export const SMS_ACTUAL_COST = 15; // Twilioへの実費（参考）
-export const SMS_MARGIN = 5; // マージン
+export const SMS_COST_PER_MESSAGE = 25; // 顧客への請求額
+export const SMS_ACTUAL_COST = 13; // Twilioへの実費（参考）
+export const SMS_MARGIN = 12; // マージン（Stripe手数料3.6%差引前）
 
 // 低残高通知のデフォルト閾値（円）— 自動チャージ設定がない場合に使用
 export const LOW_BALANCE_DEFAULT_THRESHOLD = 1000;
@@ -22,10 +22,10 @@ const LOW_BALANCE_NOTIFY_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6時間
 
 // チャージプラン
 export const CHARGE_PLANS = [
-  { id: "plan_3000", amount: 3000, label: "3,000円（約150通）" },
-  { id: "plan_5000", amount: 5000, label: "5,000円（約250通）" },
-  { id: "plan_10000", amount: 10000, label: "10,000円（約500通）" },
-  { id: "plan_30000", amount: 30000, label: "30,000円（約1,500通）" },
+  { id: "plan_3000", amount: 3000, label: "3,000円（約120通）" },
+  { id: "plan_5000", amount: 5000, label: "5,000円（約200通）" },
+  { id: "plan_10000", amount: 10000, label: "10,000円（約400通）" },
+  { id: "plan_30000", amount: 30000, label: "30,000円（約1,200通）" },
 ];
 
 /**

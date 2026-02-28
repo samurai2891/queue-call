@@ -58,7 +58,7 @@ describe('SMS Balance Functions', () => {
     it('should fail when balance is insufficient', async () => {
       const storeId = 1;
       const ticketId = 100;
-      const initialBalance = 10; // Less than SMS_COST_PER_MESSAGE (20)
+      const initialBalance = 10; // Less than SMS_COST_PER_MESSAGE (25)
       
       // Mock store with insufficient balance
       mockDb.limit.mockResolvedValueOnce([{ id: storeId, smsBalance: initialBalance, name: 'Test Store' }]);
@@ -221,8 +221,8 @@ describe('SMS Balance Functions', () => {
   });
   
   describe('SMS_COST_PER_MESSAGE', () => {
-    it('should be 20 yen per message', () => {
-      expect(stripeModule.SMS_COST_PER_MESSAGE).toBe(20);
+    it('should be 25 yen per message', () => {
+      expect(stripeModule.SMS_COST_PER_MESSAGE).toBe(25);
     });
   });
 
@@ -352,7 +352,7 @@ describe('SMS Balance Functions', () => {
       await stripeModule.sendLowBalanceNotification(mockDb, store, 500);
 
       const callContent = vi.mocked(notifyOwner).mock.calls[0][0].content;
-      expect(callContent).toContain('25 通分'); // 500 / 20 = 25
+      expect(callContent).toContain('20 通分'); // 500 / 25 = 20
     });
 
     it('should include settings URL in notification', async () => {
