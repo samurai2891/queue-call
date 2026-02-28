@@ -167,6 +167,57 @@ describe('SMS Balance Functions', () => {
       expect(mockDb.offset).toHaveBeenCalledWith(offset);
       expect(result.total).toBe(15);
     });
+
+    it('should filter by type when charge type is specified', async () => {
+      const storeId = 1;
+      const mockChargeTransactions = [
+        { id: 1, storeId, type: 'charge', amount: 5000, balanceAfter: 5000 },
+      ];
+      
+      mockDb.where.mockResolvedValueOnce([{ count: 1 }]);
+      mockDb.offset = vi.fn().mockResolvedValueOnce(mockChargeTransactions);
+      mockDb.limit.mockReturnThis();
+      
+      const result = await stripeModule.getSmsTransactions(storeId, 50, 0, 'charge');
+      
+      expect(result.transactions).toEqual(mockChargeTransactions);
+      expect(result.total).toBe(1);
+      // where should be called with AND condition (storeId + type)
+      expect(mockDb.where).toHaveBeenCalledTimes(2);
+    });
+
+    it('should filter by type when consume type is specified', async () => {
+      const storeId = 1;
+      const mockConsumeTransactions = [
+        { id: 2, storeId, type: 'consume', amount: -20, balanceAfter: 4980 },
+      ];
+      
+      mockDb.where.mockResolvedValueOnce([{ count: 1 }]);
+      mockDb.offset = vi.fn().mockResolvedValueOnce(mockConsumeTransactions);
+      mockDb.limit.mockReturnThis();
+      
+      const result = await stripeModule.getSmsTransactions(storeId, 50, 0, 'consume');
+      
+      expect(result.transactions).toEqual(mockConsumeTransactions);
+      expect(result.total).toBe(1);
+    });
+
+    it('should return all types when no type filter is specified', async () => {
+      const storeId = 1;
+      const mockAllTransactions = [
+        { id: 1, storeId, type: 'charge', amount: 5000, balanceAfter: 5000 },
+        { id: 2, storeId, type: 'consume', amount: -20, balanceAfter: 4980 },
+      ];
+      
+      mockDb.where.mockResolvedValueOnce([{ count: 2 }]);
+      mockDb.offset = vi.fn().mockResolvedValueOnce(mockAllTransactions);
+      mockDb.limit.mockReturnThis();
+      
+      const result = await stripeModule.getSmsTransactions(storeId, 50, 0, undefined);
+      
+      expect(result.transactions).toEqual(mockAllTransactions);
+      expect(result.total).toBe(2);
+    });
   });
   
   describe('SMS_COST_PER_MESSAGE', () => {

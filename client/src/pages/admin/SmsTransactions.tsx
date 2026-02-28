@@ -25,11 +25,14 @@ import {
   ChevronRight,
   Wallet,
   History,
+  Filter,
 } from 'lucide-react';
 
 import { getLoginUrl } from '@/const';
 
 const PAGE_SIZE = 20;
+
+type FilterType = 'all' | 'charge' | 'send';
 
 function SmsTransactionsContent() {
   const [, navigate] = useLocation();
@@ -37,6 +40,7 @@ function SmsTransactionsContent() {
   const { t, locale } = useLocale();
 
   const [page, setPage] = useState(0);
+  const [filterType, setFilterType] = useState<FilterType>('all');
 
   // Get user's store
   const { data: store, isLoading: storesLoading } = trpc.store.getByOwner.useQuery(
@@ -44,12 +48,13 @@ function SmsTransactionsContent() {
     { enabled: isAuthenticated }
   );
 
-  // Get SMS transactions with pagination
+  // Get SMS transactions with pagination and filter
   const { data: txData, isLoading: txLoading, refetch: refetchTx } = trpc.stripe.getSmsTransactions.useQuery(
     {
       storeId: store?.id!,
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
+      ...(filterType !== 'all' ? { type: filterType } : {}),
     },
     { enabled: !!store?.id }
   );
@@ -69,6 +74,11 @@ function SmsTransactionsContent() {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const handleFilterChange = (newFilter: FilterType) => {
+    setFilterType(newFilter);
+    setPage(0); // フィルター変更時にページをリセット
   };
 
   // Auth check
@@ -106,6 +116,12 @@ function SmsTransactionsContent() {
   const rangeStart = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const rangeEnd = Math.min((page + 1) * PAGE_SIZE, total);
 
+  const filterButtons: { value: FilterType; labelKey: string; icon?: React.ReactNode }[] = [
+    { value: 'all', labelKey: 'settings.smsTransactionFilterAll' },
+    { value: 'charge', labelKey: 'settings.smsTransactionFilterCharge', icon: <CreditCard className="h-3.5 w-3.5" /> },
+    { value: 'send', labelKey: 'settings.smsTransactionFilterSend', icon: <MessageSquare className="h-3.5 w-3.5" /> },
+  ];
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -134,6 +150,32 @@ function SmsTransactionsContent() {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-4">
+        {/* Filter bar */}
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center rounded-lg border bg-muted/30 p-1 gap-1">
+            {filterButtons.map((btn) => (
+              <button
+                key={btn.value}
+                onClick={() => handleFilterChange(btn.value)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  filterType === btn.value
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                }`}
+              >
+                {btn.icon}
+                {t(btn.labelKey as any)}
+              </button>
+            ))}
+          </div>
+          {filterType !== 'all' && (
+            <span className="text-sm text-muted-foreground">
+              {total}{t('settings.smsTransactionFilterAll') === 'すべて' ? '件' : ''}
+            </span>
+          )}
+        </div>
+
         <Card>
           <CardContent className="p-0">
             {txLoading ? (
@@ -146,6 +188,16 @@ function SmsTransactionsContent() {
               <div className="p-12 text-center">
                 <History className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
                 <p className="text-muted-foreground">{t('settings.smsTransactionNoRecords')}</p>
+                {filterType !== 'all' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => handleFilterChange('all')}
+                  >
+                    {t('settings.smsTransactionFilterAll')}
+                  </Button>
+                )}
               </div>
             ) : (
               <>

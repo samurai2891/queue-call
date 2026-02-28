@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { getDb } from "./db";
 import { stores, smsTransactions } from "../drizzle/schema";
 import { notifyOwner } from "./_core/notification";
@@ -216,19 +216,24 @@ export async function getSmsBalance(storeId: number): Promise<number> {
 /**
  * SMS取引履歴を取得
  */
-export async function getSmsTransactions(storeId: number, limit = 50, offset = 0) {
+export async function getSmsTransactions(storeId: number, limit = 50, offset = 0, type?: 'charge' | 'consume' | 'refund') {
   const db = await getDb();
   if (!db) return { transactions: [], total: 0 };
+
+  // 'send' フィルターは 'consume' に変換（UIでは「送信」と表示）
+  const whereCondition = type
+    ? and(eq(smsTransactions.storeId, storeId), eq(smsTransactions.type, type))
+    : eq(smsTransactions.storeId, storeId);
 
   const [countResult] = await db
     .select({ count: sql<number>`count(*)` })
     .from(smsTransactions)
-    .where(eq(smsTransactions.storeId, storeId));
+    .where(whereCondition);
 
   const transactions = await db
     .select()
     .from(smsTransactions)
-    .where(eq(smsTransactions.storeId, storeId))
+    .where(whereCondition)
     .orderBy(sql`${smsTransactions.createdAt} DESC`)
     .limit(limit)
     .offset(offset);
