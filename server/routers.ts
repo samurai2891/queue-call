@@ -80,6 +80,14 @@ const RATE_LIMITS = {
   },
   smsOtp: [{ windowMs: 30 * 60 * 1000, limit: 3 }],
   staffLogin: [{ windowMs: 10 * 60 * 1000, limit: 5 }],
+  reservation: [
+    { windowMs: 60_000, limit: 3 },
+    { windowMs: 60 * 60 * 1000, limit: 20 },
+  ],
+  callAction: [
+    { windowMs: 60_000, limit: 10 },
+    { windowMs: 60 * 60 * 1000, limit: 120 },
+  ],
 };
 
 const rateLimitBuckets = new Map<string, RateLimitEntry>();
@@ -953,6 +961,15 @@ const ticketRouter = router({
       if (!session || session.storeId !== input.storeId) {
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
       }
+
+      const callIp = getRequestIp(ctx.req);
+      enforceRateLimits({
+        scope: 'call-action',
+        key: `${input.storeId}:${callIp}`,
+        windows: RATE_LIMITS.callAction,
+        requestId: ctx.requestId,
+        storeSlug: session.storeId.toString(),
+      });
  
       const tickets = await db.getWaitingTickets(input.storeId);
       const nextTicket = tickets.find(t => t.status === 'WAITING');
@@ -1030,6 +1047,15 @@ const ticketRouter = router({
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
       }
 
+      const callSpecificIp = getRequestIp(ctx.req);
+      enforceRateLimits({
+        scope: 'call-action',
+        key: `${session.storeId}:${callSpecificIp}`,
+        windows: RATE_LIMITS.callAction,
+        requestId: ctx.requestId,
+        storeSlug: session.storeId.toString(),
+      });
+
       const ticket = await db.getTicketById(input.ticketId);
       if (!ticket || ticket.storeId !== session.storeId) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
@@ -1104,6 +1130,15 @@ const ticketRouter = router({
       if (!session) {
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid session' });
       }
+
+      const recallIp = getRequestIp(ctx.req);
+      enforceRateLimits({
+        scope: 'call-action',
+        key: `${session.storeId}:${recallIp}`,
+        windows: RATE_LIMITS.callAction,
+        requestId: ctx.requestId,
+        storeSlug: session.storeId.toString(),
+      });
 
       const ticket = await db.getTicketById(input.ticketId);
       if (!ticket || ticket.storeId !== session.storeId) {
@@ -2238,18 +2273,27 @@ const reservationRouter = router({
       note: z.string().optional(),
       locale: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const store = await db.getStoreBySlug(input.storeSlug);
       if (!store) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Store not found' });
       }
+
+      const ipAddress = getRequestIp(ctx.req);
+      enforceRateLimits({
+        scope: 'reservation-create',
+        key: `${store.id}:${ipAddress}`,
+        windows: RATE_LIMITS.reservation,
+        requestId: ctx.requestId,
+        storeSlug: store.slug,
+      });
 
       const settings = store.settings?.reservation;
       if (!settings?.enabled) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Reservations are not enabled for this store' });
       }
 
-      // 時間枠の空きを確認
+      // 時間枚の空きを確認
       const count = await db.getReservationCountBySlot(store.id, input.reservationDate, input.reservationTime);
       const maxPerSlot = settings.maxPerSlot || 5;
       if (count >= maxPerSlot) {
