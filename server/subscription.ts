@@ -457,12 +457,14 @@ export async function reactivateSubscription(storeId: number): Promise<{ success
 export async function changeSubscriptionPlan(
   storeId: number,
   newPlanId: "standard" | "pro"
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; previousPlan?: string }> {
   const db = await getDb();
   if (!db) return { success: false, message: "Database not available" };
 
   const [store] = await db.select().from(stores).where(eq(stores.id, storeId)).limit(1);
   if (!store) return { success: false, message: "Store not found" };
+
+  const previousPlan = store.subscriptionPlan || 'free';
 
   if (!store.stripeSubscriptionId) {
     return { success: false, message: "No active subscription to change" };
@@ -502,7 +504,7 @@ export async function changeSubscriptionPlan(
 
     console.log(`[Subscription] Store ${storeId} plan changed to ${newPlanId}`);
 
-    return { success: true, message: `${PLANS[newPlanId].nameJa}プランに変更しました` };
+    return { success: true, message: `${PLANS[newPlanId].nameJa}プランに変更しました`, previousPlan };
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
     return { success: false, message: errMsg };

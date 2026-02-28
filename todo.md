@@ -1454,3 +1454,15 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] フロントエンド: フィード追加にも同様のトースト通知・カウンター・ボタン無効化を追加
 - [x] 翻訳: 5言語対応（ja/en/ko/zh-CN/zh-TW）
 - [x] テスト追加・実行（境界値テスト追加、全470テスト全パス）
+
+### プランアップグレード後オンボーディングUI（完了）
+- [x] サーバー側: getUnlockedFeatures関数（旧プランと新プランの差分から解放機能一覧を返す）
+- [x] サーバー側: getUnlockedFeatures APIをsubscriptionRouterに追加
+- [x] サーバー側: changeSubscriptionPlanにpreviousPlan情報を含める
+- [x] フロントエンド: UpgradeOnboardingDialogコンポーネント作成（祝福メッセージ+解放機能チェックリスト+各機能への直接リンク）
+- [x] フロントエンド: useUpgradeOnboardingフック（ローカルストレージで表示制御、7日間NEWバッジ表示）
+- [x] フロントエンド: BillingTabにオンボーディングダイアログを統合
+- [x] フロントエンド: 設定画面の各タブにNEWバッジ表示（解放された機能のタブにアニメーション付きバッジ）
+- [x] フロントエンド: モバイルセレクターにもNEWバッジ対応
+- [x] 多言語対応（5言語: ja/en/ko/zh-CN/zh-TW）
+- [x] テスト追加・実行（getUnlockedFeaturesテスト7件追加、全477テスト全パス）

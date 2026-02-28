@@ -12,7 +12,7 @@ import { broadcastQueueUpdate, broadcastTicketUpdate, broadcastIntakeStatus } fr
 import { createCheckoutSession, getSmsBalance, getSmsTransactions, getSmsAnalytics, CHARGE_PLANS, SMS_COST_PER_MESSAGE } from "./stripe";
 import { PLANS, createSubscriptionCheckout, getSubscriptionInfo, cancelSubscription, reactivateSubscription, changeSubscriptionPlan, checkAndIncrementMonthlyTicket, type PlanId } from "./subscription";
 import { checkBusinessHours } from "../shared/businessHours";
-import { checkSmsAllowed, checkReservationAllowed, checkMenuLimit, checkStaffLimit, getAnalyticsDaysLimit, checkCsvExportAllowed, checkBrandingAllowed, getPlanLimitsInfo, getBrandingLevel, checkBusinessHoursAllowed } from "./plan-limits";
+import { checkSmsAllowed, checkReservationAllowed, checkMenuLimit, checkStaffLimit, getAnalyticsDaysLimit, checkCsvExportAllowed, checkBrandingAllowed, getPlanLimitsInfo, getBrandingLevel, checkBusinessHoursAllowed, getUnlockedFeatures } from "./plan-limits";
 
 
 
@@ -2244,7 +2244,7 @@ const subscriptionRouter = router({
         if (!result.success) {
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: result.message });
         }
-        return { type: 'plan_changed' as const, message: result.message };
+        return { type: 'plan_changed' as const, message: result.message, previousPlan: result.previousPlan };
       }
 
       const origin = ctx.req.headers.origin || 'http://localhost:3000';
@@ -2259,7 +2259,7 @@ const subscriptionRouter = router({
         stripeCustomerId: store.stripeCustomerId || undefined,
       });
 
-      return { type: 'checkout' as const, url: session.url, sessionId: session.sessionId };
+      return { type: 'checkout' as const, url: session.url, sessionId: session.sessionId, previousPlan: store.subscriptionPlan || 'free' };
     }),
 
   // Get plan limits for current store (for frontend display)
@@ -2271,6 +2271,17 @@ const subscriptionRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
       return getPlanLimitsInfo(store.subscriptionPlan);
+    }),
+
+  // Get unlocked features after plan upgrade
+  getUnlockedFeatures: protectedProcedure
+    .input(z.object({
+      storeId: z.number(),
+      oldPlanId: z.string(),
+      newPlanId: z.string(),
+    }))
+    .query(({ input }) => {
+      return getUnlockedFeatures(input.oldPlanId, input.newPlanId);
     }),
 
   // Cancel subscription (at period end)

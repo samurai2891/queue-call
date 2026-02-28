@@ -63,6 +63,7 @@ import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 import { VapidSettings } from '@/components/VapidSettings';
 import { PlanGate, PlanBadge } from '@/components/PlanGate';
+import { UpgradeOnboardingDialog, useUpgradeOnboarding } from '@/components/UpgradeOnboardingDialog';
 
 const LOCALE_OPTIONS = [
   { value: 'ja', label: '日本語' },
@@ -842,6 +843,13 @@ function SettingsContent() {
     { storeId: store?.id || 0 },
     { enabled: !!store?.id }
   );
+
+  // Onboarding NEW badge helper
+  const onboardingHelper = useUpgradeOnboarding(store?.id);
+  const isTabNew = useCallback((featureKey: string) => {
+    if (!planLimits?.planId) return false;
+    return onboardingHelper.isFeatureNew(featureKey, planLimits.planId);
+  }, [planLimits?.planId, onboardingHelper]);
 
   const { data: menuCategories, refetch: refetchCategories } = trpc.menu.getCategories.useQuery(
     { storeId: store?.id || 0 },
@@ -1924,6 +1932,16 @@ function SettingsContent() {
     );
   }
 
+  // Map tab IDs to feature keys for NEW badge display
+  const tabFeatureKeyMap: Record<string, string[]> = {
+    notifications: ['sms'],
+    menu: ['menuUnlimited'],
+    reservation: ['reservation'],
+    branding: ['customColor', 'customLogo'],
+    businessHours: ['businessHours'],
+    security: ['staffIncrease'],
+  };
+
   const tabs = [
     { id: 'general', label: t('settings.general'), icon: Store },
     { id: 'queue', label: t('settings.queue'), icon: Clock },
@@ -1939,6 +1957,12 @@ function SettingsContent() {
     { id: 'security', label: t('settings.security'), icon: Shield },
     { id: 'billing', label: t('settings.billing') || 'プラン・お支払い', icon: CreditCard },
   ];
+
+  const hasNewBadge = (tabId: string): boolean => {
+    const featureKeys = tabFeatureKeyMap[tabId];
+    if (!featureKeys) return false;
+    return featureKeys.some(key => isTabNew(key));
+  };
 
 
 
@@ -1991,11 +2015,17 @@ function SettingsContent() {
               <SelectContent>
                 {tabs.map(tab => {
                   const IconComponent = tab.icon;
+                  const isNew = hasNewBadge(tab.id);
                   return (
                     <SelectItem key={tab.id} value={tab.id} className="h-12">
                       <div className="flex items-center gap-3">
                         <IconComponent className="h-5 w-5" />
                         <span>{tab.label}</span>
+                        {isNew && (
+                          <span className="inline-flex items-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 text-[9px] font-bold border border-amber-500/20 animate-pulse">
+                            NEW
+                          </span>
+                        )}
                       </div>
                     </SelectItem>
                   );
@@ -2006,16 +2036,24 @@ function SettingsContent() {
 
           {/* Desktop: Tab List */}
           <TabsList className="hidden md:flex flex-wrap justify-start gap-2 h-auto p-2">
-            {tabs.map(tab => (
-              <TabsTrigger
-                key={tab.id}
-                value={tab.id}
-                className="flex flex-col gap-1 py-2 px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                <tab.icon className="h-4 w-4" />
-                <span className="text-xs">{tab.label}</span>
-              </TabsTrigger>
-            ))}
+            {tabs.map(tab => {
+              const isNew = hasNewBadge(tab.id);
+              return (
+                <TabsTrigger
+                  key={tab.id}
+                  value={tab.id}
+                  className="relative flex flex-col gap-1 py-2 px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  <tab.icon className="h-4 w-4" />
+                  <span className="text-xs">{tab.label}</span>
+                  {isNew && (
+                    <span className="absolute -top-1 -right-1 inline-flex items-center rounded-full bg-amber-500 text-white px-1 py-0 text-[8px] font-bold shadow-sm animate-pulse">
+                      NEW
+                    </span>
+                  )}
+                </TabsTrigger>
+              );
+            })}
           </TabsList>
 
           {/* General Settings */}
@@ -4226,14 +4264,82 @@ function BillingTab({ store, t }: { store: any; t: (key: string) => string }) {
     { enabled: !!store?.id }
   );
 
+  // Onboarding state
+  const onboarding = useUpgradeOnboarding(store?.id);
+  const [onboardingOpen, setOnboardingOpen] = React.useState(false);
+  const [onboardingFeatures, setOnboardingFeatures] = React.useState<Array<{ key: string; settingsTab?: string }>>([]);
+  const [onboardingPlanName, setOnboardingPlanName] = React.useState('');
+
+  // Check for pending upgrade on mount (after Stripe Checkout redirect)
+  React.useEffect(() => {
+    if (!store?.id || !subInfo) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('subscription') === 'success') {
+      const pending = onboarding.consumePendingUpgrade();
+      if (pending && pending.newPlan !== pending.previousPlan) {
+        const currentPlanId = subInfo.plan?.id || 'free';
+        if (onboarding.shouldShow(currentPlanId)) {
+          // Fetch unlocked features
+          fetch(`/api/trpc/subscription.getUnlockedFeatures?input=${encodeURIComponent(JSON.stringify({ storeId: store.id, oldPlanId: pending.previousPlan, newPlanId: currentPlanId }))}`)
+            .then(r => r.json())
+            .then((data: any) => {
+              const features = data?.result?.data || [];
+              if (features.length > 0) {
+                setOnboardingFeatures(features);
+                setOnboardingPlanName(subInfo.plan?.name || currentPlanId);
+                setOnboardingOpen(true);
+                onboarding.saveUpgradeInfo(currentPlanId, features.map((f: any) => f.key));
+              }
+            })
+            .catch(() => {});
+        }
+      }
+    }
+  }, [store?.id, subInfo]);
+
+  const handleOnboardingClose = () => {
+    setOnboardingOpen(false);
+    const currentPlanId = subInfo?.plan?.id || 'free';
+    onboarding.markDismissed(currentPlanId);
+  };
+
   const createCheckout = trpc.subscription.createCheckout.useMutation({
     onSuccess: (result) => {
       if (result.type === 'checkout' && result.url) {
+        // Save pending upgrade info before Stripe redirect
+        if (result.previousPlan) {
+          onboarding.savePendingUpgrade(result.previousPlan, 'pending');
+        }
         toast.info(t('settings.redirectingToCheckout'));
         window.open(result.url, '_blank');
       } else if (result.type === 'plan_changed') {
         toast.success(t('settings.planChangedSuccess'));
         utils.subscription.getInfo.invalidate();
+        utils.subscription.getPlanLimits.invalidate();
+        // Show onboarding dialog for immediate plan change
+        if (result.previousPlan) {
+          const newPlanId = subInfo?.plan?.id || 'free';
+          // Need to re-fetch to get updated plan
+          setTimeout(() => {
+            utils.subscription.getInfo.fetch({ storeId: store.id }).then((updatedInfo) => {
+              const updatedPlanId = updatedInfo?.plan?.id || 'free';
+              if (onboarding.shouldShow(updatedPlanId)) {
+                fetch(`/api/trpc/subscription.getUnlockedFeatures?input=${encodeURIComponent(JSON.stringify({ storeId: store.id, oldPlanId: result.previousPlan, newPlanId: updatedPlanId }))}`)
+                  .then(r => r.json())
+                  .then((data: any) => {
+                    const features = data?.result?.data || [];
+                    if (features.length > 0) {
+                      setOnboardingFeatures(features);
+                      setOnboardingPlanName(updatedInfo?.plan?.name || updatedPlanId);
+                      setOnboardingOpen(true);
+                      onboarding.saveUpgradeInfo(updatedPlanId, features.map((f: any) => f.key));
+                    }
+                  })
+                  .catch(() => {});
+              }
+            });
+          }, 500);
+        }
       }
     },
     onError: (err) => toast.error(err.message),
@@ -4316,6 +4422,15 @@ function BillingTab({ store, t }: { store: any; t: (key: string) => string }) {
 
   return (
     <div className="space-y-6">
+      {/* Upgrade Onboarding Dialog */}
+      <UpgradeOnboardingDialog
+        open={onboardingOpen}
+        onClose={handleOnboardingClose}
+        newPlanName={onboardingPlanName}
+        unlockedFeatures={onboardingFeatures}
+        storeId={store?.id}
+      />
+
       {/* Current Plan Card */}
       <Card>
         <CardHeader>

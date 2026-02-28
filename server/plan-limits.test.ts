@@ -12,6 +12,7 @@ import {
   getBrandingLevel,
   checkBrandingAllowed,
   getPlanLimitsInfo,
+  getUnlockedFeatures,
 } from "./plan-limits";
 
 describe("getPlanFeatures", () => {
@@ -227,6 +228,101 @@ describe("checkBrandingAllowed", () => {
 
   it("does not throw for pro plan with logo setting", () => {
     expect(() => checkBrandingAllowed("pro", "logo")).not.toThrow();
+  });
+});
+
+describe("getUnlockedFeatures", () => {
+  it("returns all features when upgrading from free to pro", () => {
+    const features = getUnlockedFeatures("free", "pro");
+    const keys = features.map(f => f.key);
+    expect(keys).toContain("sms");
+    expect(keys).toContain("reservation");
+    expect(keys).toContain("menuUnlimited");
+    expect(keys).toContain("businessHours");
+    expect(keys).toContain("staffIncrease");
+    expect(keys).toContain("analyticsExpanded");
+    expect(keys).toContain("csvExport");
+    expect(keys).toContain("customColor");
+    expect(keys).toContain("customLogo");
+    expect(keys).toContain("supportUpgrade");
+    expect(features.length).toBe(10);
+  });
+
+  it("returns standard-specific features when upgrading from free to standard", () => {
+    const features = getUnlockedFeatures("free", "standard");
+    const keys = features.map(f => f.key);
+    expect(keys).toContain("sms");
+    expect(keys).toContain("reservation");
+    expect(keys).toContain("menuUnlimited");
+    expect(keys).toContain("businessHours");
+    expect(keys).toContain("staffIncrease");
+    expect(keys).toContain("analyticsExpanded");
+    expect(keys).toContain("customColor");
+    expect(keys).toContain("supportUpgrade");
+    // Standard does NOT unlock CSV or custom logo
+    expect(keys).not.toContain("csvExport");
+    expect(keys).not.toContain("customLogo");
+    expect(features.length).toBe(8);
+  });
+
+  it("returns pro-only features when upgrading from standard to pro", () => {
+    const features = getUnlockedFeatures("standard", "pro");
+    const keys = features.map(f => f.key);
+    expect(keys).toContain("csvExport");
+    expect(keys).toContain("customLogo");
+    expect(keys).toContain("analyticsExpanded");
+    expect(keys).toContain("staffIncrease");
+    expect(keys).toContain("supportUpgrade");
+    // These were already available in standard
+    expect(keys).not.toContain("sms");
+    expect(keys).not.toContain("reservation");
+    expect(keys).not.toContain("menuUnlimited");
+    expect(keys).not.toContain("businessHours");
+    expect(keys).not.toContain("customColor");
+    expect(features.length).toBe(5);
+  });
+
+  it("returns empty array for same plan", () => {
+    expect(getUnlockedFeatures("free", "free")).toEqual([]);
+    expect(getUnlockedFeatures("standard", "standard")).toEqual([]);
+    expect(getUnlockedFeatures("pro", "pro")).toEqual([]);
+  });
+
+  it("returns empty array for downgrade", () => {
+    expect(getUnlockedFeatures("pro", "free")).toEqual([]);
+    expect(getUnlockedFeatures("pro", "standard")).toEqual([]);
+    expect(getUnlockedFeatures("standard", "free")).toEqual([]);
+  });
+
+  it("handles null/undefined old plan as free", () => {
+    const fromNull = getUnlockedFeatures(null, "standard");
+    const fromUndefined = getUnlockedFeatures(undefined, "standard");
+    const fromFree = getUnlockedFeatures("free", "standard");
+    expect(fromNull).toEqual(fromFree);
+    expect(fromUndefined).toEqual(fromFree);
+  });
+
+  it("includes correct settingsTab for each feature", () => {
+    const features = getUnlockedFeatures("free", "pro");
+    const sms = features.find(f => f.key === "sms");
+    expect(sms?.settingsTab).toBe("notifications");
+    const reservation = features.find(f => f.key === "reservation");
+    expect(reservation?.settingsTab).toBe("reservation");
+    const menu = features.find(f => f.key === "menuUnlimited");
+    expect(menu?.settingsTab).toBe("menu");
+    const bh = features.find(f => f.key === "businessHours");
+    expect(bh?.settingsTab).toBe("businessHours");
+    const staff = features.find(f => f.key === "staffIncrease");
+    expect(staff?.settingsTab).toBe("security");
+    const color = features.find(f => f.key === "customColor");
+    expect(color?.settingsTab).toBe("branding");
+    const logo = features.find(f => f.key === "customLogo");
+    expect(logo?.settingsTab).toBe("branding");
+    // Analytics and CSV have no settingsTab
+    const analytics = features.find(f => f.key === "analyticsExpanded");
+    expect(analytics?.settingsTab).toBeUndefined();
+    const csv = features.find(f => f.key === "csvExport");
+    expect(csv?.settingsTab).toBeUndefined();
   });
 });
 

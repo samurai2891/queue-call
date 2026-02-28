@@ -1017,6 +1017,23 @@ export const translations = {
     'day.thu': '木',
     'day.fri': '金',
     'day.sat': '土',
+
+    // Onboarding
+    'onboarding.upgradeTitle': 'プランへようこそ！',
+    'onboarding.upgradeDescription': '以下の新機能が使えるようになりました。タップして設定画面に移動できます。',
+    'onboarding.feature.sms': 'SMS通知機能',
+    'onboarding.feature.reservation': '予約機能',
+    'onboarding.feature.menuUnlimited': 'メニュー無制限登録',
+    'onboarding.feature.businessHours': '営業時間制御',
+    'onboarding.feature.staffIncrease': 'スタッフアカウント増加',
+    'onboarding.feature.analyticsExpanded': '分析データ期間拡大',
+    'onboarding.feature.csvExport': 'CSVエクスポート',
+    'onboarding.feature.customColor': 'カスタムカラー設定',
+    'onboarding.feature.customLogo': 'カスタムロゴアップロード',
+    'onboarding.feature.supportUpgrade': 'サポートレベル向上',
+    'onboarding.goToSettings': '設定画面へ移動',
+    'onboarding.allDone': 'すべて確認しました',
+    'onboarding.dismissLater': 'あとで確認する',
   },
   en: {
     // Common
@@ -2022,6 +2039,23 @@ export const translations = {
     'day.thu': 'Thu',
     'day.fri': 'Fri',
     'day.sat': 'Sat',
+
+    // Onboarding
+    'onboarding.upgradeTitle': 'Welcome to your new plan!',
+    'onboarding.upgradeDescription': 'The following new features are now available. Tap to go to the settings page.',
+    'onboarding.feature.sms': 'SMS Notifications',
+    'onboarding.feature.reservation': 'Reservation System',
+    'onboarding.feature.menuUnlimited': 'Unlimited Menu Items',
+    'onboarding.feature.businessHours': 'Business Hours Control',
+    'onboarding.feature.staffIncrease': 'More Staff Accounts',
+    'onboarding.feature.analyticsExpanded': 'Extended Analytics Period',
+    'onboarding.feature.csvExport': 'CSV Export',
+    'onboarding.feature.customColor': 'Custom Color Theme',
+    'onboarding.feature.customLogo': 'Custom Logo Upload',
+    'onboarding.feature.supportUpgrade': 'Priority Support',
+    'onboarding.goToSettings': 'Go to settings',
+    'onboarding.allDone': 'All done',
+    'onboarding.dismissLater': 'Review later',
   },
   ko: {
     // Common
@@ -3028,6 +3062,23 @@ export const translations = {
     'day.thu': '목',
     'day.fri': '금',
     'day.sat': '토',
+
+    // Onboarding
+    'onboarding.upgradeTitle': '플랜에 오신 것을 환영합니다!',
+    'onboarding.upgradeDescription': '다음 새로운 기능을 사용할 수 있습니다. 탭하여 설정 화면으로 이동하세요.',
+    'onboarding.feature.sms': 'SMS 알림',
+    'onboarding.feature.reservation': '예약 기능',
+    'onboarding.feature.menuUnlimited': '메뉴 무제한 등록',
+    'onboarding.feature.businessHours': '영업시간 제어',
+    'onboarding.feature.staffIncrease': '스태프 계정 증가',
+    'onboarding.feature.analyticsExpanded': '분석 데이터 기간 확대',
+    'onboarding.feature.csvExport': 'CSV 내보내기',
+    'onboarding.feature.customColor': '맞춤 색상 설정',
+    'onboarding.feature.customLogo': '맞춤 로고 업로드',
+    'onboarding.feature.supportUpgrade': '우선 지원',
+    'onboarding.goToSettings': '설정으로 이동',
+    'onboarding.allDone': '모두 확인했습니다',
+    'onboarding.dismissLater': '나중에 확인',
   },
   'zh-Hans': {
     // Common
@@ -4034,6 +4085,23 @@ export const translations = {
     'day.thu': '四',
     'day.fri': '五',
     'day.sat': '六',
+
+    // Onboarding
+    'onboarding.upgradeTitle': '欢迎使用新套餐！',
+    'onboarding.upgradeDescription': '以下新功能已解锁。点击可跳转到设置页面。',
+    'onboarding.feature.sms': '短信通知',
+    'onboarding.feature.reservation': '预约功能',
+    'onboarding.feature.menuUnlimited': '菜单无限添加',
+    'onboarding.feature.businessHours': '营业时间控制',
+    'onboarding.feature.staffIncrease': '员工账号增加',
+    'onboarding.feature.analyticsExpanded': '分析数据期限扩展',
+    'onboarding.feature.csvExport': 'CSV导出',
+    'onboarding.feature.customColor': '自定义颜色',
+    'onboarding.feature.customLogo': '自定义Logo上传',
+    'onboarding.feature.supportUpgrade': '优先支持',
+    'onboarding.goToSettings': '前往设置',
+    'onboarding.allDone': '全部确认',
+    'onboarding.dismissLater': '稍后查看',
   },
   'zh-Hant': {
     // Common
@@ -5040,6 +5108,23 @@ export const translations = {
     'day.thu': '四',
     'day.fri': '五',
     'day.sat': '六',
+
+    // Onboarding
+    'onboarding.upgradeTitle': '歡迎使用新方案！',
+    'onboarding.upgradeDescription': '以下新功能已解鎖。點擊可跳轉到設定頁面。',
+    'onboarding.feature.sms': '簡訊通知',
+    'onboarding.feature.reservation': '預約功能',
+    'onboarding.feature.menuUnlimited': '菜單無限新增',
+    'onboarding.feature.businessHours': '營業時間控制',
+    'onboarding.feature.staffIncrease': '員工帳號增加',
+    'onboarding.feature.analyticsExpanded': '分析數據期限擴展',
+    'onboarding.feature.csvExport': 'CSV匯出',
+    'onboarding.feature.customColor': '自訂顏色',
+    'onboarding.feature.customLogo': '自訂Logo上傳',
+    'onboarding.feature.supportUpgrade': '優先支援',
+    'onboarding.goToSettings': '前往設定',
+    'onboarding.allDone': '全部確認',
+    'onboarding.dismissLater': '稍後查看',
   },
 } as const;
 
