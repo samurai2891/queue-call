@@ -10,20 +10,9 @@ import "./index.css";
 
 const queryClient = new QueryClient();
 
-if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js", { updateViaCache: 'none' })
-      .then((registration) => {
-        // Check for updates periodically (every 30 minutes)
-        setInterval(() => {
-          registration.update().catch(() => {});
-        }, 30 * 60 * 1000);
-      })
-      .catch((error) => {
-        console.warn("[ServiceWorker] Registration failed", error);
-      });
-  });
-}
+// Service Worker is registered automatically by VitePWA plugin
+// with injectManifest strategy - no manual registration needed.
+// The SW includes push notification handlers and Workbox precaching.
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
 

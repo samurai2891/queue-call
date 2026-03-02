@@ -121,46 +121,39 @@ describe('M-4: VAPID key auto-configuration flow', () => {
   });
 });
 
-// ==================== M-5: Dynamic Service Worker cache versioning ====================
-describe('M-5: Dynamic Service Worker cache versioning', () => {
-  it('should use dynamic cache version based on Date.now()', async () => {
+// ==================== M-5: Service Worker with injectManifest ====================
+describe('M-5: Service Worker with injectManifest strategy', () => {
+  it('should use injectManifest strategy with workbox precaching', async () => {
     const fs = await import('fs');
-    const swContent = fs.readFileSync('client/public/sw.js', 'utf-8');
+    const swContent = fs.readFileSync('client/src/sw.ts', 'utf-8');
     
-    // Should NOT have hardcoded 'queue-call-v1'
-    expect(swContent).not.toContain("CACHE_NAME = 'queue-call-v1'");
-    
-    // Should use dynamic versioning
-    expect(swContent).toContain('CACHE_VERSION');
-    expect(swContent).toContain('CACHE_PREFIX');
-    expect(swContent).toContain('Date.now()');
+    // Should use workbox precaching
+    expect(swContent).toContain('precacheAndRoute');
+    expect(swContent).toContain('self.__WB_MANIFEST');
   });
 
-  it('should clean up old caches on activate', async () => {
+  it('should clean up outdated caches via workbox', async () => {
     const fs = await import('fs');
-    const swContent = fs.readFileSync('client/public/sw.js', 'utf-8');
+    const swContent = fs.readFileSync('client/src/sw.ts', 'utf-8');
     
-    // Should have activate event listener that cleans old caches
-    expect(swContent).toContain("addEventListener('activate'");
-    expect(swContent).toContain('caches.delete');
-    expect(swContent).toContain('CACHE_PREFIX');
+    expect(swContent).toContain('cleanupOutdatedCaches');
   });
 
-  it('should use network-first strategy for fetch', async () => {
+  it('should include skipWaiting and clientsClaim for auto-update', async () => {
     const fs = await import('fs');
-    const swContent = fs.readFileSync('client/public/sw.js', 'utf-8');
+    const swContent = fs.readFileSync('client/src/sw.ts', 'utf-8');
     
-    // Should have fetch event listener with network-first approach
-    expect(swContent).toContain("addEventListener('fetch'");
-    expect(swContent).toContain('fetch(event.request)');
+    expect(swContent).toContain('self.skipWaiting()');
+    expect(swContent).toContain('clientsClaim()');
   });
 
-  it('should skip API and SSE requests in fetch handler', async () => {
+  it('vite.config.ts should use injectManifest strategy', async () => {
     const fs = await import('fs');
-    const swContent = fs.readFileSync('client/public/sw.js', 'utf-8');
+    const configContent = fs.readFileSync('vite.config.ts', 'utf-8');
     
-    expect(swContent).toContain("'/api/'");
-    expect(swContent).toContain("'/sse'");
+    expect(configContent).toContain("strategies: 'injectManifest'");
+    expect(configContent).toContain("srcDir: 'src'");
+    expect(configContent).toContain("filename: 'sw.ts'");
   });
 });
 
@@ -168,7 +161,7 @@ describe('M-5: Dynamic Service Worker cache versioning', () => {
 describe('Service Worker push handler: nested data extraction', () => {
   it('should extract url from nested data object', async () => {
     const fs = await import('fs');
-    const swContent = fs.readFileSync('client/public/sw.js', 'utf-8');
+    const swContent = fs.readFileSync('client/src/sw.ts', 'utf-8');
     
     // Should handle nested data object from server payload
     expect(swContent).toContain('nestedData');
@@ -179,7 +172,7 @@ describe('Service Worker push handler: nested data extraction', () => {
 
   it('should extract ticketToken from nested data object', async () => {
     const fs = await import('fs');
-    const swContent = fs.readFileSync('client/public/sw.js', 'utf-8');
+    const swContent = fs.readFileSync('client/src/sw.ts', 'utf-8');
     
     expect(swContent).toContain('nestedData.ticketToken || data.ticketToken');
   });

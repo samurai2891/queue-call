@@ -7,9 +7,11 @@ interface UsePushNotificationOptions {
   subscribeFn?: (data: { ticketId: number; endpoint: string; p256dh: string; auth: string }) => Promise<void>;
   /** Optional function to check server-side subscription status */
   checkServerSubscription?: (ticketId: number, endpoint: string) => Promise<boolean>;
+  /** Function to fetch VAPID public key from server */
+  getVapidPublicKey?: () => Promise<string | null>;
 }
 
-export function usePushNotification({ ticketId, onSubscribed, onError, subscribeFn, checkServerSubscription }: UsePushNotificationOptions = {}) {
+export function usePushNotification({ ticketId, onSubscribed, onError, subscribeFn, checkServerSubscription, getVapidPublicKey }: UsePushNotificationOptions = {}) {
   const [isSupported, setIsSupported] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -97,17 +99,25 @@ export function usePushNotification({ ticketId, onSubscribed, onError, subscribe
       let subscription = await registration.pushManager.getSubscription();
 
       if (!subscription) {
-        // Create new subscription
-        const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+        // Fetch VAPID public key from server API (not from build-time env)
+        let vapidPublicKey: string | null = null;
+        
+        if (getVapidPublicKey) {
+          vapidPublicKey = await getVapidPublicKey();
+        }
+        
+        // Fallback to env var (may work in dev mode)
+        if (!vapidPublicKey) {
+          vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || null;
+        }
         
         if (!vapidPublicKey) {
-          const message = 'VAPID public key is not configured';
+          const message = 'VAPID public key is not configured. Please generate VAPID keys in Settings.';
           console.warn(`[Push] ${message}`);
           onError?.(message);
           setIsLoading(false);
           return false;
         }
-
 
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
@@ -144,7 +154,7 @@ export function usePushNotification({ ticketId, onSubscribed, onError, subscribe
       setIsLoading(false);
       return false;
     }
-  }, [isSupported, ticketId, permission, requestPermission, subscribeFn, onSubscribed, onError]);
+  }, [isSupported, ticketId, permission, requestPermission, subscribeFn, onSubscribed, onError, getVapidPublicKey]);
 
   const unsubscribe = useCallback(async () => {
     try {

@@ -89,41 +89,41 @@ describe('L-1: VAPID_SUBJECT auto-resolution', () => {
 
 // ==================== L-2: Background Sync Removal Tests ====================
 describe('L-2: Background Sync removal from Service Worker', () => {
-  it('sw.js should not contain sync event listener', async () => {
+  it('sw.ts should not contain sync event listener', async () => {
     const fs = await import('fs');
     const path = await import('path');
-    const swPath = path.resolve(__dirname, '../client/public/sw.js');
+    const swPath = path.resolve(__dirname, '../client/src/sw.ts');
     const swContent = fs.readFileSync(swPath, 'utf-8');
     
     expect(swContent).not.toContain("addEventListener('sync'");
     expect(swContent).not.toContain('addEventListener("sync"');
   });
 
-  it('sw.js should not contain syncCheckin function', async () => {
+  it('sw.ts should not contain syncCheckin function', async () => {
     const fs = await import('fs');
     const path = await import('path');
-    const swPath = path.resolve(__dirname, '../client/public/sw.js');
+    const swPath = path.resolve(__dirname, '../client/src/sw.ts');
     const swContent = fs.readFileSync(swPath, 'utf-8');
     
     expect(swContent).not.toContain('syncCheckin');
   });
 
-  it('sw.js should still contain push event listener', async () => {
+  it('sw.ts should still contain push event listener', async () => {
     const fs = await import('fs');
     const path = await import('path');
-    const swPath = path.resolve(__dirname, '../client/public/sw.js');
+    const swPath = path.resolve(__dirname, '../client/src/sw.ts');
     const swContent = fs.readFileSync(swPath, 'utf-8');
     
-    expect(swContent).toContain("addEventListener('push'");
+    expect(swContent).toContain("self.addEventListener('push'");
   });
 
-  it('sw.js should still contain notificationclick event listener', async () => {
+  it('sw.ts should still contain notificationclick event listener', async () => {
     const fs = await import('fs');
     const path = await import('path');
-    const swPath = path.resolve(__dirname, '../client/public/sw.js');
+    const swPath = path.resolve(__dirname, '../client/src/sw.ts');
     const swContent = fs.readFileSync(swPath, 'utf-8');
     
-    expect(swContent).toContain("addEventListener('notificationclick'");
+    expect(swContent).toContain("self.addEventListener('notificationclick'");
   });
 });
 

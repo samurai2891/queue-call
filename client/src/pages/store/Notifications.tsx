@@ -61,6 +61,14 @@ function NotificationsContent() {
         return true; // If check fails, assume subscribed to avoid false negatives
       }
     },
+    getVapidPublicKey: async () => {
+      try {
+        const result = await trpcUtils.system.getVapidPublicKey.fetch();
+        return result?.publicKey || null;
+      } catch {
+        return null;
+      }
+    },
     onSubscribed: () => {
       toast.success(t('notification.pushEnabled'));
     },

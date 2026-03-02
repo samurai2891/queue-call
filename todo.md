@@ -1580,3 +1580,12 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 
 ## BUG-006: Staff.tsx — `<p>` cannot contain nested `<div>`
 - [x] Staff.tsxで`<p>`タグ内に`<div>`がネストされている箇所を特定し修正 — AlertDialogDescriptionにasChildを追加し3箇所修正
+---
+## BUG-007: プッシュ通知がアプリを閉じると届かない
+- [x] プッシュ通知の実装全体を調査（Service Worker、サーバーサイド送信、クライアント購読フロー）
+- [x] プッシュ通知周りの全体的な異常チェック
+- [x] CRITICAL-1修正: VitePWAをinjectManifest戦略に変更し、カスタムSWのpush/notificationclickハンドラを保持
+- [x] CRITICAL-2修正: VAPID公開鍵をビルド時env変数ではなくサーバーAPIから取得するように変更
+- [x] HIGH-4修正: sendWaitTimeAlertのpushデータにurlフィールドを追加
+- [x] 古いテストのSWパス参照を新しいclient/src/sw.tsに更新
+- [x] 発見した問題の修正

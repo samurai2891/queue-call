@@ -799,6 +799,19 @@ export async function sendWaitTimeAlert(
   const title = localizedAlert.title.replace('{storeName}', storeName);
   const message = localizedAlert.body.replace('{minutes}', String(estimatedMinutes));
 
+  // Build ticket URL for notification click navigation
+  let ticketUrl: string | undefined;
+  if (options?.storeSlug) {
+    const db = await getDb();
+    if (db) {
+      const [ticket] = await db.select({ ticketToken: tickets.ticketToken }).from(tickets).where(eq(tickets.id, ticketId)).limit(1);
+      if (ticket?.ticketToken) {
+        const baseUrl = process.env.APP_BASE_URL || process.env.PUBLIC_BASE_URL || 'http://localhost:3000';
+        ticketUrl = `${baseUrl.replace(/\/+$/, '')}/s/${options.storeSlug}/ticket/${ticket.ticketToken}`;
+      }
+    }
+  }
+
   const result = await sendPushNotification(ticketId, {
     title,
     body: message,
@@ -808,6 +821,7 @@ export async function sendWaitTimeAlert(
       ticketId,
       ticketNumber,
       estimatedMinutes,
+      url: ticketUrl || '/',
     },
   }, logContext);
 
