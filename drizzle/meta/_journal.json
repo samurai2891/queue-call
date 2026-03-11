@@ -1,0 +1,104 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1768001805327,
+      "tag": "0000_loving_alice",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1768321841763,
+      "tag": "0001_exotic_excalibur",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1768325151941,
+      "tag": "0002_yielding_killer_shrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1768336817612,
+      "tag": "0003_tidy_gertrude_yorkes",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1768834429099,
+      "tag": "0004_rapid_wilson_fisk",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1769518625675,
+      "tag": "0005_violet_red_hulk",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1769544191438,
+      "tag": "0006_marvelous_tattoo",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1769577154531,
+      "tag": "0007_little_supreme_intelligence",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1772244810875,
+      "tag": "0008_orange_steve_rogers",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1772257868518,
+      "tag": "0009_slow_bucky",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1772274294795,
+      "tag": "0010_glamorous_ultimatum",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1772286205714,
+      "tag": "0011_busy_shinobi_shaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1773200000000,
+      "tag": "0012_internal_admin_phase1",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1773201000000,
+      "tag": "0013_internal_admin_phase3",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+CREATE TABLE `reservations` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`storeId` int NOT NULL,
+	`reservationNumber` varchar(20) NOT NULL,
+	`reservationDate` varchar(10) NOT NULL,
+	`reservationTime` varchar(5) NOT NULL,
+	`customerName` varchar(255) NOT NULL,
+	`customerPhone` varchar(20),
+	`customerEmail` varchar(320),
+	`partySize` int NOT NULL,
+	`note` text,
+	`locale` varchar(10) DEFAULT 'ja',
+	`status` enum('PENDING','CONFIRMED','CHECKED_IN','COMPLETED','CANCELED','NO_SHOW') NOT NULL DEFAULT 'PENDING',
+	`ticketId` int,
+	`confirmedAt` timestamp,
+	`checkedInAt` timestamp,
+	`completedAt` timestamp,
+	`canceledAt` timestamp,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `reservations_id` PRIMARY KEY(`id`)
+);

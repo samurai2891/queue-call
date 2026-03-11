@@ -1,0 +1,1322 @@
+import { useParams, useLocation } from 'wouter';
+import { StoreLayout } from '@/components/StoreLayout';
+import { useState, useEffect, useMemo } from 'react';
+import { trpc } from '@/lib/trpc';
+import { useLocale, LocaleProvider, SUPPORTED_LOCALES } from '@/contexts/LocaleContext';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { 
+  Phone, 
+  Users, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  SkipForward, 
+  Bell, 
+  LogOut,
+  Pause,
+  Play,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  ChevronUp,
+  ChevronDown,
+  ListChecks,
+  X,
+  Filter
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { useSSE } from '@/hooks/useSSE';
+import { AnimatedPage, AnimatedCard } from '@/components/AnimatedPage';
+import { RATE_LIMITED_ERR_MSG } from '@shared/const';
+import { checkBusinessHours } from '../../../../shared/businessHours';
+import type { Locale } from '@/contexts/LocaleContext';
+
+
+type TicketStatus = 'WAITING' | 'CALLED' | 'ARRIVED' | 'SKIPPED' | 'DONE' | 'CANCELED' | 'EXPIRED';
+
+interface Ticket {
+  id: number;
+  number: number;
+  partySize: number;
+  status: TicketStatus;
+  note: string | null;
+  createdAt: Date;
+  calledAt: Date | null;
+  checkinDeadlineAt: Date | null;
+}
+
+const SESSION_STORAGE_KEY = 'queue-call-staff-session';
+
+function StaffContent() {
+  const params = useParams<{ storeSlug: string }>();
+  const [, navigate] = useLocation();
+  const { t } = useLocale();
+  
+  const [sessionToken, setSessionToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem(SESSION_STORAGE_KEY);
+    }
+    return null;
+  });
+  const [pin, setPin] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [role, setRole] = useState<'staff' | 'manager' | null>(null);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [intakeStatus, setIntakeStatus] = useState<'open' | 'paused'>('open');
+  const [skipDialogOpen, setSkipDialogOpen] = useState(false);
+  const [skipReason, setSkipReason] = useState('');
+  const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+  const [reorderModeEnabled, setReorderModeEnabled] = useState(false);
+  const [reorderDialogOpen, setReorderDialogOpen] = useState(false);
+  const [reorderReason, setReorderReason] = useState('');
+  const [reorderTarget, setReorderTarget] = useState<{ ticketId: number; delta: number } | null>(null);
+  const [manualPartySize, setManualPartySize] = useState(2);
+  const [manualNote, setManualNote] = useState('');
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [businessHoursOverride, setBusinessHoursOverride] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkSkipDialogOpen, setBulkSkipDialogOpen] = useState(false);
+  const [bulkSkipReason, setBulkSkipReason] = useState('');
+  const [bulkDoneDialogOpen, setBulkDoneDialogOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'WAITING' | 'CALLED' | 'ARRIVED'>('ALL');
+  const [staffSelectionMode, setStaffSelectionMode] = useState(false);
+  const [availableStaffMembers, setAvailableStaffMembers] = useState<{id: number; name: string}[]>([]);
+  const [pendingRole, setPendingRole] = useState<'staff' | 'manager' | null>(null);
+  const [staffMemberName, setStaffMemberName] = useState<string | null>(null);
+
+
+  const { data: store, isLoading: storeLoading, error: storeError } = trpc.store.getBySlug.useQuery(
+    { slug: params.storeSlug || '' },
+    { enabled: !!params.storeSlug }
+  );
+
+  const reorderEnabled = store?.settings?.queue?.enableReorder ?? false;
+  const reorderMaxMove = store?.settings?.queue?.reorderMaxMove ?? 3;
+  const reorderReasonRequired = store?.settings?.queue?.reorderReasonRequired ?? false;
+  const manualMaxPartySize = store?.settings?.kiosk?.maxPartySize ?? 10;
+
+
+  // Verify session
+  const { data: session, isLoading: sessionLoading, error: sessionError } = trpc.staff.getSession.useQuery(
+    { sessionToken: sessionToken || '' },
+    { enabled: !!sessionToken, retry: false }
+  );
+
+  useEffect(() => {
+    if (sessionError) {
+      setSessionToken(null);
+      setRole(null);
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+  }, [sessionError]);
+
+  // Permissions derived from session (manager has all permissions)
+  const permissions = useMemo(() => {
+    if (role === 'manager') {
+      return { canCall: true, canEditSettings: true, canManage: true };
+    }
+    if (session && 'permissions' in session) {
+      const p = (session as any).permissions;
+      return {
+        canCall: p?.canCall ?? true,
+        canEditSettings: p?.canEditSettings ?? false,
+        canManage: p?.canManage ?? false,
+      };
+    }
+    return { canCall: true, canEditSettings: false, canManage: false };
+  }, [role, session]);
+
+  // Get waiting list
+
+  const { data: waitingList, refetch: refetchWaitingList } = trpc.staff.getWaitingList.useQuery(
+    { sessionToken: sessionToken || '', storeId: store?.id || 0 },
+    { enabled: !!sessionToken && !!session && !!store?.id, refetchInterval: 30000 }
+  );
+
+  useEffect(() => {
+    if (waitingList) {
+      setTickets(waitingList as Ticket[]);
+    }
+  }, [waitingList]);
+
+  useEffect(() => {
+    if (store) {
+      setIntakeStatus(store.intakeStatus as 'open' | 'paused');
+      setBusinessHoursOverride(store.settings?.businessHours?.override === true);
+    }
+  }, [store]);
+
+  useEffect(() => {
+    if (!reorderEnabled) {
+      setReorderModeEnabled(false);
+    }
+  }, [reorderEnabled]);
+
+  // SSE for real-time updates
+  useSSE({
+    scope: 'staff',
+    storeId: store?.id || 0,
+    storeSlug: params.storeSlug,
+    sessionToken: sessionToken || undefined,
+    enabled: !!store?.id && !!sessionToken && !!session,
+    onQueueUpdate: () => {
+
+      refetchWaitingList();
+    },
+    onIntakeStatus: (data) => {
+      setIntakeStatus(data.status);
+    },
+  });
+
+  // Mutations
+  const loginMutation = trpc.staff.login.useMutation({
+    onSuccess: (data) => {
+      if ('needsStaffSelection' in data && data.needsStaffSelection && 'staffMembers' in data) {
+        setAvailableStaffMembers(data.staffMembers as {id: number; name: string}[]);
+        setPendingRole(data.role as 'staff' | 'manager');
+        setStaffSelectionMode(true);
+        setIsLoggingIn(false);
+        return;
+      }
+      if ('sessionToken' in data && data.sessionToken) {
+        setSessionToken(data.sessionToken);
+        setRole(data.role as 'staff' | 'manager');
+        setStaffMemberName('staffMemberName' in data ? (data.staffMemberName as string | null) : null);
+        sessionStorage.setItem(SESSION_STORAGE_KEY, data.sessionToken);
+      }
+      setPin('');
+      setStaffSelectionMode(false);
+      setAvailableStaffMembers([]);
+      setPendingRole(null);
+      setIsLoggingIn(false);
+    },
+    onError: (error: any) => {
+      if (error.message === RATE_LIMITED_ERR_MSG) {
+        toast.error(t('common.rateLimited'));
+      } else {
+        toast.error(t('staff.wrongPin'));
+      }
+      setIsLoggingIn(false);
+    },
+  });
+
+
+  const logoutMutation = trpc.staff.logout.useMutation({
+    onSuccess: () => {
+      setSessionToken(null);
+      setRole(null);
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    },
+  });
+
+  const showNotificationFeedback = (result?: { push: boolean; sms: boolean; smsReason?: string }) => {
+    if (!result) return;
+    if (result.push) toast.success(t('staff.notifPushSent'), { duration: 3000 });
+    else if (result.push === false) toast.warning(t('staff.notifPushFailed'), { duration: 4000 });
+    if (result.sms) toast.success(t('staff.notifSmsSent'), { duration: 3000 });
+    else if (result.sms === false && result.smsReason) toast.warning(`${t('staff.notifSmsFailed')}: ${result.smsReason}`, { duration: 4000 });
+    if (!result.push && !result.sms) toast.info(t('staff.notifNone'), { duration: 3000 });
+  };
+
+  const callNextMutation = trpc.staff.callNext.useMutation({
+    onMutate: async () => {
+      // Optimistically move the first WAITING ticket to CALLED status to prevent double-call
+      setTickets(prev => {
+        const firstWaiting = prev.find(t => t.status === 'WAITING');
+        if (!firstWaiting) return prev;
+        return prev.map(t =>
+          t.id === firstWaiting.id ? { ...t, status: 'CALLED' as const } : t
+        );
+      });
+    },
+    onSuccess: (data) => {
+      toast.success(`${t('staff.call')}: #${data.number}`);
+      showNotificationFeedback(data.notificationResult);
+      refetchWaitingList();
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+      refetchWaitingList();
+    },
+  });
+
+  const manualCreateMutation = trpc.staff.createManual.useMutation({
+    onSuccess: () => {
+      toast.success(t('staff.manualAddSuccess'));
+      refetchWaitingList();
+      setManualNote('');
+      setManualPartySize(Math.min(2, manualMaxPartySize));
+    },
+    onError: (error: any) => {
+      const message = error.message === 'Intake is paused'
+        ? t('staff.manualAddDisabled')
+        : error.message;
+      toast.error(message);
+    },
+  });
+ 
+  const recallMutation = trpc.staff.recall.useMutation({
+    onSuccess: (data) => {
+      toast.success(t('staff.recall'));
+      showNotificationFeedback(data.notificationResult);
+      refetchWaitingList();
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+      refetchWaitingList();
+    },
+  });
+
+  const skipMutation = trpc.staff.skip.useMutation({
+    onMutate: async (variables) => {
+      // Optimistically remove the skipped ticket from local state
+      setTickets(prev => prev.filter(t => t.id !== variables.ticketId));
+    },
+    onSuccess: () => {
+      toast.success(t('staff.skip'));
+      refetchWaitingList();
+      setSkipDialogOpen(false);
+      setSkipReason('');
+      setSelectedTicketId(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+      refetchWaitingList();
+    },
+  });
+
+  const moveTicketMutation = trpc.staff.moveTicket.useMutation({
+    onSuccess: () => {
+      toast.success(t('staff.reorderSuccess'));
+      refetchWaitingList();
+      setReorderDialogOpen(false);
+      setReorderReason('');
+      setReorderTarget(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+    },
+  });
+ 
+  const doneMutation = trpc.staff.done.useMutation({
+    onMutate: async (variables) => {
+      // Optimistically remove the done ticket from local state to prevent double-click
+      setTickets(prev => prev.filter(t => t.id !== variables.ticketId));
+    },
+    onSuccess: () => {
+      toast.success(t('staff.done'));
+      refetchWaitingList();
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+      refetchWaitingList();
+    },
+  });
+
+  const bulkDoneMutation = trpc.staff.bulkDone.useMutation({
+    onMutate: async (variables) => {
+      setTickets(prev => prev.filter(t => !variables.ticketIds.includes(t.id)));
+    },
+    onSuccess: (data) => {
+      toast.success(`${data.successCount}${t('staff.bulkDoneSuccess')}`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      refetchWaitingList();
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+      refetchWaitingList();
+    },
+  });
+
+  const bulkSkipMutation = trpc.staff.bulkSkip.useMutation({
+    onMutate: async (variables) => {
+      setTickets(prev => prev.filter(t => !variables.ticketIds.includes(t.id)));
+    },
+    onSuccess: (data) => {
+      toast.success(`${data.successCount}${t('staff.bulkSkipSuccess')}`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      setBulkSkipDialogOpen(false);
+      setBulkSkipReason('');
+      refetchWaitingList();
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+      refetchWaitingList();
+    },
+  });
+
+  const toggleIntakeMutation = trpc.staff.toggleIntake.useMutation({
+    onSuccess: () => {
+      const newStatus = intakeStatus === 'open' ? 'paused' : 'open';
+      setIntakeStatus(newStatus);
+      toast.success(newStatus === 'open' ? t('staff.intakeOpen') : t('staff.intakePaused'));
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+    },
+  });
+
+  const toggleOverrideMutation = trpc.staff.toggleBusinessHoursOverride.useMutation({
+    onSuccess: (data) => {
+      setBusinessHoursOverride(data.override);
+      toast.success(
+        data.override
+          ? t('staff.businessHoursOverrideOn')
+          : t('staff.businessHoursOverrideOff')
+      );
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+    },
+  });
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!store || !pin) return;
+    setIsLoggingIn(true);
+    loginMutation.mutate({ storeId: store.id, pin });
+  };
+
+  const handleStaffSelect = (staffMemberId: number) => {
+    if (!store || !pin) return;
+    setIsLoggingIn(true);
+    loginMutation.mutate({ storeId: store.id, pin, staffMemberId });
+  };
+
+  const handleCancelStaffSelection = () => {
+    setStaffSelectionMode(false);
+    setAvailableStaffMembers([]);
+    setPendingRole(null);
+    setPin('');
+  };
+
+  const handleLogout = () => {
+    if (sessionToken) {
+      logoutMutation.mutate({ sessionToken });
+    }
+  };
+
+  const handleCallNext = () => {
+    if (!sessionToken || !store) return;
+    callNextMutation.mutate({ sessionToken, storeId: store.id });
+  };
+
+  const handleManualCreate = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!sessionToken || !store) return;
+    manualCreateMutation.mutate({
+      sessionToken,
+      storeId: store.id,
+      partySize: manualPartySize,
+      note: manualNote.trim() || undefined,
+    });
+  };
+
+  const handleManualPartySizeChange = (value: string) => {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isNaN(parsed)) {
+      setManualPartySize(1);
+      return;
+    }
+    const clamped = Math.max(1, Math.min(parsed, manualMaxPartySize));
+    setManualPartySize(clamped);
+  };
+ 
+  const handleRecall = (ticketId: number) => {
+
+    if (!sessionToken) return;
+    recallMutation.mutate({ sessionToken, ticketId });
+  };
+
+  const handleSkip = (ticketId: number) => {
+
+    setSelectedTicketId(ticketId);
+    setSkipDialogOpen(true);
+  };
+
+  const confirmSkip = () => {
+    if (!sessionToken || !selectedTicketId) return;
+    skipMutation.mutate({ sessionToken, ticketId: selectedTicketId, reason: skipReason || undefined });
+  };
+
+  const handleMoveTicket = (ticketId: number, delta: number) => {
+    if (!sessionToken) return;
+    if (reorderReasonRequired) {
+      setReorderTarget({ ticketId, delta });
+      setReorderDialogOpen(true);
+      return;
+    }
+    moveTicketMutation.mutate({ sessionToken, ticketId, delta });
+  };
+
+  const confirmReorder = () => {
+    if (!sessionToken || !reorderTarget) return;
+    moveTicketMutation.mutate({
+      sessionToken,
+      ticketId: reorderTarget.ticketId,
+      delta: reorderTarget.delta,
+      reason: reorderReason.trim() || undefined,
+    });
+  };
+
+  const handleReorderDialogChange = (open: boolean) => {
+    setReorderDialogOpen(open);
+    if (!open) {
+      setReorderReason('');
+      setReorderTarget(null);
+    }
+  };
+ 
+  const handleDone = (ticketId: number) => {
+    if (!sessionToken) return;
+    doneMutation.mutate({ sessionToken, ticketId });
+  };
+
+  const toggleSelection = (ticketId: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(ticketId)) {
+        next.delete(ticketId);
+      } else {
+        next.add(ticketId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const selectableIds = filteredTickets.map(t => t.id);
+    if (selectedIds.size === selectableIds.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableIds));
+    }
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDone = () => {
+    setBulkDoneDialogOpen(true);
+  };
+
+  const confirmBulkDone = () => {
+    if (!sessionToken) return;
+    bulkDoneMutation.mutate({ sessionToken, ticketIds: Array.from(selectedIds) });
+    setBulkDoneDialogOpen(false);
+  };
+
+  const handleBulkSkip = () => {
+    setBulkSkipDialogOpen(true);
+  };
+
+  const confirmBulkSkip = () => {
+    if (!sessionToken) return;
+    bulkSkipMutation.mutate({ sessionToken, ticketIds: Array.from(selectedIds), reason: bulkSkipReason || undefined });
+  };
+
+  const handleToggleIntake = () => {
+    if (!sessionToken || !store) return;
+    const newStatus = intakeStatus === 'open' ? 'paused' : 'open';
+    toggleIntakeMutation.mutate({ sessionToken, storeId: store.id, status: newStatus });
+  };
+
+  const handleToggleOverride = (checked: boolean) => {
+    if (!sessionToken || !store) return;
+    toggleOverrideMutation.mutate({ sessionToken, storeId: store.id, override: checked });
+  };
+
+  // Business hours status
+  const businessHoursEnabled = store?.settings?.businessHours?.enabled === true;
+  const businessHoursStatus = businessHoursEnabled ? checkBusinessHours(store?.settings?.businessHours as any) : null;
+  const isOutsideBusinessHours = businessHoursStatus ? !businessHoursStatus.isOpen : false;
+
+  const getStatusBadge = (status: TicketStatus) => {
+    const variants: Record<TicketStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
+      WAITING: { variant: 'secondary', label: t('ticket.status.WAITING') },
+      CALLED: { variant: 'default', label: t('ticket.status.CALLED') },
+      ARRIVED: { variant: 'default', label: t('ticket.status.ARRIVED') },
+      SKIPPED: { variant: 'outline', label: t('ticket.status.SKIPPED') },
+      DONE: { variant: 'secondary', label: t('ticket.status.DONE') },
+      CANCELED: { variant: 'destructive', label: t('ticket.status.CANCELED') },
+      EXPIRED: { variant: 'destructive', label: t('ticket.status.EXPIRED') },
+    };
+    const config = variants[status];
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  if (storeLoading || sessionLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (storeError || !store) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4">
+        <AlertCircle className="h-16 w-16 text-destructive" />
+        <h1 className="text-2xl font-bold">{t('common.error')}</h1>
+        <Button variant="outline" onClick={() => navigate(`/s/${params.storeSlug}`)}>
+          {t('common.back')}
+        </Button>
+      </div>
+    );
+  }
+
+  // Staff Selection Screen — after PIN verification
+  if (staffSelectionMode && availableStaffMembers.length > 0) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
+        <header className="p-4 flex justify-between items-center">
+          <Button variant="ghost" size="icon" className="active:scale-90 transition-transform" onClick={handleCancelStaffSelection}>
+            <XCircle className="h-5 w-5" />
+          </Button>
+          <LanguageSwitcher showLabel />
+        </header>
+        <main className="flex-1 container flex flex-col items-center justify-center py-4">
+          <AnimatedCard delay={100} hoverEffect={false} className="w-full max-w-sm">
+            <Card className="w-full">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-center">{t('staff.selectStaff')}</CardTitle>
+                <CardDescription className="text-center">{t('staff.selectStaffDesc')}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {availableStaffMembers.map((member) => (
+                  <Button
+                    key={member.id}
+                    variant="outline"
+                    className="w-full h-14 text-lg justify-start gap-3 active:scale-[0.97] transition-transform"
+                    disabled={isLoggingIn}
+                    onClick={() => handleStaffSelect(member.id)}
+                  >
+                    <Users className="h-5 w-5 text-muted-foreground" />
+                    {member.name}
+                  </Button>
+                ))}
+                <Separator className="my-3" />
+                <Button
+                  variant="ghost"
+                  className="w-full text-muted-foreground"
+                  onClick={handleCancelStaffSelection}
+                >
+                  {t('common.back')}
+                </Button>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+        </main>
+      </div>
+    );
+  }
+
+  // Login Screen — Numpad UI
+  if (!sessionToken || !session) {
+    const handleNumpadPress = (digit: string) => {
+      if (pin.length < 8) {
+        setPin(prev => prev + digit);
+      }
+    };
+    const handleNumpadDelete = () => {
+      setPin(prev => prev.slice(0, -1));
+    };
+    const handleNumpadClear = () => {
+      setPin('');
+    };
+
+    return (
+      <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
+        <header className="p-4 flex justify-between items-center">
+          <Button variant="ghost" size="icon" className="active:scale-90 transition-transform" onClick={() => navigate(`/s/${params.storeSlug}`)}>
+            <XCircle className="h-5 w-5" />
+          </Button>
+          <LanguageSwitcher showLabel />
+        </header>
+        <main className="flex-1 container flex flex-col items-center justify-center py-4">
+          <AnimatedCard delay={100} hoverEffect={false} className="w-full max-w-sm">
+            <Card className="w-full">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-center">{t('staff.login')}</CardTitle>
+                <CardDescription className="text-center">{t('staff.pinLabel')}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleLogin} className="space-y-4">
+                  {/* PIN dots display */}
+                  <div className="flex items-center justify-center gap-3 py-4">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`h-4 w-4 rounded-full transition-all duration-200 ${
+                          i < pin.length
+                            ? 'bg-primary scale-110'
+                            : 'bg-muted border-2 border-muted-foreground/20'
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Hidden input for form submission */}
+                  <input type="hidden" value={pin} />
+
+                  {/* Numpad grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+                      <Button
+                        key={digit}
+                        type="button"
+                        variant="outline"
+                        className="h-14 text-2xl font-semibold hover:bg-accent active:scale-90 transition-transform"
+                        onClick={() => handleNumpadPress(digit)}
+                      >
+                        {digit}
+                      </Button>
+                    ))}
+                    {/* Bottom row: Clear, 0, Delete */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-14 text-sm font-medium text-muted-foreground hover:text-foreground active:scale-95 transition-transform"
+                      onClick={handleNumpadClear}
+                    >
+                      {t('staff.numpadClear')}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-14 text-2xl font-semibold hover:bg-accent active:scale-90 transition-transform"
+                      onClick={() => handleNumpadPress('0')}
+                    >
+                      0
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-14 text-lg font-medium text-muted-foreground hover:text-foreground active:scale-95 transition-transform"
+                      onClick={handleNumpadDelete}
+                    >
+                      ⌫
+                    </Button>
+                  </div>
+
+                  {/* Login button */}
+                  <Button
+                    type="submit"
+                    className="w-full h-14 text-lg active:scale-[0.97] transition-transform"
+                    disabled={isLoggingIn || !pin}
+                  >
+                    {isLoggingIn ? (
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    ) : null}
+                    {t('staff.login')}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+        </main>
+      </div>
+    );
+  }
+
+  // Staff Dashboard
+  const waitingTickets = tickets.filter(t => t.status === 'WAITING');
+  const calledTickets = tickets.filter(t => t.status === 'CALLED');
+  const arrivedTickets = tickets.filter(t => t.status === 'ARRIVED');
+  const filteredTickets = statusFilter === 'ALL' ? tickets : tickets.filter(t => t.status === statusFilter);
+  const waitingIndexMap = new Map(waitingTickets.map((ticket, index) => [ticket.id, index]));
+  const lastWaitingIndex = waitingTickets.length - 1;
+  const canReorder = reorderEnabled && reorderModeEnabled && reorderMaxMove > 0;
+
+  const handleFilterChange = (filter: 'ALL' | 'WAITING' | 'CALLED' | 'ARRIVED') => {
+    setStatusFilter(filter);
+    // Reset selection when filter changes
+    if (selectionMode) {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const statusFilterOptions = [
+    { value: 'ALL' as const, label: t('staff.filterAll'), count: tickets.length },
+    { value: 'WAITING' as const, label: t('ticket.status.WAITING'), count: waitingTickets.length },
+    { value: 'CALLED' as const, label: t('ticket.status.CALLED'), count: calledTickets.length },
+    { value: 'ARRIVED' as const, label: t('ticket.status.ARRIVED'), count: arrivedTickets.length },
+  ];
+
+  return (
+    <StoreLayout storeSlug={params.storeSlug || ''} storeName={store.name}>
+      <div className="min-h-screen flex flex-col bg-background">
+        {/* Header */}
+        <header className="sticky top-0 z-10 bg-background border-b">
+          <div className="container py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-semibold">{store.name}</h1>
+              <Badge variant={role === 'manager' ? 'default' : 'secondary'}>
+              {role === 'manager' ? t('staff.roleManager') : t('staff.roleStaff')}
+            </Badge>
+            {staffMemberName && (
+              <span className="text-sm text-muted-foreground">{staffMemberName}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <Button variant="ghost" size="icon" onClick={handleLogout}>
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* P0-4: 「次を呼ぶ」ボタン + ステータスをsticky固定 */}
+      <div className="sticky top-[53px] z-10 bg-background border-b shadow-sm">
+        <div className="container py-3 space-y-3">
+          {/* Call Next Button — 最も重要なアクション */}
+          <Button
+            size="lg"
+            className="w-full h-14 text-lg"
+            onClick={handleCallNext}
+            disabled={callNextMutation.isPending || waitingTickets.length === 0 || !permissions.canCall}
+          >
+            {callNextMutation.isPending ? (
+              <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+            ) : (
+              <Bell className="mr-2 h-6 w-6" />
+            )}
+            {t('staff.call')} ({waitingTickets.length})
+          </Button>
+
+          {/* Stats — コンパクトなインライン表示 */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex items-center justify-center gap-2 p-2 bg-muted/50 rounded-lg">
+              <span className="text-lg font-bold text-primary tabular-nums">{waitingTickets.length}</span>
+              <span className="text-xs text-muted-foreground">{t('ticket.status.WAITING')}</span>
+            </div>
+            <div className="flex items-center justify-center gap-2 p-2 bg-muted/50 rounded-lg">
+              <span className="text-lg font-bold text-warning tabular-nums">{calledTickets.length}</span>
+              <span className="text-xs text-muted-foreground">{t('ticket.status.CALLED')}</span>
+            </div>
+            <div className="flex items-center justify-center gap-2 p-2 bg-muted/50 rounded-lg">
+              <span className="text-lg font-bold text-success tabular-nums">{arrivedTickets.length}</span>
+              <span className="text-xs text-muted-foreground">{t('ticket.status.ARRIVED')}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="container py-4 space-y-4">
+        {/* Intake Status */}
+        <div className="flex items-center justify-between p-3 bg-card rounded-lg border">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium">{t('staff.intake')}</span>
+            <Badge variant={intakeStatus === 'open' ? 'default' : 'destructive'}>
+              {intakeStatus === 'open' ? t('staff.intakeOpen') : t('staff.intakePaused')}
+            </Badge>
+          </div>
+          <Button
+            variant={intakeStatus === 'open' ? 'destructive' : 'default'}
+            size="sm"
+            onClick={handleToggleIntake}
+            disabled={toggleIntakeMutation.isPending || !permissions.canManage}
+          >
+            {intakeStatus === 'open' ? (
+              <>
+                <Pause className="mr-2 h-4 w-4" />
+                {t('staff.pauseIntake')}
+              </>
+            ) : (
+              <>
+                <Play className="mr-2 h-4 w-4" />
+                {t('staff.resumeIntake')}
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Business Hours Override — 営業時間外受付許可 (canManage権限が必要) */}
+        {businessHoursEnabled && isOutsideBusinessHours && permissions.canManage && (
+          <div className="flex items-center justify-between p-3 bg-card rounded-lg border border-warning/50">
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-warning" />
+                <span className="text-sm font-medium">{t('staff.businessHoursOverride')}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {businessHoursOverride
+                  ? t('staff.businessHoursOverrideOnDesc')
+                  : t('staff.businessHoursOverrideOffDesc')}
+              </p>
+            </div>
+            <Switch
+              checked={businessHoursOverride}
+              onCheckedChange={handleToggleOverride}
+              disabled={toggleOverrideMutation.isPending}
+            />
+          </div>
+        )}
+
+        {/* Business Hours Override Active Banner */}
+        {businessHoursEnabled && businessHoursOverride && permissions.canManage && (
+          <Alert className="border-warning/50 bg-warning/5">
+            <AlertCircle className="h-4 w-4 text-warning" />
+            <AlertTitle className="text-warning">{t('staff.businessHoursOverrideActive')}</AlertTitle>
+            <AlertDescription className="text-xs">
+              {t('staff.businessHoursOverrideActiveDesc')}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Manual Add — 折りたたみ (canManage権限が必要) */}
+        {permissions.canManage && (
+        <div className="bg-card rounded-lg border">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between p-3 text-left"
+            onClick={() => setShowManualForm(!showManualForm)}
+          >
+            <span className="text-sm font-medium">{t('staff.manualAddTitle')}</span>
+            {showManualForm ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+          {showManualForm && (
+            <div className="px-3 pb-3 border-t">
+              <p className="text-xs text-muted-foreground mt-2 mb-3">{t('staff.manualAddDescription')}</p>
+              <form className="space-y-3" onSubmit={handleManualCreate}>
+                <div className="grid gap-3 md:grid-cols-[160px,1fr]">
+                  <div className="space-y-1">
+                    <Label htmlFor="manualPartySize">{t('join.partySize')}</Label>
+                    <Input
+                      id="manualPartySize"
+                      type="number"
+                      min={1}
+                      max={manualMaxPartySize}
+                      value={manualPartySize}
+                      onChange={(e) => handleManualPartySizeChange(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="manualNote">{t('join.note')}</Label>
+                    <Textarea
+                      id="manualNote"
+                      value={manualNote}
+                      onChange={(e) => setManualNote(e.target.value)}
+                      placeholder={t('join.notePlaceholder')}
+                      rows={2}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={manualCreateMutation.isPending || intakeStatus !== 'open'}
+                  >
+                    {manualCreateMutation.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {t('staff.manualAddAction')}
+                  </Button>
+                  {intakeStatus !== 'open' && (
+                    <p className="text-xs text-muted-foreground">{t('staff.manualAddDisabled')}</p>
+                  )}
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+        )}
+
+        {reorderEnabled && permissions.canManage && (
+          <div className="flex items-center justify-between p-3 bg-card rounded-lg border">
+            <div className="space-y-1">
+              <span className="text-sm font-medium">{t('staff.reorderMode')}</span>
+              <p className="text-xs text-muted-foreground">
+                {reorderModeEnabled ? t('staff.reorderModeOn') : t('staff.reorderModeOff')}
+              </p>
+            </div>
+            <Switch
+              checked={reorderModeEnabled}
+              onCheckedChange={(checked) => setReorderModeEnabled(checked)}
+            />
+          </div>
+        )}
+
+        {reorderEnabled && reorderModeEnabled && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>{t('staff.reorderMode')}</AlertTitle>
+            <AlertDescription>{t('staff.reorderWarning')}</AlertDescription>
+          </Alert>
+        )}
+      </div>
+
+      {/* Ticket List */}
+      <div className="flex-1 container pb-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h2 className="font-semibold">{t('staff.waitingList')}</h2>
+            {tickets.length > 0 && permissions.canManage && (
+              <Button
+                variant={selectionMode ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
+              >
+                {selectionMode ? <X className="h-4 w-4 mr-1" /> : <ListChecks className="h-4 w-4 mr-1" />}
+                {selectionMode ? t('staff.selectionModeOff') : t('staff.selectionMode')}
+              </Button>
+            )}
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => refetchWaitingList()}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Status Filter Tabs */}
+        <div className="flex items-center gap-1 mb-3 overflow-x-auto pb-1">
+          <Filter className="h-4 w-4 text-muted-foreground mr-1 shrink-0" />
+          {statusFilterOptions.map((option) => (
+            <Button
+              key={option.value}
+              variant={statusFilter === option.value ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleFilterChange(option.value)}
+              className="shrink-0"
+            >
+              {option.label}
+              <Badge
+                variant={statusFilter === option.value ? 'secondary' : 'outline'}
+                className="ml-1.5 px-1.5 py-0 text-xs min-w-[1.25rem] justify-center"
+              >
+                {option.count}
+              </Badge>
+            </Button>
+          ))}
+        </div>
+
+        {/* Bulk Action Bar */}
+        {selectionMode && (
+          <div className="flex items-center justify-between mb-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" onClick={toggleSelectAll}>
+                {selectedIds.size === filteredTickets.length ? t('staff.deselectAll') : t('staff.selectAll')}
+              </Button>
+              <span className="text-sm font-medium">
+                {selectedIds.size}{t('staff.selectedCount')}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBulkSkip}
+                disabled={selectedIds.size === 0 || bulkSkipMutation.isPending || bulkDoneMutation.isPending}
+              >
+                <SkipForward className="h-4 w-4 mr-1" />
+                {t('staff.bulkSkip')}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleBulkDone}
+                disabled={selectedIds.size === 0 || bulkDoneMutation.isPending || bulkSkipMutation.isPending}
+              >
+                {bulkDoneMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                )}
+                {t('staff.bulkDone')}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <ScrollArea className="h-[calc(100vh-400px)]">
+          {tickets.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>{t('staff.noWaiting')}</p>
+            </div>
+          ) : filteredTickets.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Filter className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>{t('staff.filterNoResults')}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredTickets.map((ticket) => {
+                const waitingIndex = waitingIndexMap.get(ticket.id);
+                const canMoveUp = canReorder && ticket.status === 'WAITING' && waitingIndex !== undefined && waitingIndex > 0;
+                const canMoveDown = canReorder && ticket.status === 'WAITING' && waitingIndex !== undefined && waitingIndex < lastWaitingIndex;
+
+                return (
+                  <Card
+                    key={ticket.id}
+                    className={`${ticket.status === 'CALLED' ? 'ring-2 ring-primary' : ''} ${selectionMode && selectedIds.has(ticket.id) ? 'bg-primary/5 ring-1 ring-primary/30' : ''} ${selectionMode ? 'cursor-pointer' : ''}`}
+                    onClick={selectionMode ? () => toggleSelection(ticket.id) : undefined}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-4">
+                          {selectionMode && (
+                            <Checkbox
+                              checked={selectedIds.has(ticket.id)}
+                              onCheckedChange={() => toggleSelection(ticket.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-1"
+                            />
+                          )}
+                          <div className="text-3xl font-bold tabular-nums">#{ticket.number}</div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              {getStatusBadge(ticket.status)}
+                              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {ticket.partySize}
+                              </span>
+                            </div>
+                            {ticket.note && (
+                              <p className="text-sm text-muted-foreground mt-1 italic">"{ticket.note}"</p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(ticket.createdAt).toLocaleTimeString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {ticket.status === 'WAITING' && canReorder && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                aria-label={t('staff.moveUp')}
+                                onClick={() => handleMoveTicket(ticket.id, -1)}
+                                disabled={!canMoveUp || moveTicketMutation.isPending}
+                              >
+                                <ChevronUp className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                aria-label={t('staff.moveDown')}
+                                onClick={() => handleMoveTicket(ticket.id, 1)}
+                                disabled={!canMoveDown || moveTicketMutation.isPending}
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          {ticket.status === 'CALLED' && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleRecall(ticket.id)}
+                                disabled={recallMutation.isPending || doneMutation.isPending || skipMutation.isPending || !permissions.canCall}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                              {permissions.canManage && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSkip(ticket.id)}
+                                disabled={skipMutation.isPending || doneMutation.isPending}
+                              >
+                                <SkipForward className="h-4 w-4" />
+                              </Button>
+                              )}
+                            </>
+                          )}
+                        {ticket.status === 'ARRIVED' && permissions.canManage && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleDone(ticket.id)}
+                            disabled={doneMutation.isPending}
+                          >
+                            <CheckCircle className="mr-1 h-4 w-4" />
+                            {t('staff.done')}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+
+      {/* Skip Dialog */}
+      <AlertDialog open={skipDialogOpen} onOpenChange={setSkipDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('staff.skip')}</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-muted-foreground text-sm">
+                <div className="space-y-3 mt-2">
+                  <Label htmlFor="skipReason">{t('staff.reorderReason')}</Label>
+                  <Input
+                    id="skipReason"
+                    placeholder={t('staff.reorderReasonPlaceholder')}
+                    value={skipReason}
+                    onChange={(e) => setSkipReason(e.target.value)}
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSkip}>
+              {t('common.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reorder Dialog */}
+      <AlertDialog open={reorderDialogOpen} onOpenChange={handleReorderDialogChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('staff.reorderConfirm')}</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-muted-foreground text-sm">
+                <div className="space-y-3 mt-2">
+                  <Label htmlFor="reorderReason">{t('staff.reorderReason')}</Label>
+                  <Input
+                    id="reorderReason"
+                    placeholder={t('staff.reorderReasonPlaceholder')}
+                    value={reorderReason}
+                    onChange={(e) => setReorderReason(e.target.value)}
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmReorder}
+              disabled={moveTicketMutation.isPending || (reorderReasonRequired && !reorderReason.trim())}
+            >
+              {t('common.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Done Confirm Dialog */}
+      <AlertDialog open={bulkDoneDialogOpen} onOpenChange={setBulkDoneDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('staff.bulkDone')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('staff.bulkDoneConfirm')}
+              <br />
+              <span className="text-xs text-muted-foreground">{t('staff.bulkActionDesc')}</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkDone}
+              disabled={bulkDoneMutation.isPending}
+            >
+              {bulkDoneMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : null}
+              {t('staff.bulkDone')} ({selectedIds.size})
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Skip Confirm Dialog */}
+      <AlertDialog open={bulkSkipDialogOpen} onOpenChange={(open) => {
+        setBulkSkipDialogOpen(open);
+        if (!open) setBulkSkipReason('');
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('staff.bulkSkip')}</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-muted-foreground text-sm">
+                {t('staff.bulkSkipConfirm')}
+                <div className="space-y-3 mt-3">
+                  <Label htmlFor="bulkSkipReason">{t('staff.reorderReason')}</Label>
+                  <Input
+                    id="bulkSkipReason"
+                    placeholder={t('staff.reorderReasonPlaceholder')}
+                    value={bulkSkipReason}
+                    onChange={(e) => setBulkSkipReason(e.target.value)}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground mt-2 block">{t('staff.bulkActionDesc')}</span>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkSkip}
+              disabled={bulkSkipMutation.isPending}
+            >
+              {bulkSkipMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : null}
+              {t('staff.bulkSkip')} ({selectedIds.size})
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      </div>
+    </StoreLayout>
+  );
+}
+
+export default function Staff() {
+  const params = useParams<{ storeSlug: string }>();
+  const { data: store } = trpc.store.getBySlug.useQuery(
+    { slug: params.storeSlug || '' },
+    { enabled: !!params.storeSlug }
+  );
+
+  const supportedLocales = (store?.supportedLocales || SUPPORTED_LOCALES) as Locale[];
+  const defaultLocale = (store?.defaultLocale || 'ja') as Locale;
+
+  return (
+    <LocaleProvider defaultLocale={defaultLocale} supportedLocales={supportedLocales}>
+      <StaffContent />
+    </LocaleProvider>
+  );
+}

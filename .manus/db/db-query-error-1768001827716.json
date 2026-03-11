@@ -1,0 +1,8 @@
+{
+  "query": "DESCRIBE stores;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user zN6v3835fExzWSq.4b780e52d435 --database 9PkSnVJ3696qvv2NFCWti9 --execute DESCRIBE stores;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1146 (42S02) at line 1: Table '9pksnvj3696qvv2nfcwti9.stores' doesn't exist"
+  ]
+}
