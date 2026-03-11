@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { AdminLayout } from "@/components/internal-admin/AdminLayout";
 import { IncludeTestToggle } from "@/components/internal-admin/IncludeTestToggle";
 import { KpiCard } from "@/components/internal-admin/KpiCard";
+import { QueryErrorAlert } from "@/components/internal-admin/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,12 +75,18 @@ export default function InternalAdminTickets() {
     () => heatmapData.reduce((max, row) => Math.max(max, row.avgCount), 0),
     [heatmapData]
   );
+  const primaryError =
+    summaryQuery.error ??
+    byStoreQuery.error ??
+    peakHoursQuery.error ??
+    checkinRateQuery.error;
 
   return (
     <AdminLayout
       title="チケット統計"
       description="全店舗の受付・呼び出し・到着状況を期間別に確認できます。"
     >
+      {primaryError ? <QueryErrorAlert message={primaryError.message} /> : null}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-2">
           {ticketDayOptions.map(option => (
@@ -95,7 +102,7 @@ export default function InternalAdminTickets() {
         <IncludeTestToggle checked={includeTest} onCheckedChange={setIncludeTest} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <KpiCard
           title="総発券数"
           value={formatNumber(summaryQuery.data?.totalTickets ?? 0)}
@@ -129,6 +136,13 @@ export default function InternalAdminTickets() {
           value={`${formatNumber(summaryQuery.data?.avgWaitMinutes ?? 0)}分`}
           description="createdAt → calledAt"
           icon={Clock3}
+          loading={summaryQuery.isLoading}
+        />
+        <KpiCard
+          title="キャンセル率"
+          value={formatRate(summaryQuery.data?.cancelRate ?? 0)}
+          description={`キャンセル ${formatNumber(summaryQuery.data?.canceledCount ?? 0)} 件`}
+          icon={Activity}
           loading={summaryQuery.isLoading}
         />
       </div>

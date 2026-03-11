@@ -74,6 +74,7 @@ describe("admin test accounts router", () => {
             intakeStatus: "open",
             testPlanOverride: "free",
             subscriptionPlan: "free",
+            effectiveSubscriptionPlan: "free",
             currentNumber: 0,
             isTest: true,
             updatedAt: new Date("2026-03-11T10:00:00.000Z").toISOString(),

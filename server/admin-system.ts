@@ -74,3 +74,64 @@ export async function getAdminSystemHealth() {
     };
   }
 }
+
+export async function getAdminTwilioBalance() {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+
+  if (!accountSid || !authToken) {
+    return {
+      available: false,
+      currency: null,
+      balance: null,
+      formattedBalance: "Unavailable",
+      error: "Twilio credentials are not configured",
+    };
+  }
+
+  try {
+    const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Balance.json`,
+      {
+        headers: {
+          Authorization: `Basic ${auth}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      return {
+        available: false,
+        currency: null,
+        balance: null,
+        formattedBalance: "Unavailable",
+        error: `Twilio balance request failed with status ${response.status}`,
+      };
+    }
+
+    const result = (await response.json()) as {
+      balance?: string | null;
+      currency?: string | null;
+    };
+    const currency = result.currency?.toUpperCase() ?? null;
+    const balance = result.balance ?? null;
+
+    return {
+      available: balance !== null,
+      currency,
+      balance,
+      formattedBalance:
+        balance !== null ? `${currency ?? "BAL"} ${balance}` : "Unavailable",
+      error: null,
+    };
+  } catch (error) {
+    return {
+      available: false,
+      currency: null,
+      balance: null,
+      formattedBalance: "Unavailable",
+      error: error instanceof Error ? error.message : "Unknown Twilio error",
+    };
+  }
+}

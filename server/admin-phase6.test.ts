@@ -16,6 +16,7 @@ vi.mock("./admin-system", async () => {
     ...actual,
     getAdminSystemVapidStatus: vi.fn(),
     getAdminSystemHealth: vi.fn(),
+    getAdminTwilioBalance: vi.fn(),
   };
 });
 
@@ -91,6 +92,13 @@ describe("admin phase 6 router", () => {
       latencyMs: 8,
       checkedAt: new Date("2026-03-11T12:00:00.000Z").toISOString(),
     });
+    vi.mocked(adminSystem.getAdminTwilioBalance).mockResolvedValue({
+      available: true,
+      currency: "USD",
+      balance: "12.34",
+      formattedBalance: "USD 12.34",
+      error: null,
+    });
   });
 
   it("passes system inputs through to helpers", async () => {
@@ -106,6 +114,10 @@ describe("admin phase 6 router", () => {
     await expect(caller.admin.system.vapidStatus({ includeTest: true })).resolves.toMatchObject({
       source: "env",
     });
+    await expect(caller.admin.system.twilioBalance()).resolves.toMatchObject({
+      available: true,
+      formattedBalance: "USD 12.34",
+    });
     await expect(caller.admin.system.health()).resolves.toMatchObject({
       queryOk: true,
       latencyMs: 8,
@@ -114,6 +126,7 @@ describe("admin phase 6 router", () => {
     expect(adminDb.getAdminPushStats).toHaveBeenCalledWith({ includeTest: true });
     expect(adminDb.getAdminSmsStats).toHaveBeenCalledWith({ includeTest: false });
     expect(adminSystem.getAdminSystemVapidStatus).toHaveBeenCalledWith({ includeTest: true });
+    expect(adminSystem.getAdminTwilioBalance).toHaveBeenCalled();
     expect(adminSystem.getAdminSystemHealth).toHaveBeenCalled();
   });
 
@@ -121,6 +134,9 @@ describe("admin phase 6 router", () => {
     const caller = appRouter.createCaller(createContext("regular-user", false));
 
     await expect(caller.admin.system.pushStats({ includeTest: false })).rejects.toThrow(
+      "You do not have required permission (10002)"
+    );
+    await expect(caller.admin.system.twilioBalance()).rejects.toThrow(
       "You do not have required permission (10002)"
     );
     await expect(caller.admin.system.health()).rejects.toThrow(

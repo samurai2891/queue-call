@@ -29,7 +29,11 @@ import {
   updateAdminUserTestFlag,
 } from "../db";
 import { getAdminChurnRate, getAdminRecentPayments } from "../admin-revenue";
-import { getAdminSystemHealth, getAdminSystemVapidStatus } from "../admin-system";
+import {
+  getAdminSystemHealth,
+  getAdminSystemVapidStatus,
+  getAdminTwilioBalance,
+} from "../admin-system";
 
 const pageInput = z.object({
   page: z.number().int().min(1).optional().default(1),
@@ -341,6 +345,9 @@ export const adminRouter = router({
       .query(async ({ input }) => {
         return getAdminSystemVapidStatus(input);
       }),
+    twilioBalance: internalAdminProcedure.query(async () => {
+      return getAdminTwilioBalance();
+    }),
     health: internalAdminProcedure.query(async () => {
       return getAdminSystemHealth();
     }),

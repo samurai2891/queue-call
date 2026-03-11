@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/internal-admin/AdminLayout";
+import { QueryErrorAlert } from "@/components/internal-admin/QueryErrorAlert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -124,6 +125,7 @@ export default function InternalAdminStores() {
   const selectedStore = detailQuery.data;
   const statusChanged = selectedStore ? draftStatus !== selectedStore.intakeStatus : false;
   const testFlagChanged = selectedStore ? draftIsTest !== selectedStore.isTest : false;
+  const primaryError = listQuery.error ?? detailQuery.error;
 
   const saveStatus = async (nextStatus: StoreStatus) => {
     if (!selectedStoreId) return;
@@ -139,6 +141,7 @@ export default function InternalAdminStores() {
       title="店舗管理"
       description="店舗の稼働状態、プラン、テストフラグを横断して管理できます。"
     >
+      {primaryError ? <QueryErrorAlert message={primaryError.message} /> : null}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
           <Card>
@@ -261,7 +264,10 @@ export default function InternalAdminStores() {
                                 <Badge variant={item.intakeStatus === "open" ? "secondary" : "outline"}>
                                   {item.intakeStatus === "open" ? "受付中" : "一時停止"}
                                 </Badge>
-                                <Badge variant="outline">{item.subscriptionPlan}</Badge>
+                                <Badge variant="outline">actual {item.subscriptionPlan}</Badge>
+                                {item.effectiveSubscriptionPlan !== item.subscriptionPlan ? (
+                                  <Badge>effective {item.effectiveSubscriptionPlan}</Badge>
+                                ) : null}
                                 {item.isTest ? <Badge variant="outline">テスト</Badge> : null}
                               </div>
                             </TableCell>
@@ -367,7 +373,10 @@ export default function InternalAdminStores() {
                       <Badge variant={selectedStore.intakeStatus === "open" ? "secondary" : "outline"}>
                         {selectedStore.intakeStatus === "open" ? "受付中" : "一時停止"}
                       </Badge>
-                      <Badge variant="outline">{selectedStore.subscriptionPlan}</Badge>
+                      <Badge variant="outline">actual {selectedStore.subscriptionPlan}</Badge>
+                      {selectedStore.effectiveSubscriptionPlan !== selectedStore.subscriptionPlan ? (
+                        <Badge>effective {selectedStore.effectiveSubscriptionPlan}</Badge>
+                      ) : null}
                       {selectedStore.subscriptionStatus ? (
                         <Badge variant="outline">{selectedStore.subscriptionStatus}</Badge>
                       ) : null}

@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/internal-admin/AdminLayout";
+import { QueryErrorAlert } from "@/components/internal-admin/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -131,6 +132,7 @@ export default function InternalAdminUsers() {
   const selectedUser = detailQuery.data;
   const statusChanged = selectedUser ? draftStatus !== selectedUser.status : false;
   const testFlagChanged = selectedUser ? draftIsTest !== selectedUser.isTest : false;
+  const primaryError = listQuery.error ?? detailQuery.error;
 
   const saveStatus = async (nextStatus: UserStatus) => {
     if (!selectedUserId) return;
@@ -146,6 +148,7 @@ export default function InternalAdminUsers() {
       title="ユーザー管理"
       description="契約者アカウントを横断して検索し、状態とテストフラグを更新できます。"
     >
+      {primaryError ? <QueryErrorAlert message={primaryError.message} /> : null}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
           <Card>
@@ -484,7 +487,12 @@ export default function InternalAdminUsers() {
                             <Store className="h-4 w-4 text-muted-foreground" />
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2">
-                            <Badge variant="outline">{store.subscriptionPlan}</Badge>
+                            <Badge variant="outline">actual {store.subscriptionPlan}</Badge>
+                            {store.effectiveSubscriptionPlan !== store.subscriptionPlan ? (
+                              <Badge>
+                                effective {store.effectiveSubscriptionPlan}
+                              </Badge>
+                            ) : null}
                             <Badge variant={store.intakeStatus === "open" ? "secondary" : "outline"}>
                               {store.intakeStatus === "open" ? "受付中" : "一時停止"}
                             </Badge>

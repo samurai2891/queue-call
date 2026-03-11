@@ -283,7 +283,13 @@ describe("Staff Member Router", () => {
         name: "テスト",
       });
 
-      expect(checkStaffLimit).toHaveBeenCalledWith("standard", 3);
+      expect(checkStaffLimit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 1,
+          subscriptionPlan: "standard",
+        }),
+        3,
+      );
     });
 
     it("should reject non-owner access", async () => {

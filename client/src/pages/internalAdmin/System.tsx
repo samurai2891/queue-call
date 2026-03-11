@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { AdminLayout } from "@/components/internal-admin/AdminLayout";
 import { IncludeTestToggle } from "@/components/internal-admin/IncludeTestToggle";
 import { KpiCard } from "@/components/internal-admin/KpiCard";
+import { QueryErrorAlert } from "@/components/internal-admin/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import {
   Database,
   KeyRound,
   MessageSquare,
+  Wallet,
   ShieldAlert,
   Signal,
 } from "lucide-react";
@@ -50,15 +52,25 @@ export default function InternalAdminSystem() {
     { includeTest },
     { enabled: Boolean(user?.isInternalAdmin) }
   );
+  const twilioBalanceQuery = trpc.admin.system.twilioBalance.useQuery(undefined, {
+    enabled: Boolean(user?.isInternalAdmin),
+  });
   const healthQuery = trpc.admin.system.health.useQuery(undefined, {
     enabled: Boolean(user?.isInternalAdmin),
   });
+  const primaryError =
+    pushStatsQuery.error ??
+    smsStatsQuery.error ??
+    vapidStatusQuery.error ??
+    twilioBalanceQuery.error ??
+    healthQuery.error;
 
   return (
     <AdminLayout
       title="システム監視"
       description="Push / SMS / VAPID / DB の状態を read-only で確認します。"
     >
+      {primaryError ? <QueryErrorAlert message={primaryError.message} /> : null}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <Alert className="max-w-3xl">
           <Signal className="h-4 w-4" />
@@ -70,7 +82,7 @@ export default function InternalAdminSystem() {
         <IncludeTestToggle checked={includeTest} onCheckedChange={setIncludeTest} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <KpiCard
           title="Push 購読数"
           value={formatNumber(pushStatsQuery.data?.totalSubscriptions ?? 0)}
@@ -102,6 +114,13 @@ export default function InternalAdminSystem() {
           }
           icon={Database}
           loading={healthQuery.isLoading}
+        />
+        <KpiCard
+          title="Twilio 残高"
+          value={twilioBalanceQuery.data?.formattedBalance ?? "Unavailable"}
+          description={twilioBalanceQuery.data?.error ?? "read-only"}
+          icon={Wallet}
+          loading={twilioBalanceQuery.isLoading}
         />
       </div>
 
@@ -148,7 +167,7 @@ export default function InternalAdminSystem() {
             <CardTitle>SMS 監視</CardTitle>
             <CardDescription>`sms_logs` と `sms_transactions` から 24h / 30d 指標を集計します。</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {smsStatsQuery.isLoading ? (
               [...Array(6)].map((_, index) => <Skeleton key={index} className="h-24 w-full" />)
             ) : (
@@ -176,6 +195,15 @@ export default function InternalAdminSystem() {
                 <div className="rounded-2xl border p-4">
                   <div className="text-sm text-muted-foreground">30d チャージ</div>
                   <div className="mt-2 text-2xl font-semibold">{formatCurrency(smsStatsQuery.data?.chargeAmount30d ?? 0)}</div>
+                </div>
+                <div className="rounded-2xl border p-4">
+                  <div className="text-sm text-muted-foreground">Twilio 残高</div>
+                  <div className="mt-2 text-2xl font-semibold">
+                    {twilioBalanceQuery.data?.formattedBalance ?? "Unavailable"}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {twilioBalanceQuery.data?.error ?? "Twilio Balance API"}
+                  </div>
                 </div>
               </>
             )}

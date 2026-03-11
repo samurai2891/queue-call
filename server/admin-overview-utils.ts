@@ -1,4 +1,13 @@
 export type OverviewPlanId = "free" | "standard" | "pro";
+export type PlanSource =
+  | string
+  | null
+  | undefined
+  | {
+      subscriptionPlan?: string | null;
+      isTest?: boolean | null;
+      testPlanOverride?: string | null;
+    };
 
 export type DailyCountPoint = {
   date: string;
@@ -32,6 +41,30 @@ export function normalizeOverviewPlanId(
     return planId;
   }
   return "free";
+}
+
+export function resolveEffectivePlanId(planSource: PlanSource): OverviewPlanId {
+  if (
+    planSource &&
+    typeof planSource === "object" &&
+    !Array.isArray(planSource)
+  ) {
+    const rawPlanId =
+      planSource.isTest && planSource.testPlanOverride
+        ? planSource.testPlanOverride
+        : planSource.subscriptionPlan;
+
+    return normalizeOverviewPlanId(rawPlanId);
+  }
+
+  return normalizeOverviewPlanId(
+    typeof planSource === "string" || planSource == null ? planSource : undefined
+  );
+}
+
+export function calculateRatio(numerator: number, denominator: number) {
+  if (denominator <= 0) return 0;
+  return numerator / denominator;
 }
 
 export function getPlanMrr(planId: OverviewPlanId) {

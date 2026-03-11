@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/internal-admin/AdminLayout";
+import { QueryErrorAlert } from "@/components/internal-admin/QueryErrorAlert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -151,6 +152,8 @@ export default function InternalAdminTestAccounts() {
   const selectedCandidate =
     candidatesQuery.data?.items.find(user => user.id === selectedUserId) ??
     accountsQuery.data?.find(account => account.user.id === selectedUserId)?.user;
+  const primaryError =
+    statsQuery.error ?? accountsQuery.error ?? candidatesQuery.error;
 
   return (
     <AdminLayout
@@ -158,6 +161,7 @@ export default function InternalAdminTestAccounts() {
       description="既存ユーザーを 1 人選んで test user 化し、fixed slug の 3 店舗を upsert します。"
     >
       <div className="space-y-4">
+        {primaryError ? <QueryErrorAlert message={primaryError.message} /> : null}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Card>
             <CardHeader>
@@ -370,7 +374,10 @@ export default function InternalAdminTestAccounts() {
                             testPlanOverride: {store?.testPlanOverride ?? definition.label.toLowerCase()}
                           </div>
                           <div className="text-muted-foreground">
-                            subscriptionPlan: {store?.subscriptionPlan ?? "-"}
+                            actualPlan: {store?.subscriptionPlan ?? "-"}
+                          </div>
+                          <div className="text-muted-foreground">
+                            effectivePlan: {store?.effectiveSubscriptionPlan ?? definition.label.toLowerCase()}
                           </div>
                           <div className="text-muted-foreground">
                             currentNumber: {store?.currentNumber ?? "-"}

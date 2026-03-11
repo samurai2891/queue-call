@@ -22,9 +22,11 @@ import { ENV } from './_core/env';
 import { getRequestId } from './_core/requestContext';
 import { nanoid } from 'nanoid';
 import {
+  calculateRatio,
   fillMissingDailyCounts,
   getPlanMrr,
   normalizeOverviewPlanId,
+  resolveEffectivePlanId,
   type RecentActivityItem,
 } from "./admin-overview-utils";
 
@@ -2348,7 +2350,7 @@ const fillTicketPeakHours = (
 };
 
 const toRate = (numerator: number, denominator: number) =>
-  denominator > 0 ? numerator / denominator : 0;
+  calculateRatio(numerator, denominator);
 
 const getStoreScopeConditions = (includeTest: boolean) =>
   includeTest ? [] : [eq(stores.isTest, false)];
@@ -2449,6 +2451,7 @@ export async function getAdminTicketSummary({
       arrivedCount: 0,
       doneCount: 0,
       canceledCount: 0,
+      cancelRate: 0,
       avgWaitMinutes: 0,
     };
   }
@@ -2475,6 +2478,10 @@ export async function getAdminTicketSummary({
     arrivedCount: Number(row?.arrivedCount ?? 0),
     doneCount: Number(row?.doneCount ?? 0),
     canceledCount: Number(row?.canceledCount ?? 0),
+    cancelRate: toRate(
+      Number(row?.canceledCount ?? 0),
+      Number(row?.totalTickets ?? 0)
+    ),
     avgWaitMinutes: Math.round(Number(row?.avgWaitMinutes ?? 0)),
   };
 }
@@ -3282,6 +3289,7 @@ export async function getAdminUserDetail({
       slug: stores.slug,
       intakeStatus: stores.intakeStatus,
       subscriptionPlan: stores.subscriptionPlan,
+      testPlanOverride: stores.testPlanOverride,
       isTest: stores.isTest,
     })
     .from(stores)
@@ -3306,6 +3314,7 @@ export async function getAdminUserDetail({
       slug: store.slug,
       intakeStatus: store.intakeStatus,
       subscriptionPlan: store.subscriptionPlan,
+      effectiveSubscriptionPlan: resolveEffectivePlanId(store),
       isTest: store.isTest,
     })),
   };
@@ -3346,6 +3355,7 @@ export async function getAdminStoresPage(input: AdminStoresPageInput) {
         slug: stores.slug,
         intakeStatus: stores.intakeStatus,
         subscriptionPlan: stores.subscriptionPlan,
+        testPlanOverride: stores.testPlanOverride,
         subscriptionStatus: stores.subscriptionStatus,
         isTest: stores.isTest,
         smsBalance: stores.smsBalance,
@@ -3372,6 +3382,7 @@ export async function getAdminStoresPage(input: AdminStoresPageInput) {
     slug: row.slug,
     intakeStatus: row.intakeStatus,
     subscriptionPlan: row.subscriptionPlan,
+    effectiveSubscriptionPlan: resolveEffectivePlanId(row),
     subscriptionStatus: row.subscriptionStatus,
     isTest: row.isTest,
     smsBalance: row.smsBalance,
@@ -3408,6 +3419,7 @@ export async function getAdminStoreDetail(storeId: number) {
       slug: stores.slug,
       intakeStatus: stores.intakeStatus,
       subscriptionPlan: stores.subscriptionPlan,
+      testPlanOverride: stores.testPlanOverride,
       subscriptionStatus: stores.subscriptionStatus,
       isTest: stores.isTest,
       smsBalance: stores.smsBalance,
@@ -3435,6 +3447,7 @@ export async function getAdminStoreDetail(storeId: number) {
     slug: row.slug,
     intakeStatus: row.intakeStatus,
     subscriptionPlan: row.subscriptionPlan,
+    effectiveSubscriptionPlan: resolveEffectivePlanId(row),
     subscriptionStatus: row.subscriptionStatus,
     isTest: row.isTest,
     smsBalance: row.smsBalance,
@@ -3724,6 +3737,7 @@ export async function getAdminTestAccounts() {
         intakeStatus: "open" | "paused";
         testPlanOverride: string | null;
         subscriptionPlan: "free" | "standard" | "pro";
+        effectiveSubscriptionPlan: "free" | "standard" | "pro";
         currentNumber: number;
         isTest: boolean;
         updatedAt: string;
@@ -3767,6 +3781,7 @@ export async function getAdminTestAccounts() {
       intakeStatus: store.intakeStatus,
       testPlanOverride: store.testPlanOverride,
       subscriptionPlan: store.subscriptionPlan,
+      effectiveSubscriptionPlan: resolveEffectivePlanId(store),
       currentNumber: store.currentNumber,
       isTest: store.isTest,
       updatedAt: toIsoString(store.updatedAt),

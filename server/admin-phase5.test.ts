@@ -72,6 +72,7 @@ describe("admin phase 5 router", () => {
       arrivedCount: 60,
       doneCount: 55,
       canceledCount: 8,
+      cancelRate: 0.08,
       avgWaitMinutes: 12,
     });
     vi.mocked(adminDb.getAdminTicketsByStore).mockResolvedValue([
@@ -131,6 +132,7 @@ describe("admin phase 5 router", () => {
 
     await expect(caller.admin.tickets.summary({ days: 30, includeTest: true })).resolves.toMatchObject({
       totalTickets: 100,
+      cancelRate: 0.08,
       avgWaitMinutes: 12,
     });
     await caller.admin.tickets.byStore({ days: 30, includeTest: false, limit: 10 });

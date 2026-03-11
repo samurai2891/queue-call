@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { AdminLayout } from "@/components/internal-admin/AdminLayout";
 import { IncludeTestToggle } from "@/components/internal-admin/IncludeTestToggle";
 import { KpiCard } from "@/components/internal-admin/KpiCard";
+import { QueryErrorAlert } from "@/components/internal-admin/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,12 +87,14 @@ export default function InternalAdminRevenue() {
   );
 
   const stripeErrorMessage = recentPaymentsQuery.error?.message ?? churnRateQuery.error?.message ?? null;
+  const primaryError = mrrQuery.error?.message ?? planBreakdownQuery.error?.message ?? null;
 
   return (
     <AdminLayout
       title="収益"
       description="現在の契約状態は DB、決済履歴と churn は Stripe 参照で表示します。"
     >
+      {primaryError ? <QueryErrorAlert message={primaryError} /> : null}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-2">
           {revenueDayOptions.map(option => (
