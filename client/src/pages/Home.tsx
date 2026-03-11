@@ -17,6 +17,7 @@ import {
   Check,
   X,
   MessageSquare,
+  Shield,
   Zap
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +64,16 @@ export default function Home() {
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : isAuthenticated ? (
               <>
+                {user?.isInternalAdmin ? (
+                  <Button
+                    variant="outline"
+                    className="active:scale-[0.97] transition-transform"
+                    onClick={() => navigate('/internal-admin')}
+                  >
+                    <Shield className="mr-2 h-4 w-4" />
+                    内部管理
+                  </Button>
+                ) : null}
                 <Button variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/admin/dashboard')}>
                   <BarChart3 className="mr-2 h-4 w-4" />
                   ダッシュボード

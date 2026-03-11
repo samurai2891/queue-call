@@ -36,6 +36,13 @@ const SmsHistory = lazy(() => import("./pages/admin/SmsHistory"));
 const SmsTransactions = lazy(() => import("./pages/admin/SmsTransactions"));
 const SmsAnalytics = lazy(() => import("./pages/admin/SmsAnalytics"));
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
+const InternalAdminOverview = lazy(() => import("./pages/internalAdmin/Overview"));
+const InternalAdminUsers = lazy(() => import("./pages/internalAdmin/Users"));
+const InternalAdminStores = lazy(() => import("./pages/internalAdmin/Stores"));
+const InternalAdminTickets = lazy(() => import("./pages/internalAdmin/Tickets"));
+const InternalAdminRevenue = lazy(() => import("./pages/internalAdmin/Revenue"));
+const InternalAdminSystem = lazy(() => import("./pages/internalAdmin/System"));
+const InternalAdminTestAccounts = lazy(() => import("./pages/internalAdmin/TestAccounts"));
 
 // Legal pages
 const Privacy = lazy(() => import("./pages/Privacy"));
@@ -90,6 +97,15 @@ function Router() {
         <Route path="/admin/sms-transactions" component={SmsTransactions} />
         <Route path="/admin/sms-analytics" component={SmsAnalytics} />
         <Route path="/admin/dashboard" component={Dashboard} />
+
+        {/* Internal Admin */}
+        <Route path="/internal-admin" component={InternalAdminOverview} />
+        <Route path="/internal-admin/users" component={InternalAdminUsers} />
+        <Route path="/internal-admin/stores" component={InternalAdminStores} />
+        <Route path="/internal-admin/tickets" component={InternalAdminTickets} />
+        <Route path="/internal-admin/revenue" component={InternalAdminRevenue} />
+        <Route path="/internal-admin/system" component={InternalAdminSystem} />
+        <Route path="/internal-admin/test-accounts" component={InternalAdminTestAccounts} />
         
         {/* Legal Pages */}
         <Route path="/privacy" component={Privacy} />

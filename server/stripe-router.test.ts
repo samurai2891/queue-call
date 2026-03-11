@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { appRouter } from './routers';
 import type { TrpcContext } from './_core/context';
 
 vi.mock('./db', () => ({
@@ -13,6 +12,9 @@ vi.mock('./stripe', () => ({
   CHARGE_PLANS: [],
   SMS_COST_PER_MESSAGE: 25,
 }));
+
+process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'test';
+const { appRouter } = await import('./routers');
 
 type AuthenticatedUser = NonNullable<TrpcContext['user']>;
 

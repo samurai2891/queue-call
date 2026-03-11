@@ -89,3 +89,20 @@ export const adminProcedure = publicProcedure.use(
     });
   }),
 );
+
+export const internalAdminProcedure = protectedProcedure.use(
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+
+    if (!ctx.user || !ctx.user.isInternalAdmin) {
+      throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        user: ctx.user,
+      },
+    });
+  })
+);

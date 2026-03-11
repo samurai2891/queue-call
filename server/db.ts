@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, inArray, lt, gte } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, lt, gte, notInArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { isNotNull, isNull } from "drizzle-orm";
 import { 
@@ -13,11 +13,18 @@ import {
   queueAuditLogs, InsertQueueAuditLog,
   staffSessions, InsertStaffSession,
   staffMembers, InsertStaffMember, StaffMember,
-  smsLogs, InsertSmsLog
+  smsLogs, InsertSmsLog,
+  smsTransactions
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { getRequestId } from './_core/requestContext';
 import { nanoid } from 'nanoid';
+import {
+  fillMissingDailyCounts,
+  getPlanMrr,
+  normalizeOverviewPlanId,
+  type RecentActivityItem,
+} from "./admin-overview-utils";
 
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -2258,6 +2265,329 @@ export async function getResourceCounts(storeId: number) {
     menu: Number(menuResult[0]?.count ?? 0),
     feed: Number(feedResult[0]?.count ?? 0),
   };
+}
+
+type OverviewFilterOptions = {
+  includeTest: boolean;
+  excludedOpenIds?: string[];
+};
+
+const getStartOfToday = () => {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
+const getStartOfNDaysAgo = (days: number) => {
+  const start = getStartOfToday();
+  start.setDate(start.getDate() - days + 1);
+  return start;
+};
+
+const toIsoString = (value: Date | string | null | undefined) => {
+  if (!value) return new Date(0).toISOString();
+  if (value instanceof Date) return value.toISOString();
+  return new Date(value).toISOString();
+};
+
+export async function getOverviewKpis({
+  includeTest,
+  excludedOpenIds = [],
+}: OverviewFilterOptions) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      totalUsers: 0,
+      activeStores30d: 0,
+      ticketsToday: 0,
+      smsSent30d: 0,
+      mrrExclTax: 0,
+      mrrInclTax: 0,
+    };
+  }
+
+  const start30d = getStartOfNDaysAgo(30);
+  const startToday = getStartOfToday();
+
+  const userConditions = [eq(users.isTest, false)];
+  if (excludedOpenIds.length > 0) {
+    userConditions.push(notInArray(users.openId, excludedOpenIds));
+  }
+
+  const storeConditions = includeTest ? [] : [eq(stores.isTest, false)];
+
+  const [userRows, activeStoreRows, ticketRows, smsRows, mrrStores] =
+    await Promise.all([
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(users)
+        .where(and(...userConditions)),
+      db
+        .select({ count: sql<number>`count(distinct ${tickets.storeId})` })
+        .from(tickets)
+        .innerJoin(stores, eq(tickets.storeId, stores.id))
+        .where(and(gte(tickets.createdAt, start30d), ...storeConditions)),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(tickets)
+        .innerJoin(stores, eq(tickets.storeId, stores.id))
+        .where(and(gte(tickets.createdAt, startToday), ...storeConditions)),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(smsLogs)
+        .innerJoin(stores, eq(smsLogs.storeId, stores.id))
+        .where(and(gte(smsLogs.createdAt, start30d), ...storeConditions)),
+      db
+        .select({
+          planId: stores.subscriptionPlan,
+        })
+        .from(stores)
+        .where(
+          and(
+            ...storeConditions,
+            sql`${stores.subscriptionPlan} <> 'free'`,
+            inArray(stores.subscriptionStatus, ["active", "cancel_at_period_end"])
+          )
+        ),
+    ]);
+
+  const mrr = mrrStores.reduce(
+    (sum, store) => {
+      const mrrValues = getPlanMrr(normalizeOverviewPlanId(store.planId));
+      sum.exclTax += mrrValues.exclTax;
+      sum.inclTax += mrrValues.inclTax;
+      return sum;
+    },
+    { exclTax: 0, inclTax: 0 }
+  );
+
+  return {
+    totalUsers: Number(userRows[0]?.count ?? 0),
+    activeStores30d: Number(activeStoreRows[0]?.count ?? 0),
+    ticketsToday: Number(ticketRows[0]?.count ?? 0),
+    smsSent30d: Number(smsRows[0]?.count ?? 0),
+    mrrExclTax: mrr.exclTax,
+    mrrInclTax: mrr.inclTax,
+  };
+}
+
+export async function getOverviewTicketChart({
+  includeTest,
+  days = 30,
+}: {
+  includeTest: boolean;
+  days?: number;
+}) {
+  const db = await getDb();
+  if (!db) return fillMissingDailyCounts([], days);
+
+  const startDate = getStartOfNDaysAgo(days);
+  const storeConditions = includeTest ? [] : [eq(stores.isTest, false)];
+
+  const rows = await db
+    .select({
+      date: sql<string>`DATE(${tickets.createdAt})`.as("date"),
+      count: sql<number>`count(*)`.as("count"),
+    })
+    .from(tickets)
+    .innerJoin(stores, eq(tickets.storeId, stores.id))
+    .where(and(gte(tickets.createdAt, startDate), ...storeConditions))
+    .groupBy(sql`DATE(${tickets.createdAt})`)
+    .orderBy(sql`DATE(${tickets.createdAt})`);
+
+  return fillMissingDailyCounts(
+    rows.map(row => ({
+      date: row.date,
+      count: Number(row.count ?? 0),
+    })),
+    days
+  );
+}
+
+export async function getOverviewPlanDistribution({
+  includeTest,
+}: {
+  includeTest: boolean;
+}) {
+  const db = await getDb();
+  if (!db) {
+    return [
+      { planId: "free" as const, count: 0 },
+      { planId: "standard" as const, count: 0 },
+      { planId: "pro" as const, count: 0 },
+    ];
+  }
+
+  const rows = await db
+    .select({
+      subscriptionPlan: stores.subscriptionPlan,
+      isTest: stores.isTest,
+      testPlanOverride: stores.testPlanOverride,
+    })
+    .from(stores)
+    .where(includeTest ? undefined : eq(stores.isTest, false));
+
+  const counts = rows.reduce(
+    (acc, row) => {
+      const planId =
+        includeTest && row.isTest && row.testPlanOverride
+          ? normalizeOverviewPlanId(row.testPlanOverride)
+          : normalizeOverviewPlanId(row.subscriptionPlan);
+
+      acc[planId] += 1;
+      return acc;
+    },
+    { free: 0, standard: 0, pro: 0 }
+  );
+
+  return [
+    { planId: "free" as const, count: counts.free },
+    { planId: "standard" as const, count: counts.standard },
+    { planId: "pro" as const, count: counts.pro },
+  ];
+}
+
+export async function getOverviewRecentActivity({
+  includeTest,
+  limit = 20,
+  excludedOpenIds = [],
+}: OverviewFilterOptions & { limit?: number }) {
+  const db = await getDb();
+  if (!db) return [] as RecentActivityItem[];
+
+  const userConditions = [eq(users.isTest, false)];
+  if (excludedOpenIds.length > 0) {
+    userConditions.push(notInArray(users.openId, excludedOpenIds));
+  }
+
+  const storeConditions = includeTest ? [] : [eq(stores.isTest, false)];
+
+  const [userRows, storeRows, ticketRows, smsRows, chargeRows] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        openId: users.openId,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(and(...userConditions))
+      .orderBy(desc(users.createdAt))
+      .limit(limit),
+    db
+      .select({
+        id: stores.id,
+        name: stores.name,
+        slug: stores.slug,
+        createdAt: stores.createdAt,
+      })
+      .from(stores)
+      .where(storeConditions.length > 0 ? and(...storeConditions) : undefined)
+      .orderBy(desc(stores.createdAt))
+      .limit(limit),
+    db
+      .select({
+        id: tickets.id,
+        number: tickets.number,
+        status: tickets.status,
+        createdAt: tickets.createdAt,
+        storeId: stores.id,
+        storeName: stores.name,
+      })
+      .from(tickets)
+      .innerJoin(stores, eq(tickets.storeId, stores.id))
+      .where(and(...storeConditions))
+      .orderBy(desc(tickets.createdAt))
+      .limit(limit),
+    db
+      .select({
+        id: smsLogs.id,
+        messageType: smsLogs.messageType,
+        status: smsLogs.status,
+        createdAt: smsLogs.createdAt,
+        storeId: stores.id,
+        storeName: stores.name,
+      })
+      .from(smsLogs)
+      .innerJoin(stores, eq(smsLogs.storeId, stores.id))
+      .where(and(...storeConditions))
+      .orderBy(desc(smsLogs.createdAt))
+      .limit(limit),
+    db
+      .select({
+        id: smsTransactions.id,
+        amount: smsTransactions.amount,
+        description: smsTransactions.description,
+        createdAt: smsTransactions.createdAt,
+        storeId: stores.id,
+        storeName: stores.name,
+      })
+      .from(smsTransactions)
+      .innerJoin(stores, eq(smsTransactions.storeId, stores.id))
+      .where(
+        and(
+          eq(smsTransactions.type, "charge"),
+          ...storeConditions
+        )
+      )
+      .orderBy(desc(smsTransactions.createdAt))
+      .limit(limit),
+  ]);
+
+  const activities: RecentActivityItem[] = [
+    ...userRows.map(row => ({
+      id: `user-${row.id}`,
+      type: "user_created" as const,
+      occurredAt: toIsoString(row.createdAt),
+      title: "新規ユーザー登録",
+      description:
+        row.name || row.email || row.openId
+          ? `${row.name || row.email || row.openId} が登録`
+          : `ユーザー #${row.id} が登録`,
+      userId: row.id,
+    })),
+    ...storeRows.map(row => ({
+      id: `store-${row.id}`,
+      type: "store_created" as const,
+      occurredAt: toIsoString(row.createdAt),
+      title: "新規店舗作成",
+      description: `${row.name} (${row.slug}) が作成`,
+      storeId: row.id,
+      storeName: row.name,
+    })),
+    ...ticketRows.map(row => ({
+      id: `ticket-${row.id}`,
+      type: "ticket_created" as const,
+      occurredAt: toIsoString(row.createdAt),
+      title: "チケット発券",
+      description: `${row.storeName} で受付番号 ${row.number} を発券`,
+      storeId: row.storeId,
+      storeName: row.storeName,
+    })),
+    ...smsRows.map(row => ({
+      id: `sms-${row.id}`,
+      type: "sms_sent" as const,
+      occurredAt: toIsoString(row.createdAt),
+      title: "SMS送信",
+      description: `${row.storeName} で ${row.messageType} SMS を ${row.status} 状態で記録`,
+      storeId: row.storeId,
+      storeName: row.storeName,
+    })),
+    ...chargeRows.map(row => ({
+      id: `sms-charge-${row.id}`,
+      type: "sms_charge" as const,
+      occurredAt: toIsoString(row.createdAt),
+      title: "SMSチャージ",
+      description: `${row.storeName} に ${Math.abs(Number(row.amount ?? 0)).toLocaleString()}円 をチャージ`,
+      storeId: row.storeId,
+      storeName: row.storeName,
+    })),
+  ];
+
+  return activities
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+    .slice(0, limit);
 }
 
 

@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import type { Request } from "express";
 import * as bcrypt from "bcryptjs";
 import { z } from "zod";
+import { adminRouter } from "./routers/admin";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -3228,6 +3229,7 @@ const reservationRouter = router({
 
 // ==================== Main Router ====================
 export const appRouter = router({
+  admin: adminRouter,
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),

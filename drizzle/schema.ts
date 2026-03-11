@@ -10,6 +10,7 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  isTest: boolean("is_test").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -69,6 +70,9 @@ export const stores = mysqlTable("stores", {
   
   // Stripe顧客ID
   stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
+
+  isTest: boolean("is_test").default(false).notNull(),
+  testPlanOverride: varchar("test_plan_override", { length: 50 }),
   
   // 低残高通知の最終送信日時（重複通知防止）
   lastLowBalanceNotifiedAt: timestamp("lastLowBalanceNotifiedAt"),
