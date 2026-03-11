@@ -1,6 +1,8 @@
 import { eq, and, desc, asc, sql, inArray, lt, gte, notInArray, or, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { isNotNull, isNull } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import * as bcrypt from "bcryptjs";
 import { 
   InsertUser, users, 
   stores, InsertStore, Store, StoreSettings,
@@ -14,7 +16,7 @@ import {
   staffSessions, InsertStaffSession,
   staffMembers, InsertStaffMember, StaffMember,
   smsLogs, InsertSmsLog,
-  smsTransactions
+  smsTransactions,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { getRequestId } from './_core/requestContext';
@@ -147,28 +149,14 @@ export async function updateUser(id: number, data: Partial<InsertUser>): Promise
 
 // ==================== Store Functions ====================
 
-export async function createStore(data: { 
-  slug: string; 
-  name: string; 
-  ownerId: number;
-  defaultLocale?: string;
-  supportedLocales?: string[];
-  settings?: StoreSettings;
-  staffPinHash?: string;
-  managerPinHash?: string;
-}): Promise<Store> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+const DEFAULT_STORE_SUPPORTED_LOCALES = ['ja', 'en', 'ko', 'zh-Hans', 'zh-Hant'] as const;
 
-  const kioskKey = nanoid(32);
-  const boardKey = nanoid(32);
-
-  const defaultSettings: StoreSettings = {
+export function getDefaultStoreSettings(): StoreSettings {
+  return {
     queue: {
       dailyResetTime: "04:00",
       checkinGraceMinutes: 5,
       autoSkip: false,
-
       enableReorder: false,
       reorderMaxMove: 3,
       reorderReasonRequired: true,
@@ -194,18 +182,40 @@ export async function createStore(data: {
       nextCount: 3,
     },
   };
+}
+
+const buildStoreSettings = (settings?: StoreSettings): StoreSettings => ({
+  ...getDefaultStoreSettings(),
+  ...settings,
+});
+
+export async function createStore(data: { 
+  slug: string; 
+  name: string; 
+  ownerId: number;
+  defaultLocale?: string;
+  supportedLocales?: string[];
+  settings?: StoreSettings;
+  staffPinHash?: string;
+  managerPinHash?: string;
+}): Promise<Store> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const kioskKey = nanoid(32);
+  const boardKey = nanoid(32);
 
   await db.insert(stores).values({
     slug: data.slug,
     name: data.name,
     ownerId: data.ownerId,
     defaultLocale: data.defaultLocale || 'ja',
-    supportedLocales: data.supportedLocales || ['ja', 'en', 'ko', 'zh-Hans', 'zh-Hant'],
+    supportedLocales: data.supportedLocales || [...DEFAULT_STORE_SUPPORTED_LOCALES],
     kioskKey,
     boardKey,
     staffPinHash: data.staffPinHash,
     managerPinHash: data.managerPinHash,
-    settings: data.settings ? { ...defaultSettings, ...data.settings } : defaultSettings,
+    settings: buildStoreSettings(data.settings),
   });
 
   const result = await db.select().from(stores).where(eq(stores.slug, data.slug)).limit(1);
@@ -2290,6 +2300,8 @@ type OverviewFilterOptions = {
   excludedOpenIds?: string[];
 };
 
+const PAID_SUBSCRIPTION_STATUSES = ["active", "cancel_at_period_end"] as const;
+
 const getStartOfToday = () => {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
@@ -2302,11 +2314,44 @@ const getStartOfNDaysAgo = (days: number) => {
   return start;
 };
 
+const getHoursAgo = (hours: number) => {
+  const start = new Date();
+  start.setHours(start.getHours() - hours);
+  return start;
+};
+
 const toIsoString = (value: Date | string | null | undefined) => {
   if (!value) return new Date(0).toISOString();
   if (value instanceof Date) return value.toISOString();
   return new Date(value).toISOString();
 };
+
+const createZeroedHeatmap = () => {
+  const cells: Array<{ dayOfWeek: number; hour: number; avgCount: number }> = [];
+  for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek += 1) {
+    for (let hour = 0; hour < 24; hour += 1) {
+      cells.push({ dayOfWeek, hour, avgCount: 0 });
+    }
+  }
+  return cells;
+};
+
+const fillTicketPeakHours = (
+  rows: Array<{ dayOfWeek: number; hour: number; avgCount: number }>
+) => {
+  const cellMap = new Map(rows.map(row => [`${row.dayOfWeek}-${row.hour}`, row]));
+
+  return createZeroedHeatmap().map(cell => {
+    const key = `${cell.dayOfWeek}-${cell.hour}`;
+    return cellMap.get(key) ?? cell;
+  });
+};
+
+const toRate = (numerator: number, denominator: number) =>
+  denominator > 0 ? numerator / denominator : 0;
+
+const getStoreScopeConditions = (includeTest: boolean) =>
+  includeTest ? [] : [eq(stores.isTest, false)];
 
 export async function getOverviewKpis({
   includeTest,
@@ -2386,6 +2431,427 @@ export async function getOverviewKpis({
     smsSent30d: Number(smsRows[0]?.count ?? 0),
     mrrExclTax: mrr.exclTax,
     mrrInclTax: mrr.inclTax,
+  };
+}
+
+export async function getAdminTicketSummary({
+  days,
+  includeTest,
+}: {
+  days: 7 | 30 | 90;
+  includeTest: boolean;
+}) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      totalTickets: 0,
+      calledCount: 0,
+      arrivedCount: 0,
+      doneCount: 0,
+      canceledCount: 0,
+      avgWaitMinutes: 0,
+    };
+  }
+
+  const startDate = getStartOfNDaysAgo(days);
+  const storeConditions = getStoreScopeConditions(includeTest);
+
+  const [row] = await db
+    .select({
+      totalTickets: sql<number>`count(*)`,
+      calledCount: sql<number>`sum(case when ${tickets.calledAt} is not null then 1 else 0 end)`,
+      arrivedCount: sql<number>`sum(case when ${tickets.arrivedAt} is not null or ${tickets.status} in ('ARRIVED', 'DONE') then 1 else 0 end)`,
+      doneCount: sql<number>`sum(case when ${tickets.status} = 'DONE' then 1 else 0 end)`,
+      canceledCount: sql<number>`sum(case when ${tickets.status} = 'CANCELED' then 1 else 0 end)`,
+      avgWaitMinutes: sql<number>`avg(case when ${tickets.calledAt} is not null then timestampdiff(minute, ${tickets.createdAt}, ${tickets.calledAt}) else null end)`,
+    })
+    .from(tickets)
+    .innerJoin(stores, eq(tickets.storeId, stores.id))
+    .where(and(gte(tickets.createdAt, startDate), ...storeConditions));
+
+  return {
+    totalTickets: Number(row?.totalTickets ?? 0),
+    calledCount: Number(row?.calledCount ?? 0),
+    arrivedCount: Number(row?.arrivedCount ?? 0),
+    doneCount: Number(row?.doneCount ?? 0),
+    canceledCount: Number(row?.canceledCount ?? 0),
+    avgWaitMinutes: Math.round(Number(row?.avgWaitMinutes ?? 0)),
+  };
+}
+
+export async function getAdminTicketsByStore({
+  days,
+  includeTest,
+  limit = 20,
+}: {
+  days: 7 | 30 | 90;
+  includeTest: boolean;
+  limit?: number;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const startDate = getStartOfNDaysAgo(days);
+  const storeConditions = getStoreScopeConditions(includeTest);
+
+  const rows = await db
+    .select({
+      storeId: stores.id,
+      storeName: stores.name,
+      slug: stores.slug,
+      totalTickets: sql<number>`count(*)`,
+      doneCount: sql<number>`sum(case when ${tickets.status} = 'DONE' then 1 else 0 end)`,
+      canceledCount: sql<number>`sum(case when ${tickets.status} = 'CANCELED' then 1 else 0 end)`,
+      calledCount: sql<number>`sum(case when ${tickets.calledAt} is not null then 1 else 0 end)`,
+      checkedInCount: sql<number>`sum(case when ${tickets.arrivedAt} is not null or ${tickets.status} in ('ARRIVED', 'DONE') then 1 else 0 end)`,
+      avgWaitMinutes: sql<number>`avg(case when ${tickets.calledAt} is not null then timestampdiff(minute, ${tickets.createdAt}, ${tickets.calledAt}) else null end)`,
+    })
+    .from(tickets)
+    .innerJoin(stores, eq(tickets.storeId, stores.id))
+    .where(and(gte(tickets.createdAt, startDate), ...storeConditions))
+    .groupBy(stores.id, stores.name, stores.slug)
+    .orderBy(desc(sql`count(*)`))
+    .limit(limit);
+
+  return rows.map(row => {
+    const calledCount = Number(row.calledCount ?? 0);
+    const checkedInCount = Number(row.checkedInCount ?? 0);
+    return {
+      storeId: row.storeId,
+      storeName: row.storeName,
+      slug: row.slug,
+      totalTickets: Number(row.totalTickets ?? 0),
+      doneCount: Number(row.doneCount ?? 0),
+      canceledCount: Number(row.canceledCount ?? 0),
+      avgWaitMinutes: Math.round(Number(row.avgWaitMinutes ?? 0)),
+      checkinRate: toRate(checkedInCount, calledCount),
+    };
+  });
+}
+
+export async function getAdminTicketPeakHours({
+  days,
+  includeTest,
+}: {
+  days: 7 | 30 | 90;
+  includeTest: boolean;
+}) {
+  const db = await getDb();
+  if (!db) return createZeroedHeatmap();
+
+  const startDate = getStartOfNDaysAgo(days);
+  const storeConditions = getStoreScopeConditions(includeTest);
+  const storeScopeSql =
+    storeConditions.length > 0 ? sql`AND ${stores.isTest} = false` : sql``;
+
+  const result = await db.execute(sql`
+    SELECT
+      dayofweek(${tickets.createdAt}) - 1 as dayOfWeek,
+      hour(${tickets.createdAt}) as hour,
+      count(*) / count(distinct date(${tickets.createdAt})) as avgCount
+    FROM ${tickets}
+    INNER JOIN ${stores} ON ${tickets.storeId} = ${stores.id}
+    WHERE ${tickets.createdAt} >= ${startDate}
+      ${storeScopeSql}
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+  `) as any;
+
+  const rows = (result[0] || []).map((row: any) => ({
+    dayOfWeek: Number(row.dayOfWeek),
+    hour: Number(row.hour),
+    avgCount: Math.round(Number(row.avgCount) || 0),
+  }));
+
+  return fillTicketPeakHours(rows);
+}
+
+export async function getAdminTicketCheckinRate({
+  days,
+  includeTest,
+}: {
+  days: 7 | 30 | 90;
+  includeTest: boolean;
+}) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      calledCount: 0,
+      checkedInCount: 0,
+      rate: 0,
+    };
+  }
+
+  const startDate = getStartOfNDaysAgo(days);
+  const storeConditions = getStoreScopeConditions(includeTest);
+
+  const [row] = await db
+    .select({
+      calledCount: sql<number>`sum(case when ${tickets.calledAt} is not null then 1 else 0 end)`,
+      checkedInCount: sql<number>`sum(case when ${tickets.arrivedAt} is not null or ${tickets.status} in ('ARRIVED', 'DONE') then 1 else 0 end)`,
+    })
+    .from(tickets)
+    .innerJoin(stores, eq(tickets.storeId, stores.id))
+    .where(and(gte(tickets.createdAt, startDate), ...storeConditions));
+
+  const calledCount = Number(row?.calledCount ?? 0);
+  const checkedInCount = Number(row?.checkedInCount ?? 0);
+
+  return {
+    calledCount,
+    checkedInCount,
+    rate: toRate(checkedInCount, calledCount),
+  };
+}
+
+export async function getAdminRevenueMrr({
+  includeTest,
+}: {
+  includeTest: boolean;
+}) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      mrrExclTax: 0,
+      mrrInclTax: 0,
+      paidStores: 0,
+    };
+  }
+
+  const storeConditions = getStoreScopeConditions(includeTest);
+  const rows = await db
+    .select({
+      planId: stores.subscriptionPlan,
+    })
+    .from(stores)
+    .where(
+      and(
+        ...storeConditions,
+        sql`${stores.subscriptionPlan} <> 'free'`,
+        inArray(stores.subscriptionStatus, [...PAID_SUBSCRIPTION_STATUSES])
+      )
+    );
+
+  const totals = rows.reduce(
+    (acc, row) => {
+      const values = getPlanMrr(normalizeOverviewPlanId(row.planId));
+      acc.mrrExclTax += values.exclTax;
+      acc.mrrInclTax += values.inclTax;
+      acc.paidStores += 1;
+      return acc;
+    },
+    { mrrExclTax: 0, mrrInclTax: 0, paidStores: 0 }
+  );
+
+  return totals;
+}
+
+export async function getAdminRevenuePlanBreakdown({
+  includeTest,
+}: {
+  includeTest: boolean;
+}) {
+  const db = await getDb();
+  if (!db) {
+    return [
+      { planId: "free" as const, storeCount: 0, mrrExclTax: 0, mrrInclTax: 0 },
+      { planId: "standard" as const, storeCount: 0, mrrExclTax: 0, mrrInclTax: 0 },
+      { planId: "pro" as const, storeCount: 0, mrrExclTax: 0, mrrInclTax: 0 },
+    ];
+  }
+
+  const rows = await db
+    .select({
+      planId: stores.subscriptionPlan,
+      subscriptionStatus: stores.subscriptionStatus,
+    })
+    .from(stores)
+    .where(includeTest ? undefined : eq(stores.isTest, false));
+
+  const breakdown = rows.reduce(
+    (acc, row) => {
+      const planId = normalizeOverviewPlanId(row.planId);
+      acc[planId].storeCount += 1;
+
+      if (planId !== "free" && row.subscriptionStatus && PAID_SUBSCRIPTION_STATUSES.includes(row.subscriptionStatus as (typeof PAID_SUBSCRIPTION_STATUSES)[number])) {
+        const values = getPlanMrr(planId);
+        acc[planId].mrrExclTax += values.exclTax;
+        acc[planId].mrrInclTax += values.inclTax;
+      }
+
+      return acc;
+    },
+    {
+      free: { planId: "free" as const, storeCount: 0, mrrExclTax: 0, mrrInclTax: 0 },
+      standard: { planId: "standard" as const, storeCount: 0, mrrExclTax: 0, mrrInclTax: 0 },
+      pro: { planId: "pro" as const, storeCount: 0, mrrExclTax: 0, mrrInclTax: 0 },
+    }
+  );
+
+  return [breakdown.free, breakdown.standard, breakdown.pro];
+}
+
+export async function getAdminPushStats({
+  includeTest,
+}: {
+  includeTest: boolean;
+}) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      totalSubscriptions: 0,
+      ticketsWithPush: 0,
+      storesWithPush: 0,
+      subscriptionsLast30d: 0,
+    };
+  }
+
+  const storeConditions = getStoreScopeConditions(includeTest);
+  const start30d = getStartOfNDaysAgo(30);
+
+  const [totalsRow, recentRow] = await Promise.all([
+    db
+      .select({
+        totalSubscriptions: sql<number>`count(*)`,
+        ticketsWithPush: sql<number>`count(distinct ${pushSubscriptions.ticketId})`,
+        storesWithPush: sql<number>`count(distinct ${tickets.storeId})`,
+      })
+      .from(pushSubscriptions)
+      .innerJoin(tickets, eq(pushSubscriptions.ticketId, tickets.id))
+      .innerJoin(stores, eq(tickets.storeId, stores.id))
+      .where(storeConditions.length > 0 ? and(...storeConditions) : undefined),
+    db
+      .select({
+        subscriptionsLast30d: sql<number>`count(*)`,
+      })
+      .from(pushSubscriptions)
+      .innerJoin(tickets, eq(pushSubscriptions.ticketId, tickets.id))
+      .innerJoin(stores, eq(tickets.storeId, stores.id))
+      .where(and(gte(pushSubscriptions.createdAt, start30d), ...storeConditions)),
+  ]);
+
+  const totals = totalsRow[0];
+  const recent = recentRow[0];
+
+  return {
+    totalSubscriptions: Number(totals?.totalSubscriptions ?? 0),
+    ticketsWithPush: Number(totals?.ticketsWithPush ?? 0),
+    storesWithPush: Number(totals?.storesWithPush ?? 0),
+    subscriptionsLast30d: Number(recent?.subscriptionsLast30d ?? 0),
+  };
+}
+
+export async function getAdminSmsStats({
+  includeTest,
+}: {
+  includeTest: boolean;
+}) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      sent24h: 0,
+      failed24h: 0,
+      sent30d: 0,
+      failed30d: 0,
+      creditsConsumed30d: 0,
+      chargeAmount30d: 0,
+    };
+  }
+
+  const storeConditions = getStoreScopeConditions(includeTest);
+  const start24h = getHoursAgo(24);
+  const start30d = getStartOfNDaysAgo(30);
+
+  const [sms24hRows, sms30dRows, chargeRows] = await Promise.all([
+    db
+      .select({
+        sent24h: sql<number>`sum(case when ${smsLogs.status} in ('sent', 'delivered') then 1 else 0 end)`,
+        failed24h: sql<number>`sum(case when ${smsLogs.status} = 'failed' then 1 else 0 end)`,
+      })
+      .from(smsLogs)
+      .innerJoin(stores, eq(smsLogs.storeId, stores.id))
+      .where(and(gte(smsLogs.createdAt, start24h), ...storeConditions)),
+    db
+      .select({
+        sent30d: sql<number>`sum(case when ${smsLogs.status} in ('sent', 'delivered') then 1 else 0 end)`,
+        failed30d: sql<number>`sum(case when ${smsLogs.status} = 'failed' then 1 else 0 end)`,
+        creditsConsumed30d: sql<number>`sum(case when ${smsLogs.status} in ('sent', 'delivered') then ${smsLogs.creditConsumed} else 0 end)`,
+      })
+      .from(smsLogs)
+      .innerJoin(stores, eq(smsLogs.storeId, stores.id))
+      .where(and(gte(smsLogs.createdAt, start30d), ...storeConditions)),
+    db
+      .select({
+        chargeAmount30d: sql<number>`sum(case when ${smsTransactions.type} = 'charge' then abs(${smsTransactions.amount}) else 0 end)`,
+      })
+      .from(smsTransactions)
+      .innerJoin(stores, eq(smsTransactions.storeId, stores.id))
+      .where(and(gte(smsTransactions.createdAt, start30d), ...storeConditions)),
+  ]);
+
+  const sms24h = sms24hRows[0];
+  const sms30d = sms30dRows[0];
+  const charge = chargeRows[0];
+
+  return {
+    sent24h: Number(sms24h?.sent24h ?? 0),
+    failed24h: Number(sms24h?.failed24h ?? 0),
+    sent30d: Number(sms30d?.sent30d ?? 0),
+    failed30d: Number(sms30d?.failed30d ?? 0),
+    creditsConsumed30d: Number(sms30d?.creditsConsumed30d ?? 0),
+    chargeAmount30d: Number(charge?.chargeAmount30d ?? 0),
+  };
+}
+
+export async function getAdminVapidStoreStats({
+  includeTest,
+}: {
+  includeTest: boolean;
+}) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      storesWithKeys: 0,
+      totalStores: 0,
+      hasMatchingConfiguredStore: false,
+    };
+  }
+
+  const rows = await db
+    .select({
+      settings: stores.settings,
+      isTest: stores.isTest,
+    })
+    .from(stores)
+    .where(includeTest ? undefined : eq(stores.isTest, false));
+
+  let storesWithKeys = 0;
+  let hasMatchingConfiguredStore = false;
+  const configuredPublicKey = process.env.VAPID_PUBLIC_KEY || process.env.VITE_VAPID_PUBLIC_KEY || null;
+  const configuredPrivateKey = process.env.VAPID_PRIVATE_KEY || null;
+
+  for (const row of rows) {
+    const vapid = row.settings?.vapid;
+    const hasKeys = Boolean(vapid?.publicKey && vapid?.privateKey);
+    if (!hasKeys) {
+      continue;
+    }
+
+    storesWithKeys += 1;
+    if (
+      configuredPublicKey &&
+      configuredPrivateKey &&
+      vapid?.publicKey === configuredPublicKey &&
+      vapid?.privateKey === configuredPrivateKey
+    ) {
+      hasMatchingConfiguredStore = true;
+    }
+  }
+
+  return {
+    storesWithKeys,
+    totalStores: rows.length,
+    hasMatchingConfiguredStore,
   };
 }
 
@@ -3000,6 +3466,425 @@ export async function updateAdminStoreIntakeStatus(
 
 export async function updateAdminStoreTestFlag(storeId: number, isTest: boolean): Promise<void> {
   await updateStore(storeId, { isTest });
+}
+
+const TEST_ACCOUNT_STORE_DEFINITIONS = [
+  {
+    slug: "test-free",
+    name: "Test Store Free",
+    testPlanOverride: "free" as const,
+  },
+  {
+    slug: "test-standard",
+    name: "Test Store Standard",
+    testPlanOverride: "standard" as const,
+  },
+  {
+    slug: "test-pro",
+    name: "Test Store Pro",
+    testPlanOverride: "pro" as const,
+  },
+];
+
+const TEST_ACCOUNT_SLUGS = TEST_ACCOUNT_STORE_DEFINITIONS.map(store => store.slug);
+
+const getTestAccountStoreSortIndex = (slug: string) =>
+  TEST_ACCOUNT_STORE_DEFINITIONS.findIndex(store => store.slug === slug);
+
+async function resetTestStoreInTransaction(tx: any, storeId: number) {
+  const [store] = await tx
+    .select({
+      id: stores.id,
+      isTest: stores.isTest,
+    })
+    .from(stores)
+    .where(eq(stores.id, storeId))
+    .limit(1);
+
+  if (!store) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Test store not found" });
+  }
+
+  if (!store.isTest) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Only test stores can be reset" });
+  }
+
+  const ticketRows = await tx
+    .select({ id: tickets.id })
+    .from(tickets)
+    .where(eq(tickets.storeId, storeId));
+
+  const ticketIds = ticketRows.map((ticket: { id: number }) => ticket.id);
+
+  if (ticketIds.length > 0) {
+    await tx.delete(pushSubscriptions).where(inArray(pushSubscriptions.ticketId, ticketIds));
+    await tx.delete(smsSubscriptions).where(inArray(smsSubscriptions.ticketId, ticketIds));
+  }
+
+  await tx.delete(queueAuditLogs).where(eq(queueAuditLogs.storeId, storeId));
+  await tx.delete(staffSessions).where(eq(staffSessions.storeId, storeId));
+  await tx.delete(reservations).where(eq(reservations.storeId, storeId));
+  await tx.delete(tickets).where(eq(tickets.storeId, storeId));
+
+  await tx
+    .update(stores)
+    .set({
+      settings: getDefaultStoreSettings(),
+      resetTime: "04:00",
+      currentNumber: 0,
+      dayKey: null,
+      currentCheckinPin: null,
+      checkinPinUpdatedAt: null,
+      monthlyTicketCount: 0,
+      monthlyTicketResetDate: null,
+    })
+    .where(eq(stores.id, storeId));
+}
+
+export async function setupAdminTestAccount({
+  userId,
+  internalAdminOpenIds,
+}: {
+  userId: number;
+  internalAdminOpenIds: string[];
+}) {
+  const db = await getDb();
+  if (!db) {
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+  }
+
+  const [staffPinHash, managerPinHash] = await Promise.all([
+    bcrypt.hash("1234", 10),
+    bcrypt.hash("9999", 10),
+  ]);
+
+  return db.transaction(async tx => {
+    const [user] = await tx
+      .select({
+        id: users.id,
+        openId: users.openId,
+        status: users.status,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+    }
+
+    if (internalAdminOpenIds.includes(user.openId)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Internal admin users cannot become test accounts" });
+    }
+
+    if (user.status !== "active") {
+      throw new TRPCError({ code: "CONFLICT", message: "Selected user must be active" });
+    }
+
+    const ownedStores = await tx
+      .select({
+        id: stores.id,
+        slug: stores.slug,
+      })
+      .from(stores)
+      .where(eq(stores.ownerId, userId));
+
+    const conflictingOwnedStore = ownedStores.find(store => !TEST_ACCOUNT_SLUGS.includes(store.slug));
+    if (conflictingOwnedStore) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "Selected user already owns non-test-account stores",
+      });
+    }
+
+    const existingFixedStores = await tx
+      .select({
+        id: stores.id,
+        slug: stores.slug,
+        ownerId: stores.ownerId,
+      })
+      .from(stores)
+      .where(inArray(stores.slug, TEST_ACCOUNT_SLUGS));
+
+    const foreignStore = existingFixedStores.find(store => store.ownerId !== userId);
+    if (foreignStore) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "Fixed test-account stores are already bound to another user",
+      });
+    }
+
+    await tx.update(users).set({ isTest: true }).where(eq(users.id, userId));
+
+    const storesBySlug = new Map(existingFixedStores.map(store => [store.slug, store]));
+    let storesCreated = 0;
+    let storesUpdated = 0;
+
+    for (const definition of TEST_ACCOUNT_STORE_DEFINITIONS) {
+      const existingStore = storesBySlug.get(definition.slug);
+
+      if (existingStore) {
+        await tx
+          .update(stores)
+          .set({
+            name: definition.name,
+            isTest: true,
+            testPlanOverride: definition.testPlanOverride,
+          })
+          .where(eq(stores.id, existingStore.id));
+        storesUpdated += 1;
+        continue;
+      }
+
+      await tx.insert(stores).values({
+        slug: definition.slug,
+        name: definition.name,
+        ownerId: userId,
+        defaultLocale: "ja",
+        supportedLocales: [...DEFAULT_STORE_SUPPORTED_LOCALES],
+        kioskKey: nanoid(32),
+        boardKey: nanoid(32),
+        staffPinHash,
+        managerPinHash,
+        settings: getDefaultStoreSettings(),
+        resetTime: "04:00",
+        isTest: true,
+        testPlanOverride: definition.testPlanOverride,
+      });
+      storesCreated += 1;
+    }
+
+    return {
+      userId,
+      storesCreated,
+      storesUpdated,
+    };
+  });
+}
+
+export async function getAdminTestAccounts() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const [testUsers, testStoreRows] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        openId: users.openId,
+        name: users.name,
+        email: users.email,
+        status: users.status,
+        isTest: users.isTest,
+        updatedAt: users.updatedAt,
+      })
+      .from(users)
+      .where(eq(users.isTest, true))
+      .orderBy(desc(users.updatedAt), desc(users.id)),
+    db
+      .select({
+        ownerId: stores.ownerId,
+        ownerOpenId: users.openId,
+        ownerName: users.name,
+        ownerEmail: users.email,
+        ownerStatus: users.status,
+        ownerIsTest: users.isTest,
+        ownerUpdatedAt: users.updatedAt,
+        id: stores.id,
+        name: stores.name,
+        slug: stores.slug,
+        intakeStatus: stores.intakeStatus,
+        testPlanOverride: stores.testPlanOverride,
+        subscriptionPlan: stores.subscriptionPlan,
+        currentNumber: stores.currentNumber,
+        isTest: stores.isTest,
+        updatedAt: stores.updatedAt,
+      })
+      .from(stores)
+      .innerJoin(users, eq(stores.ownerId, users.id))
+      .where(eq(stores.isTest, true))
+      .orderBy(desc(stores.updatedAt), desc(stores.id)),
+  ]);
+
+  const accountsByUserId = new Map<
+    number,
+    {
+      user: {
+        id: number;
+        openId: string;
+        name: string | null;
+        email: string | null;
+        status: "active" | "suspended";
+        isTest: boolean;
+        updatedAt: string;
+      };
+      stores: Array<{
+        id: number;
+        name: string;
+        slug: string;
+        intakeStatus: "open" | "paused";
+        testPlanOverride: string | null;
+        subscriptionPlan: "free" | "standard" | "pro";
+        currentNumber: number;
+        isTest: boolean;
+        updatedAt: string;
+      }>;
+    }
+  >();
+
+  for (const user of testUsers) {
+    accountsByUserId.set(user.id, {
+      user: {
+        id: user.id,
+        openId: user.openId,
+        name: user.name,
+        email: user.email,
+        status: user.status,
+        isTest: user.isTest,
+        updatedAt: toIsoString(user.updatedAt),
+      },
+      stores: [],
+    });
+  }
+
+  for (const store of testStoreRows) {
+    const existing = accountsByUserId.get(store.ownerId) ?? {
+      user: {
+        id: store.ownerId,
+        openId: store.ownerOpenId,
+        name: store.ownerName,
+        email: store.ownerEmail,
+        status: store.ownerStatus,
+        isTest: store.ownerIsTest,
+        updatedAt: toIsoString(store.ownerUpdatedAt),
+      },
+      stores: [],
+    };
+
+    existing.stores.push({
+      id: store.id,
+      name: store.name,
+      slug: store.slug,
+      intakeStatus: store.intakeStatus,
+      testPlanOverride: store.testPlanOverride,
+      subscriptionPlan: store.subscriptionPlan,
+      currentNumber: store.currentNumber,
+      isTest: store.isTest,
+      updatedAt: toIsoString(store.updatedAt),
+    });
+
+    accountsByUserId.set(store.ownerId, existing);
+  }
+
+  return Array.from(accountsByUserId.values())
+    .map(account => ({
+      ...account,
+      stores: account.stores.sort((left, right) => {
+        const leftIndex = getTestAccountStoreSortIndex(left.slug);
+        const rightIndex = getTestAccountStoreSortIndex(right.slug);
+        return leftIndex - rightIndex;
+      }),
+    }))
+    .sort((left, right) => right.user.updatedAt.localeCompare(left.user.updatedAt));
+}
+
+export async function getAdminTestAccountStats() {
+  const db = await getDb();
+  if (!db) {
+    return {
+      testUsers: 0,
+      testStores: 0,
+      storesReady: false,
+      lastUpdatedAt: null,
+    };
+  }
+
+  const [testUserRows, testStoreRows, fixedStoreRows] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        updatedAt: users.updatedAt,
+      })
+      .from(users)
+      .where(eq(users.isTest, true)),
+    db
+      .select({
+        id: stores.id,
+        ownerId: stores.ownerId,
+        slug: stores.slug,
+        updatedAt: stores.updatedAt,
+      })
+      .from(stores)
+      .where(eq(stores.isTest, true)),
+    db
+      .select({
+        ownerId: stores.ownerId,
+        slug: stores.slug,
+      })
+      .from(stores)
+      .where(and(eq(stores.isTest, true), inArray(stores.slug, TEST_ACCOUNT_SLUGS))),
+  ]);
+
+  const latestUserUpdate = testUserRows
+    .map(row => toIsoString(row.updatedAt))
+    .sort()
+    .at(-1);
+  const latestStoreUpdate = testStoreRows
+    .map(row => toIsoString(row.updatedAt))
+    .sort()
+    .at(-1);
+  const lastUpdatedAt =
+    [latestUserUpdate, latestStoreUpdate].filter(Boolean).sort().at(-1) ?? null;
+
+  const ownerIds = new Set(fixedStoreRows.map(row => row.ownerId));
+  const storesReady = fixedStoreRows.length === TEST_ACCOUNT_SLUGS.length && ownerIds.size === 1;
+
+  return {
+    testUsers: testUserRows.length,
+    testStores: testStoreRows.length,
+    storesReady,
+    lastUpdatedAt,
+  };
+}
+
+export async function resetAdminTestStore(storeId: number) {
+  const db = await getDb();
+  if (!db) {
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+  }
+
+  await db.transaction(async tx => {
+    await resetTestStoreInTransaction(tx, storeId);
+  });
+
+  return {
+    storeId,
+    reset: true,
+  };
+}
+
+export async function resetAllAdminTestStores(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+  }
+
+  const result = await db.transaction(async tx => {
+    const testStores = await tx
+      .select({ id: stores.id })
+      .from(stores)
+      .where(and(eq(stores.ownerId, userId), eq(stores.isTest, true)));
+
+    for (const store of testStores) {
+      await resetTestStoreInTransaction(tx, store.id);
+    }
+
+    return testStores.length;
+  });
+
+  return {
+    userId,
+    resetStores: result,
+  };
 }
 
 

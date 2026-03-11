@@ -303,6 +303,9 @@ WHERE stores.is_test = false
 
 ### 9.2 方針
 
+- アプリ内で新規 auth ユーザーは作成しない
+- 既存ユーザーを 1 人選び、`users.is_test = true` に更新してテストユーザー化する
+- `test-free` / `test-standard` / `test-pro` は fixed slug として upsert する
 - 初期チケットは投入しない
 - 各店舗の UI から手動でテストデータを追加する
 - テスト操作の追跡は `stores.is_test = true` で識別する
@@ -315,8 +318,12 @@ WHERE stores.is_test = false
 |---|---|
 | tickets | 対象店舗のチケット削除 |
 | push_subscriptions | 対象店舗の購読情報削除 |
-| 店舗設定 | 営業時間、カスタマイズなどを既定値へ戻す |
-| 統計キャッシュ | 対象があればクリア |
+| sms_subscriptions | 対象店舗の購読情報削除 |
+| reservations | 対象店舗の予約データ削除 |
+| staff_sessions | 対象店舗のスタッフセッション削除 |
+| queue_audit_logs | 対象店舗の監査ログ削除 |
+| 店舗設定 / カウンタ | `stores.settings`, `resetTime`, `currentNumber`, `dayKey`, `currentCheckinPin`, `checkinPinUpdatedAt`, `monthlyTicketCount`, `monthlyTicketResetDate` を既定値へ戻す |
+| コンテンツ / 課金履歴 | 削除しない |
 | store レコード | 削除しない |
 
 ---
@@ -344,8 +351,8 @@ WHERE stores.is_test = false
 | 呼び出し数 | 呼び出し済み件数 |
 | キャンセル率 | キャンセル数 / 総発券数 |
 | 平均待ち時間 | 発券から呼び出し or 完了までの平均 |
-| ピーク時間帯 | 時間帯別の発券集中度 |
-| チェックイン率 | 呼び出し後にチェックインした割合 |
+| ピーク時間帯 | 曜日×時間帯ヒートマップ用の平均発券数 |
+| チェックイン率 | `calledAt IS NOT NULL` のうち到着済み (`arrivedAt` または `ARRIVED/DONE`) の割合 |
 
 ### 10.3 収益で表示する指標
 
@@ -353,21 +360,29 @@ WHERE stores.is_test = false
 |---|---|
 | MRR | 月額定常売上 |
 | プラン別売上 | Free / Standard / Pro 等の売上内訳 |
-| 直近決済 | 直近の決済一覧 |
-| チャーン率 | 解約率 |
+| 直近決済 | Stripe の subscription invoice 一覧 |
+| チャーン率 | Stripe subscription の実解約率 |
 | LTV 推定 | 参考値として将来追加余地あり |
+
+> 2026-03-11 時点の Phase 5 実装では、収益の current-state 指標は DB 集計、  
+> `recentPayments` と `churnRate` は Stripe 直接参照で取得する。  
+> `recentPayments` に SMS チャージ checkout は含めない。
 
 ### 10.4 システム監視で表示する指標
 
 | 指標 | 説明 |
 |---|---|
-| Push 送信数 | 24h / 7d |
-| Push 成功率 | 送信成功率。永続ログ追加後に定義 |
-| Push 失敗理由 | endpoint 不正、期限切れ等。永続ログ追加後に表示 |
+| Push 購読数 | `push_subscriptions` ベースの既存 signal |
+| Push 成功率 | 永続ログ追加後に定義 |
+| Push 失敗理由 | 永続ログ追加後に表示 |
 | SMS送信数 | 24h / 30d |
 | Twilio 残高 | 取得可能なら表示 |
 | VAPID鍵設定済み店舗数 | 設定済み / 全店舗 |
 | DB接続状態 | システムヘルスの最小指標 |
+
+> 2026-03-11 時点の Phase 6 実装では、システム監視画面は read-only とし、  
+> Push 監視は成功率ではなく既存 signal のみを表示する。  
+> 既存 `systemRouter` の VAPID 生成 / test push 操作は internal admin 画面へは持ち込まない。
 
 ---
 
@@ -548,8 +563,9 @@ client/src/components/internal-admin/
 
 ### 実装内容
 
-- テストユーザー + 3 店舗一括セットアップ
+- 既存ユーザー選択 + test user 化 + 3 店舗 upsert
 - テストアカウント一覧
+- テストアカウント stats
 - 店舗単位リセット
 - 全店舗一括リセット
 - テスト店舗カード UI
@@ -557,9 +573,10 @@ client/src/components/internal-admin/
 
 ### 完了条件
 
-- ボタン 1 つでテスト環境を作成できる
+- 既存ユーザーを 1 人選んでテスト環境を作成できる
 - テスト店舗から通常 UI 操作ができる
 - リセット後に店舗は残り、関連データのみ初期化される
+- 新規 auth ユーザー生成を伴わない
 
 ---
 
@@ -574,8 +591,9 @@ client/src/components/internal-admin/
 - チケット統計 API 群
 - 期間切替 UI
 - 店舗別ランキング
-- 時間帯ヒートマップ
-- Stripe 連携の MRR / 決済 / チャーン表示
+- 曜日×時間帯ヒートマップ
+- DB 集計の MRR / plan breakdown
+- Stripe 直接参照の recentPayments / churnRate 表示
 
 ### 完了条件
 
@@ -593,16 +611,17 @@ client/src/components/internal-admin/
 
 ### 実装内容
 
-- Push 統計
+- Push 既存 signal 統計
 - SMS 統計
 - VAPID 状態
 - DB ヘルス状態
-- 監視 UI 実装
+- read-only 監視 UI 実装
 
 ### 完了条件
 
 - Push / SMS / VAPID / DB の状態が一画面で確認できる
 - 重大な設定漏れを発見しやすい UI になる
+- 監視画面に運用操作ボタンが出ない
 
 ---
 
@@ -726,24 +745,26 @@ client/src/components/internal-admin/
 
 | ID | タスク | 成果物 | 依存 |
 |---|---|---|---|
-| 4.1.1 | `admin.testAccounts.setup` 実装 | API | 1.2.4, 1.1.3 |
+| 4.1.1 | 既存 user 選択ベースの `admin.testAccounts.setup` 実装 | API | 1.2.4, 1.1.3 |
 | 4.1.2 | `admin.testAccounts.list` 実装 | API | 1.2.4 |
 | 4.1.3 | `admin.testAccounts.resetStore` 実装 | API | 1.2.4 |
 | 4.1.4 | `admin.testAccounts.resetAll` 実装 | API | 4.1.3 |
 | 4.1.5 | `admin.testAccounts.stats` 実装 | API | 1.2.4 |
-| 4.1.6 | リセット処理をトランザクション化 | 実装 | 4.1.3 |
-| 4.1.7 | テスト作成 | test file | 4.1.1-4.1.6 |
+| 4.1.6 | fixed slug (`test-free`, `test-standard`, `test-pro`) の upsert 実装 | 実装 | 4.1.1 |
+| 4.1.7 | リセット処理を transaction 化し operational data のみ対象化 | 実装 | 4.1.3 |
+| 4.1.8 | テスト作成 | test file | 4.1.1-4.1.7 |
 
 ### 4.2 フロントサイド
 
 | ID | タスク | 成果物 | 依存 |
 |---|---|---|---|
-| 4.2.1 | セットアップ UI 実装 | `TestAccounts.tsx` | 4.1.1 |
+| 4.2.1 | 既存 user 検索 + 選択 UI 実装 | `TestAccounts.tsx` | 4.1.1 |
 | 4.2.2 | テスト店舗カード表示 | `TestAccounts.tsx` | 4.1.2, 4.1.5 |
 | 4.2.3 | 個別リセット導線 | `TestAccounts.tsx` | 4.1.3 |
 | 4.2.4 | 一括リセット導線 | `TestAccounts.tsx` | 4.1.4 |
 | 4.2.5 | 店舗への直接リンク | `TestAccounts.tsx` | 4.1.2 |
-| 4.2.6 | 状態ハンドリング | `TestAccounts.tsx` | 4.2.1-4.2.5 |
+| 4.2.6 | setup / reset 後の `list` / `stats` 再取得 | `TestAccounts.tsx` | 4.2.1-4.2.5 |
+| 4.2.7 | 状態ハンドリング | `TestAccounts.tsx` | 4.2.1-4.2.6 |
 
 ---
 
@@ -755,7 +776,7 @@ client/src/components/internal-admin/
 |---|---|---|---|
 | 5.1.1 | `admin.tickets.summary` 実装 | API | 1.2.4 |
 | 5.1.2 | `admin.tickets.byStore` 実装 | API | 1.2.4 |
-| 5.1.3 | `admin.tickets.peakHours` 実装 | API | 1.2.4 |
+| 5.1.3 | heatmap 用 shape の `admin.tickets.peakHours` 実装 | API | 1.2.4 |
 | 5.1.4 | `admin.tickets.checkinRate` 実装 | API | 1.2.4 |
 | 5.1.5 | テスト作成 | test file | 5.1.1-5.1.4 |
 
@@ -766,7 +787,7 @@ client/src/components/internal-admin/
 | 5.2.1 | 期間セレクター実装 | `Tickets.tsx` | - |
 | 5.2.2 | サマリーカード実装 | `Tickets.tsx` | 5.1.1 |
 | 5.2.3 | 店舗別ランキング実装 | `Tickets.tsx` | 5.1.2 |
-| 5.2.4 | ヒートマップ実装 | `Tickets.tsx` | 5.1.3 |
+| 5.2.4 | 曜日×時間帯ヒートマップ実装 | `Tickets.tsx` | 5.1.3 |
 | 5.2.5 | 状態ハンドリング | `Tickets.tsx` | 5.2.1-5.2.4 |
 
 ### 5.3 収益サーバーサイド
@@ -775,8 +796,8 @@ client/src/components/internal-admin/
 |---|---|---|---|
 | 5.3.1 | `admin.revenue.mrr` 実装 | API | 1.2.4 |
 | 5.3.2 | `admin.revenue.planBreakdown` 実装 | API | 1.2.4 |
-| 5.3.3 | `admin.revenue.recentPayments` 実装 | API | 1.2.4 |
-| 5.3.4 | `admin.revenue.churnRate` 実装 | API | 1.2.4 |
+| 5.3.3 | Stripe 直接参照の `admin.revenue.recentPayments` 実装 | API | 1.2.4 |
+| 5.3.4 | Stripe 直接参照の `admin.revenue.churnRate` 実装 | API | 1.2.4 |
 | 5.3.5 | テスト作成 | test file | 5.3.1-5.3.4 |
 
 ### 5.4 収益フロントサイド
@@ -797,7 +818,7 @@ client/src/components/internal-admin/
 
 | ID | タスク | 成果物 | 依存 |
 |---|---|---|---|
-| 6.1.1 | `admin.system.pushStats` 実装 | API | 1.2.4 |
+| 6.1.1 | 既存 signal ベースの `admin.system.pushStats` 実装 | API | 1.2.4 |
 | 6.1.2 | `admin.system.smsStats` 実装 | API | 1.2.4 |
 | 6.1.3 | `admin.system.vapidStatus` 実装 | API | 1.2.4 |
 | 6.1.4 | `admin.system.health` 実装 | API | 1.2.4 |
@@ -807,11 +828,12 @@ client/src/components/internal-admin/
 
 | ID | タスク | 成果物 | 依存 |
 |---|---|---|---|
-| 6.2.1 | Push 統計 UI 実装 | `System.tsx` | 6.1.1 |
+| 6.2.1 | Push 既存 signal UI 実装 | `System.tsx` | 6.1.1 |
 | 6.2.2 | SMS 統計 UI 実装 | `System.tsx` | 6.1.2 |
 | 6.2.3 | VAPID 状況 UI 実装 | `System.tsx` | 6.1.3 |
 | 6.2.4 | DB ヘルス UI 実装 | `System.tsx` | 6.1.4 |
-| 6.2.5 | 状態ハンドリング | `System.tsx` | 6.2.1-6.2.4 |
+| 6.2.5 | read-only 制御 | `System.tsx` | 6.2.1-6.2.4 |
+| 6.2.6 | 状態ハンドリング | `System.tsx` | 6.2.1-6.2.5 |
 
 ---
 
