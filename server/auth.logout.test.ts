@@ -23,9 +23,12 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
     name: "Sample User",
     loginMethod: "manus",
     role: "user",
+    status: "active",
+    isTest: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
+    isInternalAdmin: false,
   };
 
   const ctx: TrpcContext = {
@@ -39,6 +42,7 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
         clearedCookies.push({ name, options });
       },
     } as TrpcContext["res"],
+    requestId: "req_auth_logout_test",
   };
 
   return { ctx, clearedCookies };

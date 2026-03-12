@@ -109,9 +109,12 @@ function createAuthContext(): TrpcContext {
     name: "Test User",
     loginMethod: "manus",
     role: "user",
+    status: "active",
+    isTest: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
+    isInternalAdmin: false,
   };
 
   return {
@@ -125,6 +128,7 @@ function createAuthContext(): TrpcContext {
     res: {
       clearCookie: vi.fn(),
     } as unknown as TrpcContext["res"],
+    requestId: "req_staff_members_owner",
   };
 }
 
@@ -136,9 +140,12 @@ function createOtherUserContext(): TrpcContext {
     name: "Other User",
     loginMethod: "manus",
     role: "user",
+    status: "active",
+    isTest: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
+    isInternalAdmin: false,
   };
 
   return {
@@ -152,6 +159,7 @@ function createOtherUserContext(): TrpcContext {
     res: {
       clearCookie: vi.fn(),
     } as unknown as TrpcContext["res"],
+    requestId: "req_staff_members_other",
   };
 }
 
@@ -275,7 +283,13 @@ describe("Staff Member Router", () => {
         name: "テスト",
       });
 
-      expect(checkStaffLimit).toHaveBeenCalledWith("standard", 3);
+      expect(checkStaffLimit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 1,
+          subscriptionPlan: "standard",
+        }),
+        3,
+      );
     });
 
     it("should reject non-owner access", async () => {

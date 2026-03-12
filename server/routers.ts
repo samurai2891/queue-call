@@ -394,27 +394,27 @@ const storeRouter = router({
         const bhKeys = Object.keys(input.settings.businessHours);
         const isOnlyOverride = bhKeys.length === 1 && bhKeys[0] === 'override';
         if (!isOnlyOverride) {
-          checkBusinessHoursAllowed(store.subscriptionPlan);
+          checkBusinessHoursAllowed(store);
         }
       }
 
       // プラン制限チェック: SMS設定の有効化はStandard以上
       if (input.settings?.notifications?.smsEnabled === true) {
-        checkSmsAllowed(store.subscriptionPlan);
+        checkSmsAllowed(store);
       }
 
       // プラン制限チェック: 予約設定の有効化はStandard以上
       if (input.settings?.reservation?.enabled === true) {
-        checkReservationAllowed(store.subscriptionPlan);
+        checkReservationAllowed(store);
       }
 
       // プラン制限チェック: ブランディング設定
       if (input.settings?.branding) {
         if (input.settings.branding.primaryColor || input.settings.branding.accentColor) {
-          checkBrandingAllowed(store.subscriptionPlan, 'color');
+          checkBrandingAllowed(store, 'color');
         }
         if (input.settings.branding.logoUrl !== undefined) {
-          checkBrandingAllowed(store.subscriptionPlan, 'logo');
+          checkBrandingAllowed(store, 'logo');
         }
       }
 
@@ -440,7 +440,7 @@ const storeRouter = router({
       }
 
       // プランチェック: カスタムロゴはProプランのみ
-      checkBrandingAllowed(store.subscriptionPlan, 'logo');
+      checkBrandingAllowed(store, 'logo');
 
       const currentSettings = store.settings || {};
       const currentBranding = currentSettings.branding || {};
@@ -573,7 +573,7 @@ const storeRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
       // プラン別日数制限
-      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const maxDays = getAnalyticsDaysLimit(store);
       const effectiveDays = Math.min(input.days, maxDays);
       return await db.getDailyVisitorStats(input.storeId, effectiveDays);
     }),
@@ -589,7 +589,7 @@ const storeRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const maxDays = getAnalyticsDaysLimit(store);
       const effectiveDays = Math.min(input.days, maxDays);
       return await db.getDailyWaitTimeStats(input.storeId, effectiveDays);
     }),
@@ -605,7 +605,7 @@ const storeRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const maxDays = getAnalyticsDaysLimit(store);
       const effectiveDays = Math.min(input.days, maxDays);
       return await db.getHourlyStats(input.storeId, effectiveDays);
     }),
@@ -634,7 +634,7 @@ const storeRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const maxDays = getAnalyticsDaysLimit(store);
       const effectiveDays = Math.min(input.days, maxDays);
       return await db.getCrowdLevelHistory(input.storeId, effectiveDays);
     }),
@@ -650,7 +650,7 @@ const storeRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const maxDays = getAnalyticsDaysLimit(store);
       const effectiveDays = Math.min(input.days, maxDays);
       return await db.getDailyPeakHours(input.storeId, effectiveDays);
     }),
@@ -666,7 +666,7 @@ const storeRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const maxDays = getAnalyticsDaysLimit(store);
       const effectiveDays = Math.min(input.days, maxDays);
       return await db.getHourlyCrowdHeatmap(input.storeId, effectiveDays);
     }),
@@ -1113,7 +1113,7 @@ const ticketRouter = router({
       const smsEnabled = notificationSettings?.smsEnabled ?? false;
       const twilioConfig = getTwilioConfig();
       // プランチェック: FreeプランはSMS不可
-      const planFeatures = getPlanLimitsInfo(store?.subscriptionPlan);
+      const planFeatures = getPlanLimitsInfo(store);
       const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig) && planFeatures.smsEnabled;
       const pushTemplate = notificationSettings?.pushTemplateCalled;
       const smsTemplate = notificationSettings?.smsTemplateCalled;
@@ -1194,7 +1194,7 @@ const ticketRouter = router({
       const smsEnabled = notificationSettings?.smsEnabled ?? false;
       const twilioConfig = getTwilioConfig();
       // プランチェック: FreeプランはSMS不可
-      const planFeaturesCS = getPlanLimitsInfo(store?.subscriptionPlan);
+      const planFeaturesCS = getPlanLimitsInfo(store);
       const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig) && planFeaturesCS.smsEnabled;
       const pushTemplate = notificationSettings?.pushTemplateRecall;
       const smsTemplate = notificationSettings?.smsTemplateRecall;
@@ -1282,7 +1282,7 @@ const ticketRouter = router({
       const smsEnabled = notificationSettings?.smsEnabled ?? false;
       const twilioConfig = getTwilioConfig();
       // プランチェック: FreeプランはSMS不可
-      const planFeaturesRecall = getPlanLimitsInfo(store?.subscriptionPlan);
+      const planFeaturesRecall = getPlanLimitsInfo(store);
       const twilioConfigured = smsEnabled && isTwilioConfigured(twilioConfig) && planFeaturesRecall.smsEnabled;
       const pushTemplate = notificationSettings?.pushTemplateRecall;
       const smsTemplate = notificationSettings?.smsTemplateRecall;
@@ -1809,7 +1809,7 @@ const menuRouter = router({
 
       // プランチェック: メニュー数上限
       const currentMenuCount = await db.getMenuItemCount(input.storeId);
-      checkMenuLimit(store.subscriptionPlan, currentMenuCount);
+      checkMenuLimit(store, currentMenuCount);
 
       await db.createMenuItem(input);
       return { success: true };
@@ -1899,7 +1899,7 @@ const menuRouter = router({
 
       // プランチェック: メニュー/フィード数上限
       const currentFeedCount = await db.getFeedPostCount(input.storeId);
-      checkMenuLimit(store.subscriptionPlan, currentFeedCount);
+      checkMenuLimit(store, currentFeedCount);
 
       await db.createFeedPost(input);
       return { success: true };
@@ -2041,7 +2041,7 @@ const notificationRouter = router({
       }
 
       // プランチェック: FreeプランはSMS不可
-      checkSmsAllowed(store.subscriptionPlan);
+      checkSmsAllowed(store);
 
       // Check Twilio configuration
       const twilioConfig = {
@@ -2294,7 +2294,7 @@ const subscriptionRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      return getPlanLimitsInfo(store.subscriptionPlan);
+      return getPlanLimitsInfo(store);
     }),
 
   // Get plan usage summary (current usage vs limits)
@@ -2306,7 +2306,7 @@ const subscriptionRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
 
-      const limits = getPlanLimitsInfo(store.subscriptionPlan);
+      const limits = getPlanLimitsInfo(store);
 
       // 並列で各カウントを取得
       const [menuCount, staffCount, feedCount] = await Promise.all([
@@ -2355,7 +2355,7 @@ const subscriptionRouter = router({
       if (!store || store.ownerId !== ctx.user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
-      return getLostFeatures(store.subscriptionPlan, input.targetPlanId);
+      return getLostFeatures(store, input.targetPlanId);
     }),
 
   // Cancel subscription (at period end)
@@ -2400,11 +2400,11 @@ const subscriptionRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
 
-      const maxDays = getAnalyticsDaysLimit(store.subscriptionPlan);
+      const maxDays = getAnalyticsDaysLimit(store);
       const effectiveDays = Math.min(input.days, maxDays);
 
-      const limits = getPlanLimitsInfo(store.subscriptionPlan);
-      const planDef = PLANS[(store.subscriptionPlan || 'free') as PlanId] || PLANS.free;
+      const limits = getPlanLimitsInfo(store);
+      const planDef = PLANS[limits.planId as PlanId] || PLANS.free;
 
       // Fetch daily trends and current counts in parallel
       const [menuTrend, feedTrend, ticketTrend, currentCounts] = await Promise.all([
@@ -2511,7 +2511,7 @@ const staffMemberRouter = router({
 
       // プラン制限チェック: スタッフ枠数
       const currentCount = await db.getStaffMemberCount(input.storeId);
-      checkStaffLimit(store.subscriptionPlan, currentCount);
+      checkStaffLimit(store, currentCount);
 
       const id = await db.createStaffMember({
         storeId: input.storeId,
@@ -2634,7 +2634,7 @@ const smsLogsRouter = router({
       }
 
       // プランチェック: CSVエクスポートはProプランのみ
-      checkCsvExportAllowed(store.subscriptionPlan);
+      checkCsvExportAllowed(store);
 
       const options: Parameters<typeof db.getSmsLogsForExport>[1] = {
         status: input.status,
@@ -2812,7 +2812,7 @@ const reservationRouter = router({
       }
 
       // プランチェック: Freeプランは予約機能不可
-      checkReservationAllowed(store.subscriptionPlan);
+      checkReservationAllowed(store);
 
       // 時間枚の空きを確認
       const count = await db.getReservationCountBySlot(store.id, input.reservationDate, input.reservationTime);
@@ -3036,7 +3036,7 @@ const reservationRouter = router({
       }
 
       // プランチェック: FreeプランはSMS不可
-      checkSmsAllowed(store.subscriptionPlan);
+      checkSmsAllowed(store);
 
       // Twilio設定を取得
       const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -3102,7 +3102,7 @@ const reservationRouter = router({
       }
 
       // プランチェック: Freeプランは予約機能不可
-      checkReservationAllowed(store.subscriptionPlan);
+      checkReservationAllowed(store);
 
       // 時間枠の空きを確認
       const count = await db.getReservationCountBySlot(store.id, input.reservationDate, input.reservationTime);

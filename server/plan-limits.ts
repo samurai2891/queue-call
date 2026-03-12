@@ -4,12 +4,13 @@
  */
 import { TRPCError } from "@trpc/server";
 import { PLANS, type PlanId, type PlanDefinition } from "./subscription";
+import { resolveEffectivePlanId, type PlanSource } from "./admin-overview-utils";
 
 /**
  * 店舗のプランに応じた機能定義を取得
  */
-export function getPlanFeatures(subscriptionPlan: string | null | undefined): PlanDefinition["features"] {
-  const planId = (subscriptionPlan || "free") as PlanId;
+export function getPlanFeatures(subscriptionPlan: PlanSource): PlanDefinition["features"] {
+  const planId = resolveEffectivePlanId(subscriptionPlan) as PlanId;
   const plan = PLANS[planId] || PLANS.free;
   return plan.features;
 }
@@ -17,8 +18,8 @@ export function getPlanFeatures(subscriptionPlan: string | null | undefined): Pl
 /**
  * 店舗のプラン定義を取得
  */
-export function getStorePlan(subscriptionPlan: string | null | undefined): PlanDefinition {
-  const planId = (subscriptionPlan || "free") as PlanId;
+export function getStorePlan(subscriptionPlan: PlanSource): PlanDefinition {
+  const planId = resolveEffectivePlanId(subscriptionPlan) as PlanId;
   return PLANS[planId] || PLANS.free;
 }
 
@@ -26,7 +27,7 @@ export function getStorePlan(subscriptionPlan: string | null | undefined): PlanD
  * SMS通知がプランで許可されているかチェック
  * Free: 不可 / Standard, Pro: 可
  */
-export function checkSmsAllowed(subscriptionPlan: string | null | undefined): void {
+export function checkSmsAllowed(subscriptionPlan: PlanSource): void {
   const features = getPlanFeatures(subscriptionPlan);
   if (!features.smsEnabled) {
     throw new TRPCError({
@@ -40,7 +41,7 @@ export function checkSmsAllowed(subscriptionPlan: string | null | undefined): vo
  * 予約機能がプランで許可されているかチェック
  * Free: 不可 / Standard, Pro: 可
  */
-export function checkReservationAllowed(subscriptionPlan: string | null | undefined): void {
+export function checkReservationAllowed(subscriptionPlan: PlanSource): void {
   const features = getPlanFeatures(subscriptionPlan);
   if (!features.reservationEnabled) {
     throw new TRPCError({
@@ -54,7 +55,7 @@ export function checkReservationAllowed(subscriptionPlan: string | null | undefi
  * メニュー/フィード数がプランの上限内かチェック
  * Free: 5品まで / Standard, Pro: 無制限
  */
-export function checkMenuLimit(subscriptionPlan: string | null | undefined, currentCount: number): void {
+export function checkMenuLimit(subscriptionPlan: PlanSource, currentCount: number): void {
   const features = getPlanFeatures(subscriptionPlan);
   if (features.menuLimit !== null && currentCount >= features.menuLimit) {
     throw new TRPCError({
@@ -68,7 +69,7 @@ export function checkMenuLimit(subscriptionPlan: string | null | undefined, curr
  * 営業時間制御がプランで許可されているかチェック
  * Free: 不可 / Standard, Pro: 可
  */
-export function checkBusinessHoursAllowed(subscriptionPlan: string | null | undefined): void {
+export function checkBusinessHoursAllowed(subscriptionPlan: PlanSource): void {
   const features = getPlanFeatures(subscriptionPlan);
   if (!features.businessHoursEnabled) {
     throw new TRPCError({
@@ -82,7 +83,7 @@ export function checkBusinessHoursAllowed(subscriptionPlan: string | null | unde
  * スタッフアカウント数がプランの上限内かチェック
  * Free: 1名 / Standard: 3名 / Pro: 無制限
  */
-export function checkStaffLimit(subscriptionPlan: string | null | undefined, currentCount: number): void {
+export function checkStaffLimit(subscriptionPlan: PlanSource, currentCount: number): void {
   const features = getPlanFeatures(subscriptionPlan);
   if (features.staffLimit !== null && currentCount >= features.staffLimit) {
     const planName = features.staffLimit === 1 ? "Standard" : "Pro";
@@ -97,7 +98,7 @@ export function checkStaffLimit(subscriptionPlan: string | null | undefined, cur
  * 分析データの日数制限を取得
  * Free: 1日（当日のみ） / Standard: 30日 / Pro: 90日
  */
-export function getAnalyticsDaysLimit(subscriptionPlan: string | null | undefined): number {
+export function getAnalyticsDaysLimit(subscriptionPlan: PlanSource): number {
   const features = getPlanFeatures(subscriptionPlan);
   return features.analyticsDays;
 }
@@ -106,7 +107,7 @@ export function getAnalyticsDaysLimit(subscriptionPlan: string | null | undefine
  * CSV出力がプランで許可されているかチェック
  * Free, Standard: 不可 / Pro: 可
  */
-export function checkCsvExportAllowed(subscriptionPlan: string | null | undefined): void {
+export function checkCsvExportAllowed(subscriptionPlan: PlanSource): void {
   const features = getPlanFeatures(subscriptionPlan);
   if (!features.csvExport) {
     throw new TRPCError({
@@ -120,7 +121,7 @@ export function checkCsvExportAllowed(subscriptionPlan: string | null | undefine
  * ブランディングレベルを取得
  * Free: basic（Queue Callロゴ表示） / Standard: custom_color / Pro: full
  */
-export function getBrandingLevel(subscriptionPlan: string | null | undefined): "basic" | "custom_color" | "full" {
+export function getBrandingLevel(subscriptionPlan: PlanSource): "basic" | "custom_color" | "full" {
   const features = getPlanFeatures(subscriptionPlan);
   return features.brandingLevel;
 }
@@ -128,7 +129,7 @@ export function getBrandingLevel(subscriptionPlan: string | null | undefined): "
 /**
  * ブランディング設定の変更がプランで許可されているかチェック
  */
-export function checkBrandingAllowed(subscriptionPlan: string | null | undefined, settingType: "color" | "logo"): void {
+export function checkBrandingAllowed(subscriptionPlan: PlanSource, settingType: "color" | "logo"): void {
   const level = getBrandingLevel(subscriptionPlan);
   if (settingType === "color" && level === "basic") {
     throw new TRPCError({
@@ -151,8 +152,8 @@ export function checkBrandingAllowed(subscriptionPlan: string | null | undefined
  * @returns 解放された機能のキーと説明の配列
  */
 export function getUnlockedFeatures(
-  oldPlanId: string | null | undefined,
-  newPlanId: string | null | undefined
+  oldPlanId: PlanSource,
+  newPlanId: PlanSource
 ): Array<{ key: string; settingsTab?: string }> {
   const oldFeatures = getPlanFeatures(oldPlanId);
   const newFeatures = getPlanFeatures(newPlanId);
@@ -213,8 +214,8 @@ export function getUnlockedFeatures(
  * @returns 失われる機能のキーと影響説明の配列
  */
 export function getLostFeatures(
-  currentPlanId: string | null | undefined,
-  targetPlanId: string | null | undefined
+  currentPlanId: PlanSource,
+  targetPlanId: PlanSource
 ): Array<{ key: string; impact: string }> {
   const currentFeatures = getPlanFeatures(currentPlanId);
   const targetFeatures = getPlanFeatures(targetPlanId);
@@ -272,7 +273,7 @@ export function getLostFeatures(
 /**
  * プラン制限の概要を返す（フロントエンド表示用）
  */
-export function getPlanLimitsInfo(subscriptionPlan: string | null | undefined): {
+export function getPlanLimitsInfo(subscriptionPlan: PlanSource): {
   planId: string;
   planName: string;
   smsEnabled: boolean;
