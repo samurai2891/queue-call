@@ -71,6 +71,12 @@ describe("internal admin helpers", () => {
     expect(isInternalAdminUser(createUser("admin-open-id"))).toBe(true);
   });
 
+  it("returns true for the production internal admin openId when allowlisted", () => {
+    process.env.INTERNAL_ADMIN_IDS = "TviD2BtLwbAxQcvLDm9fCR,other-user";
+
+    expect(isInternalAdminUser(createUser("TviD2BtLwbAxQcvLDm9fCR"))).toBe(true);
+  });
+
   it("returns false when the user's openId is not allowlisted", () => {
     process.env.INTERNAL_ADMIN_IDS = "other-user";
 
@@ -120,6 +126,16 @@ describe("auth.me", () => {
 
     await expect(caller.auth.me()).resolves.toMatchObject({
       openId: "admin-open-id",
+      isInternalAdmin: true,
+    });
+  });
+
+  it("returns isInternalAdmin=true for the production internal admin openId", async () => {
+    process.env.INTERNAL_ADMIN_IDS = "TviD2BtLwbAxQcvLDm9fCR";
+    const caller = appRouter.createCaller(createAuthContext("TviD2BtLwbAxQcvLDm9fCR"));
+
+    await expect(caller.auth.me()).resolves.toMatchObject({
+      openId: "TviD2BtLwbAxQcvLDm9fCR",
       isInternalAdmin: true,
     });
   });
