@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, name, openId, role, createdAt FROM users ORDER BY createdAt ASC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user zN6v3835fExzWSq.4b780e52d435 --database 9PkSnVJ3696qvv2NFCWti9 --execute SELECT id, name, openId, role, createdAt FROM users ORDER BY createdAt ASC LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "ken yama",
+      "openId": "TviD2BtLwbAxQcvLDm9fCR",
+      "role": "admin",
+      "createdAt": "2026-01-09 23:58:59"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\topenId\trole\tcreatedAt\n1\tken yama\tTviD2BtLwbAxQcvLDm9fCR\tadmin\t2026-01-09 23:58:59\n",
+  "stderr": "",
+  "execution_time_ms": 1531
+}
