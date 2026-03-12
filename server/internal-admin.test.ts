@@ -15,6 +15,7 @@ function createUser(openId: string): AuthenticatedUser {
     name: "Internal Admin Test User",
     loginMethod: "manus",
     role: "user" as const,
+    status: "active" as const,
     isTest: false,
     createdAt: new Date(),
     updatedAt: new Date(),

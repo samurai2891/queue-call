@@ -30,6 +30,7 @@ function createUser(openId: string, isInternalAdmin: boolean): AuthenticatedUser
     name: "Overview Admin",
     loginMethod: "manus",
     role: "user",
+    status: "active",
     isTest: false,
     createdAt: new Date(),
     updatedAt: new Date(),

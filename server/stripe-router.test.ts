@@ -26,9 +26,12 @@ function createAuthContext(): TrpcContext {
     name: 'Test User',
     loginMethod: 'manus',
     role: 'user',
+    status: 'active',
+    isTest: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
+    isInternalAdmin: false,
   };
 
   return {
@@ -40,6 +43,7 @@ function createAuthContext(): TrpcContext {
     res: {
       clearCookie: vi.fn(),
     } as unknown as TrpcContext['res'],
+    requestId: 'req_stripe_router_test',
   };
 }
 

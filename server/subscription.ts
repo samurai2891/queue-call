@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "./db";
 import { stores, type Store } from "../drizzle/schema";
 import { notifyOwner } from "./_core/notification";
+import { resolveEffectivePlanId } from "./admin-overview-utils";
 
 // Stripe初期化
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
@@ -528,7 +529,7 @@ export async function getSubscriptionInfo(storeId: number): Promise<{
   const [store] = await db.select().from(stores).where(eq(stores.id, storeId)).limit(1);
   if (!store) return null;
 
-  const plan = PLANS[store.subscriptionPlan as PlanId] || PLANS.free;
+  const plan = PLANS[resolveEffectivePlanId(store) as PlanId] || PLANS.free;
 
   return {
     plan,
@@ -560,7 +561,7 @@ export async function checkAndIncrementMonthlyTicket(storeId: number): Promise<{
   const [store] = await db.select().from(stores).where(eq(stores.id, storeId)).limit(1);
   if (!store) return { allowed: false, reason: "Store not found" };
 
-  const plan = PLANS[store.subscriptionPlan as PlanId] || PLANS.free;
+  const plan = PLANS[resolveEffectivePlanId(store) as PlanId] || PLANS.free;
 
   // 有料プランは無制限
   if (plan.monthlyTicketLimit === null) {
