@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `users` ADD `status` enum('active','suspended') DEFAULT 'active' NOT NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user zN6v3835fExzWSq.4b780e52d435 --database 9PkSnVJ3696qvv2NFCWti9 --execute ALTER TABLE `users` ADD `status` enum('active','suspended') DEFAULT 'active' NOT NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1705
+}

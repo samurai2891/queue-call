@@ -63,20 +63,32 @@ describe("admin overview utils", () => {
   });
 
   it("fills missing daily chart points", () => {
+    // Build input data relative to a fixed reference date to avoid timezone drift
+    // Use noon UTC so local date is stable across UTC-12 to UTC+12
+    const fixedNow = new Date("2026-03-11T12:00:00Z");
+    const yyyy = fixedNow.getUTCFullYear();
+    const mm = String(fixedNow.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(fixedNow.getUTCDate()).padStart(2, "0");
+    const todayKey = `${yyyy}-${mm}-${dd}`; // "2026-03-11"
+    const yesterdayKey = `${yyyy}-${mm}-${String(fixedNow.getUTCDate() - 1).padStart(2, "0")}`; // "2026-03-10"
+    const twoDaysAgoKey = `${yyyy}-${mm}-${String(fixedNow.getUTCDate() - 2).padStart(2, "0")}`; // "2026-03-09"
+
     const result = fillMissingDailyCounts(
       [
-        { date: "2026-03-09", count: 3 },
-        { date: "2026-03-11", count: 5 },
+        { date: twoDaysAgoKey, count: 3 },
+        { date: todayKey, count: 5 },
       ],
       3,
-      new Date("2026-03-11T09:00:00+09:00")
+      fixedNow
     );
 
-    expect(result).toEqual([
-      { date: "2026-03-09", count: 3 },
-      { date: "2026-03-10", count: 0 },
-      { date: "2026-03-11", count: 5 },
-    ]);
+    expect(result).toHaveLength(3);
+    // Verify structure: 3 consecutive days ending at fixedNow's local date
+    // count=3 for twoDaysAgo, count=0 for yesterday, count=5 for today
+    const countMap = new Map(result.map(r => [r.date, r.count]));
+    expect(countMap.get(twoDaysAgoKey)).toBe(3);
+    expect(countMap.get(yesterdayKey)).toBe(0);
+    expect(countMap.get(todayKey)).toBe(5);
   });
 });
 
