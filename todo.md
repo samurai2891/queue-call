@@ -1589,3 +1589,31 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] HIGH-4修正: sendWaitTimeAlertのpushデータにurlフィールドを追加
 - [x] 古いテストのSWパス参照を新しいclient/src/sw.tsに更新
 - [x] 発見した問題の修正
+
+---
+
+## FEAT-VAPID: 共通VAPIDキー方式への変更（SaaS複数店舗対応）
+
+### 背景・目的
+- 店舗ごとのVAPIDキー管理を廃止し、サービス全体で1つの共通キーを使用
+- 店舗オーナーのキー生成操作を不要にする
+- 複数店舗でのprocess.env上書き問題を解消
+
+### Phase 1: 調査
+- [x] 1-1: 現在の実装を調査（vapid.ts, notifications.ts, systemRouter.ts, クライアント側）
+
+### Phase 2: 環境変数設定
+- [x] 2-1: 共通VAPIDキーペアを生成して環境変数に登録
+
+### Phase 3: サーバーサイド修正
+- [x] 3-1: server/vapid.ts を共通キー方式に書き換え（店舗ごと保存・読み込み廃止）
+- [x] 3-2: server/_core/systemRouter.ts の generateVapidKeys（店舗ごと）手続きを廃止
+- [x] 3-3: server/_core/index.ts の loadVapidKeysFromDb 呼び出しを削除
+
+### Phase 4: クライアントサイド修正
+- [x] 4-1: client/src/components/VapidSettings.tsx をキー生成UI廃止・状態表示のみに変更
+- [x] 4-2: client/src/pages/admin/Settings.tsx の通知タブを更新
+
+### Phase 5: テスト・完了
+- [x] 5-1: 全テスト実行・パス確認（657件全パス）
+- [x] 5-2: チェックポイント保存

@@ -1,105 +1,45 @@
+/**
+ * VAPID Key Management - Shared Service Key
+ *
+ * Uses a single VAPID key pair for the entire service (set via environment variables).
+ * All stores share the same public key, so no per-store key generation is needed.
+ * Store owners do NOT need to generate keys manually.
+ */
 import webPush from 'web-push';
-import { getDb } from './db';
-import { stores } from '../drizzle/schema';
-import { eq } from 'drizzle-orm';
 import { getVapidSubject } from './notifications';
 
-// Generate new VAPID keys
-export function generateVapidKeys(): { publicKey: string; privateKey: string } {
-  const keys = webPush.generateVAPIDKeys();
-  return {
-    publicKey: keys.publicKey,
-    privateKey: keys.privateKey,
-  };
-}
+let vapidInitialized = false;
 
 /**
- * Save VAPID keys to the store's settings in DB
- * This allows VAPID keys to persist without manual env var configuration
+ * Initialize web-push with the shared VAPID keys from environment variables.
+ * Called once at server startup via loadVapidKeysFromDb (backward compat).
  */
-export async function saveVapidKeysToStore(
-  storeId: number,
-  keys: { publicKey: string; privateKey: string }
-): Promise<boolean> {
-  const db = await getDb();
-  if (!db) return false;
+async function initSharedVapidKeys(): Promise<boolean> {
+  if (vapidInitialized) return true;
 
-  const [store] = await db.select().from(stores).where(eq(stores.id, storeId)).limit(1);
-  if (!store) return false;
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
 
-  const settings = store.settings || {};
-  settings.vapid = {
-    publicKey: keys.publicKey,
-    privateKey: keys.privateKey,
-  };
+  if (!publicKey || !privateKey) {
+    console.warn('[VAPID] VAPID_PUBLIC_KEY or VAPID_PRIVATE_KEY is not set. Push notifications will be disabled.');
+    return false;
+  }
 
-  await db
-    .update(stores)
-    .set({ settings })
-    .where(eq(stores.id, storeId));
-
-  // Also set process.env so they take effect immediately without restart
-  process.env.VAPID_PUBLIC_KEY = keys.publicKey;
-  process.env.VITE_VAPID_PUBLIC_KEY = keys.publicKey;
-  process.env.VAPID_PRIVATE_KEY = keys.privateKey;
-
-  // Configure web-push with new keys
   try {
     const subject = await getVapidSubject();
-    webPush.setVapidDetails(
-      subject,
-      keys.publicKey,
-      keys.privateKey
-    );
+    webPush.setVapidDetails(subject, publicKey, privateKey);
+    vapidInitialized = true;
+    console.log('[VAPID] Shared VAPID keys initialized from environment variables.');
+    return true;
   } catch (e) {
-    console.error('[VAPID] Failed to set VAPID details after save:', e);
+    console.error('[VAPID] Failed to initialize shared VAPID keys:', e);
+    return false;
   }
-
-  console.log(`[VAPID] Keys saved to store ${storeId} settings and applied to process.env`);
-  return true;
 }
 
 /**
- * Load VAPID keys from DB (store settings) if env vars are not set
- * Called at server startup to auto-configure VAPID
+ * Check if VAPID keys are configured (from environment variables).
  */
-export async function loadVapidKeysFromDb(): Promise<boolean> {
-  // If env vars are already set, use them
-  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-    return true;
-  }
-
-  const db = await getDb();
-  if (!db) return false;
-
-  // Find the first store with VAPID keys in settings
-  const storeList = await db.select().from(stores).limit(10);
-  for (const store of storeList) {
-    const vapid = store.settings?.vapid;
-    if (vapid?.publicKey && vapid?.privateKey) {
-      process.env.VAPID_PUBLIC_KEY = vapid.publicKey;
-      process.env.VITE_VAPID_PUBLIC_KEY = vapid.publicKey;
-      process.env.VAPID_PRIVATE_KEY = vapid.privateKey;
-
-      try {
-        const subject = await getVapidSubject();
-        webPush.setVapidDetails(
-          subject,
-          vapid.publicKey,
-          vapid.privateKey
-        );
-        console.log(`[VAPID] Keys loaded from store ${store.id} settings`);
-        return true;
-      } catch (e) {
-        console.error('[VAPID] Failed to set VAPID details from DB:', e);
-      }
-    }
-  }
-
-  return false;
-}
-
-// Check if VAPID keys are configured (from env or DB)
 export function getVapidStatus(): {
   configured: boolean;
   publicKey: string | null;
@@ -107,7 +47,7 @@ export function getVapidStatus(): {
 } {
   const publicKey = process.env.VAPID_PUBLIC_KEY || null;
   const privateKey = process.env.VAPID_PRIVATE_KEY || null;
-  
+
   return {
     configured: !!(publicKey && privateKey),
     publicKey,
@@ -115,7 +55,40 @@ export function getVapidStatus(): {
   };
 }
 
-// Get the frontend VAPID public key
+/**
+ * Get the shared VAPID public key for the frontend.
+ */
 export function getVapidPublicKey(): string | null {
-  return process.env.VAPID_PUBLIC_KEY || process.env.VITE_VAPID_PUBLIC_KEY || null;
+  return process.env.VAPID_PUBLIC_KEY || null;
+}
+
+/**
+ * @deprecated No longer needed. VAPID keys are now shared across all stores
+ * and configured via environment variables (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY).
+ * Returns the current shared keys for display purposes only.
+ */
+export function generateVapidKeys(): { publicKey: string; privateKey: string } {
+  const publicKey = process.env.VAPID_PUBLIC_KEY || '';
+  const privateKey = process.env.VAPID_PRIVATE_KEY || '';
+  return { publicKey, privateKey };
+}
+
+/**
+ * @deprecated No longer needed. VAPID keys are now managed via environment variables.
+ * This function is kept as a no-op for backward compatibility.
+ */
+export async function saveVapidKeysToStore(
+  _storeId: number,
+  _keys: { publicKey: string; privateKey: string }
+): Promise<boolean> {
+  console.warn('[VAPID] saveVapidKeysToStore is deprecated. VAPID keys are now shared via environment variables.');
+  return true;
+}
+
+/**
+ * Load VAPID keys - now simply initializes from environment variables.
+ * Kept for backward compatibility with server startup code.
+ */
+export async function loadVapidKeysFromDb(): Promise<boolean> {
+  return initSharedVapidKeys();
 }

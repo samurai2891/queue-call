@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { notifyOwner } from "./notification";
 import { adminProcedure, publicProcedure, router } from "./trpc";
-import { generateVapidKeys, getVapidStatus, getVapidPublicKey, saveVapidKeysToStore } from "../vapid";
+import { getVapidStatus, getVapidPublicKey } from "../vapid";
 import { sendTestPushNotification } from "../notifications";
 
 export const systemRouter = router({
@@ -29,42 +29,13 @@ export const systemRouter = router({
       } as const;
     }),
 
-  // Get VAPID configuration status
+  // Get VAPID configuration status (shared key from env vars)
   getVapidStatus: adminProcedure
     .query(() => {
       return getVapidStatus();
     }),
 
-  // Generate new VAPID keys and auto-save to DB
-  generateVapidKeys: adminProcedure
-    .input(
-      z.object({
-        storeId: z.number().int().positive(),
-      })
-    )
-    .mutation(async ({ input }) => {
-      const keys = generateVapidKeys();
-      
-      // Auto-save to DB so keys persist without manual env var configuration
-      const saved = await saveVapidKeysToStore(input.storeId, keys);
-      
-      return {
-        success: true,
-        autoConfigured: saved,
-        keys,
-        instructions: saved
-          ? {
-              message: 'VAPID keys have been generated and automatically configured. No manual setup required.',
-            }
-          : {
-              VAPID_PUBLIC_KEY: keys.publicKey,
-              VAPID_PRIVATE_KEY: keys.privateKey,
-              VITE_VAPID_PUBLIC_KEY: keys.publicKey,
-            },
-      };
-    }),
-
-  // Get public VAPID key for frontend
+  // Get public VAPID key for frontend (shared across all stores)
   getVapidPublicKey: publicProcedure
     .query(() => {
       return {
