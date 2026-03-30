@@ -25,6 +25,7 @@ describe('SMS Balance Functions', () => {
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
+      groupBy: vi.fn().mockReturnThis(),
       orderBy: vi.fn().mockReturnThis(),
       update: vi.fn().mockReturnThis(),
       set: vi.fn().mockReturnThis(),
@@ -436,14 +437,20 @@ describe('SMS Balance Functions', () => {
     });
 
     it('should aggregate daily data correctly', async () => {
+      // Use dates within the last 30 days to ensure they appear in daily dataPoints
+      const today = new Date();
+      const d1 = new Date(today); d1.setDate(d1.getDate() - 3);
+      const d2 = new Date(today); d2.setDate(d2.getDate() - 2);
+      const dateStr1 = d1.toISOString().slice(0, 10);
+      const dateStr2 = d2.toISOString().slice(0, 10);
       const mockRawData = [
-        { date: '2026-02-25', type: 'consume', count: 5, totalAmount: 100 },
-        { date: '2026-02-25', type: 'charge', count: 1, totalAmount: 1000 },
-        { date: '2026-02-26', type: 'consume', count: 3, totalAmount: 60 },
+        { date: dateStr1, type: 'consume', count: 5, totalAmount: 100 },
+        { date: dateStr1, type: 'charge', count: 1, totalAmount: 1000 },
+        { date: dateStr2, type: 'consume', count: 3, totalAmount: 60 },
       ];
 
       mockDb.groupBy = vi.fn().mockReturnThis();
-      mockDb.orderBy.mockResolvedValueOnce(mockRawData);
+      mockDb.orderBy = vi.fn().mockResolvedValueOnce(mockRawData);
 
       const result = await stripeModule.getSmsAnalytics(1, 'daily', 30);
 
@@ -462,7 +469,7 @@ describe('SMS Balance Functions', () => {
       ];
 
       mockDb.groupBy = vi.fn().mockReturnThis();
-      mockDb.orderBy.mockResolvedValueOnce(mockRawData);
+      mockDb.orderBy = vi.fn().mockResolvedValueOnce(mockRawData);
 
       const result = await stripeModule.getSmsAnalytics(1, 'weekly', 90);
 
@@ -482,7 +489,7 @@ describe('SMS Balance Functions', () => {
       ];
 
       mockDb.groupBy = vi.fn().mockReturnThis();
-      mockDb.orderBy.mockResolvedValueOnce(mockRawData);
+      mockDb.orderBy = vi.fn().mockResolvedValueOnce(mockRawData);
 
       const result = await stripeModule.getSmsAnalytics(1, 'monthly', 365);
 
@@ -494,13 +501,19 @@ describe('SMS Balance Functions', () => {
     });
 
     it('should calculate average daily send count and cost', async () => {
+      // Use dates within the last 30 days to ensure they appear in daily dataPoints
+      const today = new Date();
+      const d1 = new Date(today); d1.setDate(d1.getDate() - 5);
+      const d2 = new Date(today); d2.setDate(d2.getDate() - 4);
+      const dateStr1 = d1.toISOString().slice(0, 10);
+      const dateStr2 = d2.toISOString().slice(0, 10);
       const mockRawData = [
-        { date: '2026-02-25', type: 'consume', count: 10, totalAmount: 200 },
-        { date: '2026-02-26', type: 'consume', count: 20, totalAmount: 400 },
+        { date: dateStr1, type: 'consume', count: 10, totalAmount: 200 },
+        { date: dateStr2, type: 'consume', count: 20, totalAmount: 400 },
       ];
 
       mockDb.groupBy = vi.fn().mockReturnThis();
-      mockDb.orderBy.mockResolvedValueOnce(mockRawData);
+      mockDb.orderBy = vi.fn().mockResolvedValueOnce(mockRawData);
 
       const result = await stripeModule.getSmsAnalytics(1, 'daily', 30);
 
@@ -511,7 +524,7 @@ describe('SMS Balance Functions', () => {
 
     it('should handle empty transaction data', async () => {
       mockDb.groupBy = vi.fn().mockReturnThis();
-      mockDb.orderBy.mockResolvedValueOnce([]);
+      mockDb.orderBy = vi.fn().mockResolvedValueOnce([]);
 
       const result = await stripeModule.getSmsAnalytics(1, 'daily', 30);
 
@@ -523,7 +536,7 @@ describe('SMS Balance Functions', () => {
 
     it('should use default period and days when not specified', async () => {
       mockDb.groupBy = vi.fn().mockReturnThis();
-      mockDb.orderBy.mockResolvedValueOnce([]);
+      mockDb.orderBy = vi.fn().mockResolvedValueOnce([]);
 
       const result = await stripeModule.getSmsAnalytics(1);
 

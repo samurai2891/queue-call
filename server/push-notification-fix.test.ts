@@ -78,11 +78,15 @@ describe('Push Notification Fix Verification', () => {
       expect(content).toContain('import.meta.env.VITE_VAPID_PUBLIC_KEY');
     });
 
-    it('Notifications.tsx should pass getVapidPublicKey to usePushNotification', () => {
+    it('Notifications.tsx should use VITE_VAPID_PUBLIC_KEY env var instead of API endpoint', () => {
       const notifPath = path.resolve(__dirname, '../client/src/pages/store/Notifications.tsx');
       const content = fs.readFileSync(notifPath, 'utf-8');
+      // getVapidPublicKey callback still passed to usePushNotification
       expect(content).toContain('getVapidPublicKey');
-      expect(content).toContain('getVapidPublicKey.fetch');
+      // But it uses env var instead of API fetch for security
+      expect(content).toContain('VITE_VAPID_PUBLIC_KEY');
+      // Should NOT use the removed API endpoint
+      expect(content).not.toContain('trpcUtils.system.getVapidPublicKey.fetch');
     });
   });
 

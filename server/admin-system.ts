@@ -21,7 +21,7 @@ export async function getAdminSystemVapidStatus({
 
   return {
     configured: vapidStatus.configured,
-    publicKeyPresent: Boolean(vapidStatus.publicKey),
+    publicKeyPresent: vapidStatus.configured,
     hasPrivateKey: vapidStatus.hasPrivateKey,
     storesWithKeys: storeStats.storesWithKeys,
     totalStores: storeStats.totalStores,

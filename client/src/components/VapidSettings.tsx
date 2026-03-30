@@ -10,10 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Key, Copy, Check, AlertTriangle, CheckCircle2, Info, Bell, Send, Loader2 } from 'lucide-react';
+import { Key, AlertTriangle, CheckCircle2, Info, Bell, Send, Loader2 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
 
@@ -23,13 +21,14 @@ interface VapidSettingsProps {
 }
 
 export function VapidSettings({ t }: VapidSettingsProps) {
-  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [pushSubscription, setPushSubscription] = useState<PushSubscription | null>(null);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
 
   const { data: vapidStatus, isLoading } = trpc.system.getVapidStatus.useQuery();
-  const { data: vapidPublicKey } = trpc.system.getVapidPublicKey.useQuery();
+  // VAPID public key is embedded at build time via VITE_VAPID_PUBLIC_KEY env var
+  // It is NOT fetched via API to avoid exposing it as a public endpoint
+  const vapidPublicKeyValue = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 
   const sendTestMutation = trpc.system.sendTestPushNotification.useMutation({
     onSuccess: (result) => {
@@ -62,20 +61,9 @@ export function VapidSettings({ t }: VapidSettingsProps) {
     checkSubscription();
   }, []);
 
-  const handleCopy = async (text: string, field: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedField(field);
-      toast.success(t('settings.vapid.copied'));
-      setTimeout(() => setCopiedField(null), 2000);
-    } catch {
-      toast.error(t('settings.vapid.copyError'));
-    }
-  };
-
   // Subscribe to push notifications for testing
   const handleSubscribeForTest = async () => {
-    if (!vapidPublicKey?.publicKey) {
+    if (!vapidPublicKeyValue) {
       toast.error(t('settings.vapid.notConfigured'));
       return;
     }
@@ -92,7 +80,7 @@ export function VapidSettings({ t }: VapidSettingsProps) {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey.publicKey),
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKeyValue),
       });
 
       setPushSubscription(subscription);
@@ -168,34 +156,6 @@ export function VapidSettings({ t }: VapidSettingsProps) {
             </Badge>
           )}
         </div>
-
-        {/* Current Public Key (if configured) */}
-        {vapidStatus?.configured && vapidStatus.publicKey && (
-          <div className="space-y-2">
-            <Label>{t('settings.vapid.currentPublicKey')}</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                value={vapidStatus.publicKey}
-                readOnly
-                className="font-mono text-xs"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => handleCopy(vapidStatus.publicKey!, 'currentPublic')}
-              >
-                {copiedField === 'currentPublic' ? (
-                  <Check className="h-4 w-4 text-green-600" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {t('settings.vapid.sharedKeyNote')}
-            </p>
-          </div>
-        )}
 
         {/* Not configured alert */}
         {!vapidStatus?.configured && (

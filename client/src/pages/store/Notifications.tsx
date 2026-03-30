@@ -62,12 +62,8 @@ function NotificationsContent() {
       }
     },
     getVapidPublicKey: async () => {
-      try {
-        const result = await trpcUtils.system.getVapidPublicKey.fetch();
-        return result?.publicKey || null;
-      } catch {
-        return null;
-      }
+      // VAPID public key is embedded at build time via VITE_VAPID_PUBLIC_KEY env var
+      return (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) || null;
     },
     onSubscribed: () => {
       toast.success(t('notification.pushEnabled'));

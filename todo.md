@@ -1617,3 +1617,14 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 ### Phase 5: テスト・完了
 - [x] 5-1: 全テスト実行・パス確認（657件全パス）
 - [x] 5-2: チェックポイント保存
+
+---
+
+## SEC-001: VAPID公開鍵APIエンドポイント削除（セキュリティ改善）
+- [x] getVapidPublicKey publicProcedureエンドポイントを削除（systemRouter.ts）
+- [x] getVapidStatus戻り値からpublicKeyフィールドを削除（vapid.ts）
+- [x] VapidSettings.tsxをVITE_VAPID_PUBLIC_KEY環境変数使用に変更
+- [x] Notifications.tsxをVITE_VAPID_PUBLIC_KEY環境変数使用に変更
+- [x] sms-balance.test.tsの日付依存テスト修正（現在日付ベースに変更）
+- [x] web-push-medium.test.ts / push-notification-fix.test.tsのテスト更新
+- [x] 全テスト657件パス確認・チェックポイント保存

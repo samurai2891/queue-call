@@ -39,10 +39,10 @@ async function initSharedVapidKeys(): Promise<boolean> {
 
 /**
  * Check if VAPID keys are configured (from environment variables).
+ * Note: publicKey is intentionally NOT returned to avoid exposing it via API.
  */
 export function getVapidStatus(): {
   configured: boolean;
-  publicKey: string | null;
   hasPrivateKey: boolean;
 } {
   const publicKey = process.env.VAPID_PUBLIC_KEY || null;
@@ -50,16 +50,8 @@ export function getVapidStatus(): {
 
   return {
     configured: !!(publicKey && privateKey),
-    publicKey,
     hasPrivateKey: !!privateKey,
   };
-}
-
-/**
- * Get the shared VAPID public key for the frontend.
- */
-export function getVapidPublicKey(): string | null {
-  return process.env.VAPID_PUBLIC_KEY || null;
 }
 
 /**

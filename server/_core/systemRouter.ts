@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { notifyOwner } from "./notification";
 import { adminProcedure, publicProcedure, router } from "./trpc";
-import { getVapidStatus, getVapidPublicKey } from "../vapid";
+import { getVapidStatus } from "../vapid";
 import { sendTestPushNotification } from "../notifications";
 
 export const systemRouter = router({
@@ -33,14 +33,6 @@ export const systemRouter = router({
   getVapidStatus: adminProcedure
     .query(() => {
       return getVapidStatus();
-    }),
-
-  // Get public VAPID key for frontend (shared across all stores)
-  getVapidPublicKey: publicProcedure
-    .query(() => {
-      return {
-        publicKey: getVapidPublicKey(),
-      };
     }),
 
   // Send test push notification

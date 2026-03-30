@@ -110,14 +110,17 @@ describe('M-4: VAPID key auto-configuration flow', () => {
     expect(typeof vapid.getVapidStatus).toBe('function');
     const status = vapid.getVapidStatus();
     expect(status).toHaveProperty('configured');
-    expect(status).toHaveProperty('publicKey');
+    // publicKey is intentionally NOT returned via API for security reasons
+    expect(status).not.toHaveProperty('publicKey');
     expect(status).toHaveProperty('hasPrivateKey');
     expect(typeof status.configured).toBe('boolean');
   });
 
-  it('should have getVapidPublicKey function', async () => {
+  it('getVapidPublicKey function has been removed for security', async () => {
     const vapid = await import('./vapid');
-    expect(typeof vapid.getVapidPublicKey).toBe('function');
+    // getVapidPublicKey was removed to prevent VAPID public key exposure via API
+    // The public key is now embedded at build time via VITE_VAPID_PUBLIC_KEY env var
+    expect(typeof (vapid as any).getVapidPublicKey).toBe('undefined');
   });
 });
 
