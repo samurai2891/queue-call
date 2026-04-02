@@ -1628,3 +1628,11 @@ Tailwind CSS 4がOKLCH色形式を使用しているが、html2canvasはこの�
 - [x] sms-balance.test.tsの日付依存テスト修正（現在日付ベースに変更）
 - [x] web-push-medium.test.ts / push-notification-fix.test.tsのテスト更新
 - [x] 全テスト657件パス確認・チェックポイント保存
+
+---
+## BUG-008: 「プランをアップグレード」ボタンが機能しない
+- [x] SettingsContentで?tab=billingクエリパラメータを処理するよう修正（useSearch追加）
+- [x] PlanUsageSummary.tsxのナビゲーションを/admin/settings/billingに統一
+- [x] UsageLimitAlert.tsxのナビゲーションを/admin/settings/billingに統一
+- [x] SmsHistory.tsx、SmsTransactions.tsx、SmsAnalytics.tsxの?tab=notificationsを/admin/settings/notificationsに統一
+- [x] TypeScriptエラー0件・テスト645件パス確認・チェックポイント保存

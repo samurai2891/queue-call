@@ -698,6 +698,7 @@ function SettingsContent() {
 
   const params = useParams<{ section?: string }>();
   const [, navigate] = useLocation();
+  const searchString = useSearch();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const { t } = useLocale();
 
@@ -708,8 +709,15 @@ function SettingsContent() {
     );
   };
 
-
-  const [activeTab, setActiveTab] = useState(params.section || 'general');
+  // URLパスの:sectionパラメータ、またはクエリパラメータ?tab=XXXからアクティブタブを決定
+  const initialTab = React.useMemo(() => {
+    if (params.section) return params.section;
+    const qp = new URLSearchParams(searchString);
+    const tabParam = qp.get('tab');
+    if (tabParam) return tabParam;
+    return 'general';
+  }, []);
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [isSaving, setIsSaving] = useState(false);
   const [reorderConfirmOpen, setReorderConfirmOpen] = useState(false);
 

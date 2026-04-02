@@ -271,7 +271,7 @@ export function PlanUsageSummary({ storeId, delay = 0 }: PlanUsageSummaryProps) 
             <Button
               variant="outline"
               className="w-full group active:scale-[0.97] transition-transform"
-              onClick={() => navigate("/admin/settings?tab=billing")}
+              onClick={() => navigate("/admin/settings/billing")}
             >
               <Crown className="mr-2 h-4 w-4 text-primary" />
               {t("planUsage.upgradeButton")}

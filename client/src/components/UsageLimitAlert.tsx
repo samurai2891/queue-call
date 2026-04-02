@@ -358,7 +358,7 @@ export function UsageLimitAlert({ storeId }: UsageLimitAlertProps) {
 
   const handleUpgrade = useCallback(() => {
     setOpen(false);
-    navigate('/admin/settings?tab=billing');
+    navigate('/admin/settings/billing');
   }, [navigate]);
 
   if (approachingLimits.length === 0) return null;

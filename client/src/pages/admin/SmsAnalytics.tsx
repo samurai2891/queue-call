@@ -94,7 +94,7 @@ function SmsAnalyticsContent() {
         <Card className="max-w-md">
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground">{t('settings.smsAnalyticsNoData')}</p>
-            <Button className="mt-4" onClick={() => navigate('/admin/settings?tab=notifications')}>
+            <Button className="mt-4" onClick={() => navigate('/admin/settings/notifications')}>
               {t('common.back')}
             </Button>
           </CardContent>
@@ -148,7 +148,7 @@ function SmsAnalyticsContent() {
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background border-b">
         <div className="container mx-auto px-4 py-3 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/admin/settings?tab=notifications')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/admin/settings/notifications')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
